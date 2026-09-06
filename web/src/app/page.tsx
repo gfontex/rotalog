@@ -342,6 +342,66 @@ export default function DashboardPage() {
   const isDriver = currentUser.role === 'DRIVER';
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+  // ESTADO DA ROTA ATIVA DO MOTORISTA
+  const [driverHasActiveRoute, setDriverHasActiveRoute] = useState(true);
+  const [driverActivePlate, setDriverActivePlate] = useState('MKS2B02');
+  const [driverActiveModel, setDriverActiveModel] = useState('Fiat Strada Freedom');
+  const [driverIsOnLunch, setDriverIsOnLunch] = useState(false);
+  const [driverLunchMinutes, setDriverLunchMinutes] = useState(0);
+
+  // AÇÕES OPERACIONAIS DO MOTORISTA (COM AS NOTIFICAÇÕES EXATAS SOLICITADAS)
+  const handleDriverStartRoute = (plate: string, model: string) => {
+    setDriverHasActiveRoute(true);
+    setDriverActivePlate(plate);
+    setDriverActiveModel(model);
+    setDriverIsOnLunch(false);
+    setDriverLunchMinutes(0);
+
+    setVehicles((prev) =>
+      prev.map((v) =>
+        v.plate === plate
+          ? { ...v, status: 'IN_USE', currentDriverName: currentUser.name, usageStartTime: '08:00' }
+          : v
+      )
+    );
+
+    // Notificação exata solicitada no áudio: "Iniciando rota com carro X"
+    showToast(`Iniciando rota com carro ${model} (Placa ${plate})`, 'success');
+    triggerFleetEvent('INICIO_ROTA', currentUser.name, model, plate);
+  };
+
+  const handleDriverToggleLunch = () => {
+    if (!driverIsOnLunch) {
+      setDriverIsOnLunch(true);
+      // Notificação exata solicitada no áudio: "Iniciando intervalo para almoço"
+      showToast('Iniciando intervalo para almoço', 'success');
+      triggerFleetEvent('INICIO_PAUSA_ALMOCO', currentUser.name, driverActiveModel, driverActivePlate);
+    } else {
+      setDriverIsOnLunch(false);
+      setDriverLunchMinutes((prev) => prev + 45);
+      // Notificação exata solicitada no áudio: "Intervalo para almoço finalizado"
+      showToast('Intervalo para almoço finalizado', 'success');
+      triggerFleetEvent('FIM_PAUSA_ALMOCO', currentUser.name, driverActiveModel, driverActivePlate);
+    }
+  };
+
+  const handleDriverFinishRoute = () => {
+    setVehicles((prev) =>
+      prev.map((v) =>
+        v.plate === driverActivePlate
+          ? { ...v, status: 'AVAILABLE', currentDriverName: null, usageStartTime: null }
+          : v
+      )
+    );
+
+    setDriverHasActiveRoute(false);
+    setDriverIsOnLunch(false);
+
+    // Notificação exata solicitada no áudio: "Rota finalizada, checklist finalizado"
+    showToast('Rota finalizada, checklist finalizado', 'success');
+    triggerFleetEvent('FIM_ROTA', currentUser.name, driverActiveModel, driverActivePlate);
+  };
+
   const formatCpf = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 11);
     if (digits.length <= 3) return digits;
@@ -928,6 +988,56 @@ export default function DashboardPage() {
               )}
             </div>
 
+            {/* PAINEL DE CONTROLE DE ROTA ATIVA DO MOTORISTA */}
+            {isDriver && driverHasActiveRoute && (
+              <div className="p-4 bg-gradient-to-r from-slate-900 via-emerald-950/40 to-slate-900 border border-emerald-500/40 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/30">
+                    <Navigation className="w-5 h-5 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-sm text-white">
+                        Sua Rota Ativa: {driverActiveModel} ({driverActivePlate})
+                      </span>
+                      <span
+                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                          driverIsOnLunch
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                        }`}
+                      >
+                        {driverIsOnLunch ? '☕ EM INTERVALO DE ALMOÇO' : '🚗 EM TRÂNSITO'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Horário de início: 08:00 • Intervalo computado: {driverLunchMinutes} min
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleDriverToggleLunch}
+                    className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                  >
+                    <Coffee className="w-3.5 h-3.5 text-amber-400" />
+                    <span>{driverIsOnLunch ? 'Retomar Rota' : 'Pausar para Almoço'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDriverFinishRoute}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-lg shadow-purple-600/20"
+                  >
+                    <Flag className="w-3.5 h-3.5" />
+                    <span>Finalizar Rota & Devolver Carro</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* GRID DE CARROS COM IDENTIFICAÇÃO DE USO E CONDUTOR */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {vehicles.map((v) => (
@@ -1005,10 +1115,7 @@ export default function DashboardPage() {
                     <div className="mt-4 pt-3 border-t border-slate-800/80">
                       {v.status === 'AVAILABLE' ? (
                         <button
-                          onClick={() => {
-                            triggerFleetEvent('INICIO_ROTA', currentUser.name, `${v.brand} ${v.model}`, v.plate);
-                            showToast(`Você iniciou a rota com o veículo ${v.plate}!`);
-                          }}
+                          onClick={() => handleDriverStartRoute(v.plate, `${v.brand} ${v.model}`)}
                           className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
                         >
                           <Navigation className="w-3.5 h-3.5" />
@@ -1016,10 +1123,7 @@ export default function DashboardPage() {
                         </button>
                       ) : v.currentDriverName === currentUser.name ? (
                         <button
-                          onClick={() => {
-                            triggerFleetEvent('FIM_ROTA', currentUser.name, `${v.brand} ${v.model}`, v.plate);
-                            showToast(`Você devolveu o veículo ${v.plate} na garagem!`);
-                          }}
+                          onClick={handleDriverFinishRoute}
                           className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
                         >
                           <Flag className="w-3.5 h-3.5" />

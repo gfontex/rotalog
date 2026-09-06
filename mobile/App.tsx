@@ -199,8 +199,8 @@ export default function App() {
       );
 
       Alert.alert(
-        'Veículo Liberado!',
-        `Checklist de entrada concluído para o veículo ${selectedVehicle!.plate}. Boa rota!`,
+        'Iniciando Rota',
+        `Iniciando rota com o carro ${selectedVehicle!.brand} ${selectedVehicle!.model} (Placa ${selectedVehicle!.plate}).`,
       );
     } else {
       // Checklist de Saída / Fim de Rota
@@ -252,15 +252,15 @@ export default function App() {
       setSelectedVehicle(null);
 
       Alert.alert(
-        hasProblem ? 'Avaria Reportada!' : 'Rota Concluída!',
+        'Rota Finalizada',
         hasProblem
-          ? `Checklist finalizado com alerta. Veículo direcionado para MANUTENÇÃO.`
-          : `Veículo devolvido na base. Foram rodados ${kmDriven} km.`,
+          ? 'Rota finalizada, checklist finalizado (Avaria reportada, veículo enviado para manutenção).'
+          : 'Rota finalizada, checklist finalizado.',
       );
     }
   };
 
-  // 4. Controle de Pausa / Almoço (Opção A: 1 clique ágil)
+  // 4. Pausa para Almoço / Retomada (Opção A)
   const handleToggleLunch = () => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -272,7 +272,7 @@ export default function App() {
         isOnLunch: true,
         lunchStartTime: timeStr,
       });
-      Alert.alert('Almoço / Pausa Iniciado', `Intervalo registrado às ${timeStr}. Bom apetite!`);
+      Alert.alert('Intervalo de Almoço', 'Iniciando intervalo para almoço.');
     } else {
       // Retomar Rota
       const pauseDuration = 45; // Simulação de 45 minutos de almoço
@@ -281,7 +281,7 @@ export default function App() {
         isOnLunch: false,
         totalLunchMinutes: activeRoute.totalLunchMinutes + pauseDuration,
       });
-      Alert.alert('Rota Retomada!', `Intervalo encerrado às ${timeStr} (${pauseDuration} min registrados).`);
+      Alert.alert('Intervalo de Almoço', 'Intervalo para almoço finalizado.');
     }
   };
 
