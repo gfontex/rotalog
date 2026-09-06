@@ -30,6 +30,11 @@ import {
   Upload,
   Eye,
   EyeOff,
+  Bell,
+  BellRing,
+  Flag,
+  Radio,
+  Trash2,
 } from 'lucide-react';
 
 interface Vehicle {
@@ -81,6 +86,18 @@ interface FleetUsageReportItem {
   date: string;
 }
 
+interface FleetNotification {
+  id: string;
+  type: 'INICIO_ROTA' | 'INICIO_PAUSA_ALMOCO' | 'FIM_PAUSA_ALMOCO' | 'FIM_ROTA' | 'ALERTA_AVARIA';
+  title: string;
+  message: string;
+  timestamp: string;
+  isRead: boolean;
+  driverName: string;
+  vehiclePlate?: string;
+  vehicleModel?: string;
+}
+
 export default function DashboardPage() {
   // ESTADO DE AUTENTICAÇÃO
   const [isLoggedIn, setIsLoggedIn] = useState(true); // Começa logado no Admin MK Segurança
@@ -99,8 +116,56 @@ export default function DashboardPage() {
 
   // NAVEGAÇÃO DO PAINEL
   const [activeTab, setActiveTab] = useState<'overview' | 'reports' | 'vehicles' | 'employees' | 'checklists' | 'timeclock'>('overview');
-  const [searchQuery, setSearchQuery] = useState('');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // NOTIFICAÇÕES ADMINISTRATIVAS (EXCLUSIVAS PARA PERFIS MASTER: ADMIN & FLEET_MANAGER)
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<FleetNotification[]>([
+    {
+      id: 'notif-1',
+      type: 'INICIO_ROTA',
+      title: 'Início de Rota',
+      message: 'Joãozinho iniciou rota com o carro Renault Kangoo 1.6 Maxi, placa MKF1A01.',
+      timestamp: 'Há 5 min',
+      isRead: false,
+      driverName: 'Joãozinho Silva',
+      vehiclePlate: 'MKF1A01',
+      vehicleModel: 'Renault Kangoo 1.6 Maxi',
+    },
+    {
+      id: 'notif-2',
+      type: 'INICIO_PAUSA_ALMOCO',
+      title: 'Pausa para Almoço',
+      message: 'Joãozinho iniciou uma pausa para o almoço.',
+      timestamp: 'Há 25 min',
+      isRead: false,
+      driverName: 'Joãozinho Silva',
+      vehiclePlate: 'MKF1A01',
+      vehicleModel: 'Renault Kangoo 1.6 Maxi',
+    },
+    {
+      id: 'notif-3',
+      type: 'FIM_PAUSA_ALMOCO',
+      title: 'Retorno do Almoço',
+      message: 'Joãozinho finalizou a pausa para o almoço (45 min) e retomou o veículo.',
+      timestamp: 'Há 1 hora',
+      isRead: true,
+      driverName: 'Joãozinho Silva',
+      vehiclePlate: 'MKS2B02',
+      vehicleModel: 'Fiat Strada Freedom',
+    },
+    {
+      id: 'notif-4',
+      type: 'FIM_ROTA',
+      title: 'Fim de Uso do Carro',
+      message: 'Carlos Oliveira finalizou o uso do carro Volkswagen Gol, placa MKG3C03.',
+      timestamp: 'Há 2 horas',
+      isRead: true,
+      driverName: 'Carlos Oliveira',
+      vehiclePlate: 'MKG3C03',
+      vehicleModel: 'Volkswagen Gol',
+    },
+  ]);
 
   // MODAL VEÍCULO
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
@@ -109,7 +174,7 @@ export default function DashboardPage() {
   const [newVehicleModel, setNewVehicleModel] = useState('');
   const [newVehicleYear, setNewVehicleYear] = useState(2024);
   const [newVehicleMileage, setNewVehicleMileage] = useState(15000);
-  const [newVehicleBranch, setNewVehicleBranch] = useState('Matriz São Paulo');
+  const [newVehicleBranch, setNewVehicleBranch] = useState('Base Operacional MK');
 
   // MODAL NOVO USUÁRIO / COLABORADOR
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
@@ -117,11 +182,11 @@ export default function DashboardPage() {
   const [newEmpCpf, setNewEmpCpf] = useState('');
   const [newEmpRole, setNewEmpRole] = useState<'ADMIN' | 'FLEET_MANAGER' | 'HR' | 'DRIVER'>('DRIVER');
   const [newEmpPassword, setNewEmpPassword] = useState('');
-  const [newEmpBranch, setNewEmpBranch] = useState('Matriz São Paulo');
+  const [newEmpBranch, setNewEmpBranch] = useState('Base Operacional MK');
   const [isFacialEnrolled, setIsFacialEnrolled] = useState(false);
   const [facialStep, setFacialStep] = useState<'idle' | 'scanning' | 'done'>('idle');
 
-  // VEÍCULOS DA FROTA (INCLUINDO FROTA MK SEGURANÇA)
+  // VEÍCULOS DA FROTA
   const [vehicles, setVehicles] = useState<Vehicle[]>([
     {
       id: '1',
@@ -216,7 +281,7 @@ export default function DashboardPage() {
     },
     {
       id: '4',
-      name: 'João Silva - Motorista Operacional',
+      name: 'Joãozinho Silva - Motorista Operacional',
       cpf: '333.444.555-66',
       email: 'motorista@mkseguranca.com.br',
       role: 'DRIVER',
@@ -233,7 +298,7 @@ export default function DashboardPage() {
   const [usageReports] = useState<FleetUsageReportItem[]>([
     {
       id: 'REP-001',
-      driverName: 'João Silva',
+      driverName: 'Joãozinho Silva',
       driverCpf: '333.444.555-66',
       facialVerified: true,
       vehiclePlate: 'MKS2B02',
@@ -276,8 +341,11 @@ export default function DashboardPage() {
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 4000);
+    setTimeout(() => setNotification(null), 4500);
   };
+
+  const isMasterUser = currentUser.role === 'ADMIN' || currentUser.role === 'FLEET_MANAGER';
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   // FORMATADOR DE CPF
   const formatCpf = (value: string) => {
@@ -296,7 +364,6 @@ export default function DashboardPage() {
     const comp = loginCompany.trim().toLowerCase();
     const cleanPass = loginPassword.replace(/\D/g, '');
 
-    // Busca usuário correspondente à senha (que por padrão é o CPF do trabalhador)
     const matchedEmployee = employees.find(
       (emp) => emp.cpf.replace(/\D/g, '') === cleanPass || emp.cpf === loginPassword.trim()
     );
@@ -310,7 +377,7 @@ export default function DashboardPage() {
           role: 'ADMIN',
         });
         setIsLoggedIn(true);
-        showToast('Login realizado com sucesso! Bem-vindo à MK Segurança.');
+        showToast('Login realizado como Administrador Master!');
         return;
       }
 
@@ -332,7 +399,64 @@ export default function DashboardPage() {
 
   const handleLogout = () => {
     setIsLoggedIn(false);
+    setIsNotificationOpen(false);
     showToast('Sessão encerrada com sucesso.');
+  };
+
+  // DISPARAR EVENTO DE NOTIFICAÇÃO EM TEMPO REAL (SIMULAÇÃO DO JOÃOZINHO)
+  const triggerFleetEvent = (
+    type: 'INICIO_ROTA' | 'INICIO_PAUSA_ALMOCO' | 'FIM_PAUSA_ALMOCO' | 'FIM_ROTA',
+    driverName = 'Joãozinho',
+    carModel = 'Renault Kangoo 1.6 Maxi',
+    carPlate = 'MKF1A01'
+  ) => {
+    let title = '';
+    let message = '';
+
+    if (type === 'INICIO_ROTA') {
+      title = 'Início de Rota';
+      message = `${driverName} iniciou rota com o carro ${carModel}, placa ${carPlate}.`;
+      // Atualiza o status do carro para Em Rota
+      setVehicles((prev) =>
+        prev.map((v) => (v.plate === carPlate ? { ...v, status: 'IN_USE' } : v))
+      );
+    } else if (type === 'INICIO_PAUSA_ALMOCO') {
+      title = 'Pausa para o Almoço';
+      message = `${driverName} iniciou uma pausa para o almoço.`;
+    } else if (type === 'FIM_PAUSA_ALMOCO') {
+      title = 'Retorno do Almoço';
+      message = `${driverName} finalizou a pausa para o almoço e retomou o veículo ${carPlate}.`;
+    } else if (type === 'FIM_ROTA') {
+      title = 'Fim de Uso do Carro';
+      message = `${driverName} finalizou o uso do carro ${carModel}, placa ${carPlate}. (Odômetro: 32.550 km | Vistoria: OK)`;
+      // Atualiza o status do carro de volta para Disponível
+      setVehicles((prev) =>
+        prev.map((v) => (v.plate === carPlate ? { ...v, status: 'AVAILABLE' } : v))
+      );
+    }
+
+    const newNotif: FleetNotification = {
+      id: `notif-${Date.now()}`,
+      type,
+      title,
+      message,
+      timestamp: 'Agora mesmo',
+      isRead: false,
+      driverName,
+      vehiclePlate: carPlate,
+      vehicleModel: carModel,
+    };
+
+    setNotifications([newNotif, ...notifications]);
+    showToast(`🔔 ${message}`, 'success');
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
   };
 
   // CADASTRO DE NOVO CARRO / VEÍCULO
@@ -443,12 +567,10 @@ export default function DashboardPage() {
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4 relative overflow-hidden font-sans text-slate-100">
-        {/* Glows de fundo executivo */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] bg-sky-600/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-10 right-10 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="w-full max-w-md relative z-10">
-          {/* Logo e Cabeçalho */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center p-3.5 bg-gradient-to-br from-sky-500 to-blue-600 rounded-2xl shadow-xl shadow-sky-500/20 mb-4 border border-sky-400/30">
               <ShieldCheck className="w-9 h-9 text-white" />
@@ -459,7 +581,6 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          {/* Card de Formulário */}
           <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-8 backdrop-blur-xl shadow-2xl">
             <h2 className="text-xl font-bold text-white mb-2">Acesse sua Conta</h2>
             <p className="text-xs text-slate-400 mb-6">
@@ -531,7 +652,6 @@ export default function DashboardPage() {
               </button>
             </form>
 
-            {/* Atilho Rápido de Teste para o Usuário */}
             <div className="mt-6 pt-5 border-t border-slate-800/80">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2.5">
                 ⚡ Acesso Rápido de Demonstração (1 Clique):
@@ -545,7 +665,7 @@ export default function DashboardPage() {
                   }}
                   className="p-2.5 bg-slate-800/50 hover:bg-slate-800 text-left rounded-xl border border-slate-700/60 transition-colors"
                 >
-                  <span className="font-bold text-sky-400 block">👑 Administrador</span>
+                  <span className="font-bold text-sky-400 block">👑 Administrador Master</span>
                   <span className="text-slate-300 text-[10px] block">CPF: 139.932.487-08</span>
                 </button>
                 <button
@@ -556,7 +676,7 @@ export default function DashboardPage() {
                   }}
                   className="p-2.5 bg-slate-800/50 hover:bg-slate-800 text-left rounded-xl border border-slate-700/60 transition-colors"
                 >
-                  <span className="font-bold text-emerald-400 block">🚚 Motorista</span>
+                  <span className="font-bold text-emerald-400 block">🚚 Motorista Joãozinho</span>
                   <span className="text-slate-300 text-[10px] block">CPF: 333.444.555-66</span>
                 </button>
               </div>
@@ -576,21 +696,23 @@ export default function DashboardPage() {
   // ==========================================
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-white">
-      {/* NOTIFICAÇÃO TOAST */}
+      {/* NOTIFICAÇÃO TOAST FLUTUANTE */}
       {notification && (
         <div
-          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-2xl border text-sm flex items-center gap-3 backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-4 ${
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-2xl shadow-2xl border text-sm flex items-center gap-3 backdrop-blur-md transition-all animate-in fade-in slide-in-from-top-4 ${
             notification.type === 'success'
-              ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
+              ? 'bg-slate-900/95 border-sky-500/50 text-white shadow-sky-500/20'
               : 'bg-rose-950/90 border-rose-500/50 text-rose-200'
           }`}
         >
           {notification.type === 'success' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            <div className="p-1.5 bg-sky-500/20 rounded-xl text-sky-400">
+              <BellRing className="w-5 h-5 animate-pulse" />
+            </div>
           ) : (
             <AlertTriangle className="w-5 h-5 text-rose-400" />
           )}
-          <span className="font-medium">{notification.message}</span>
+          <span className="font-medium text-xs leading-relaxed max-w-sm">{notification.message}</span>
         </div>
       )}
 
@@ -609,17 +731,137 @@ export default function DashboardPage() {
                 </span>
               </div>
               <span className="text-[11px] text-slate-400 block -mt-0.5">
-                Painel Integrado de Frota, Biometria & Ponto CLT
+                Painel Integrado de Frota, Biometria & Notificações Administrativas
               </span>
             </div>
           </div>
 
-          {/* PERFIL DO USUÁRIO LOGADO & BOTÃO SAIR */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* ========================================================================= */}
+            {/* SINO DE NOTIFICAÇÕES (EXCLUSIVO PARA USUÁRIOS MASTER: ADMIN & GESTOR) */}
+            {/* ========================================================================= */}
+            {isMasterUser && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                  className="relative p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 rounded-xl text-slate-300 hover:text-white transition-all shadow-sm flex items-center justify-center"
+                  title="Notificações da Frota em Tempo Real"
+                >
+                  <Bell className="w-4 h-4 text-sky-400" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-600 text-white rounded-full text-[10px] font-black flex items-center justify-center border-2 border-slate-950 animate-bounce">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* PAINEL DROPDOWN DE NOTIFICAÇÕES */}
+                {isNotificationOpen && (
+                  <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                    <div className="p-3.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-sky-500/10 rounded-lg text-sky-400">
+                          <Radio className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-xs text-white block">Eventos da Frota</span>
+                          <span className="text-[10px] text-slate-400">Exclusivo para Gestores Master</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={markAllAsRead}
+                            className="text-[10px] font-semibold text-sky-400 hover:underline px-2 py-1"
+                          >
+                            Ler todas
+                          </button>
+                        )}
+                        <button
+                          onClick={clearNotifications}
+                          title="Limpar todas"
+                          className="p-1 hover:text-rose-400 text-slate-500 rounded"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/60 text-xs">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-slate-500 text-xs">
+                          Nenhuma notificação recente da frota.
+                        </div>
+                      ) : (
+                        notifications.map((n) => (
+                          <div
+                            key={n.id}
+                            className={`p-3.5 transition-colors flex items-start gap-3 ${
+                              n.isRead ? 'bg-slate-900/40 opacity-75' : 'bg-slate-800/30'
+                            }`}
+                          >
+                            <div className="mt-0.5 shrink-0">
+                              {n.type === 'INICIO_ROTA' && (
+                                <div className="p-2 bg-sky-500/10 text-sky-400 rounded-xl">
+                                  <Car className="w-4 h-4" />
+                                </div>
+                              )}
+                              {n.type === 'INICIO_PAUSA_ALMOCO' && (
+                                <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl">
+                                  <Coffee className="w-4 h-4" />
+                                </div>
+                              )}
+                              {n.type === 'FIM_PAUSA_ALMOCO' && (
+                                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </div>
+                              )}
+                              {n.type === 'FIM_ROTA' && (
+                                <div className="p-2 bg-purple-500/10 text-purple-400 rounded-xl">
+                                  <Flag className="w-4 h-4" />
+                                </div>
+                              )}
+                              {n.type === 'ALERTA_AVARIA' && (
+                                <div className="p-2 bg-rose-500/10 text-rose-400 rounded-xl">
+                                  <AlertTriangle className="w-4 h-4" />
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="font-bold text-slate-200 text-xs">{n.title}</span>
+                                <span className="text-[10px] text-slate-500">{n.timestamp}</span>
+                              </div>
+                              <p className="text-slate-300 text-[11px] leading-relaxed">{n.message}</p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="p-2 bg-slate-950 border-t border-slate-800 text-center">
+                      <span className="text-[10px] text-slate-400">
+                        Monitoramento em tempo real via Telemetria ROTALOG
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* DADOS DO USUÁRIO LOGADO */}
             <div className="hidden sm:flex flex-col text-right">
               <div className="flex items-center gap-2 justify-end">
                 <span className="text-xs font-bold text-white">{currentUser.name}</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                <span
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    isMasterUser
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-slate-800 text-slate-300 border border-slate-700'
+                  }`}
+                >
                   {currentUser.role}
                 </span>
               </div>
@@ -669,7 +911,7 @@ export default function DashboardPage() {
           </nav>
 
           {/* BOTÕES RÁPIDOS DE CADASTRO PARA ADMIN / GESTOR */}
-          {(currentUser.role === 'ADMIN' || currentUser.role === 'FLEET_MANAGER' || currentUser.role === 'HR') && (
+          {isMasterUser && (
             <div className="flex items-center gap-2 ml-4">
               <button
                 onClick={() => setIsVehicleModalOpen(true)}
@@ -691,13 +933,73 @@ export default function DashboardPage() {
       </div>
 
       {/* CONTEÚDO PRINCIPAL */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* ========================================================================= */}
+        {/* BARRA DE SIMULAÇÃO DE EVENTOS DO MOTORISTA "JOÃOZINHO" (EXCLUSIVA MASTER) */}
+        {/* ========================================================================= */}
+        {isMasterUser && (
+          <div className="p-4 bg-gradient-to-r from-slate-900 via-sky-950/40 to-slate-900 border border-sky-500/30 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                <h3 className="font-extrabold text-sm text-white">
+                  Central de Notificações da Frota (Simulador em Tempo Real)
+                </h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">
+                  Apenas Usuários Master
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">
+                Teste as notificações de uso do veículo pelo motorista <strong>Joãozinho</strong> conforme sua regra:
+              </p>
+            </div>
+
+            {/* BOTÕES DE DISPARO DAS 4 ETAPAS DE NOTIFICAÇÃO */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => triggerFleetEvent('INICIO_ROTA', 'Joãozinho', 'Renault Kangoo', 'MKF1A01')}
+                className="px-3 py-2 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <Car className="w-3.5 h-3.5 text-sky-400" />
+                <span>1. Início de Rota</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerFleetEvent('INICIO_PAUSA_ALMOCO', 'Joãozinho')}
+                className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <Coffee className="w-3.5 h-3.5 text-amber-400" />
+                <span>2. Pausa Almoço</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerFleetEvent('FIM_PAUSA_ALMOCO', 'Joãozinho', 'Renault Kangoo', 'MKF1A01')}
+                className="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>3. Retomou Almoço</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => triggerFleetEvent('FIM_ROTA', 'Joãozinho', 'Renault Kangoo', 'MKF1A01')}
+                className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                <Flag className="w-3.5 h-3.5 text-purple-400" />
+                <span>4. Fim de Uso</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ======================================= */}
         {/* ABA: DASHBOARD GERAL                    */}
         {/* ======================================= */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* CARDS DE RESUMO OPERACIONAL */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl">
                 <div className="flex items-center justify-between">
@@ -722,7 +1024,7 @@ export default function DashboardPage() {
                 <div className="text-2xl font-extrabold text-white mt-2">
                   {vehicles.filter((v) => v.status === 'IN_USE').length} Em Trânsito
                 </div>
-                <div className="text-[11px] text-slate-400 mt-1">Cronômetros operacionais ativos</div>
+                <div className="text-[11px] text-slate-400 mt-1">Notificações operacionais ativas</div>
               </div>
 
               <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl">
@@ -738,15 +1040,15 @@ export default function DashboardPage() {
 
               <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">Biometrias Cadastradas</span>
-                  <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
-                    <ShieldCheck className="w-4 h-4" />
+                  <span className="text-xs font-semibold text-slate-400">Notificações Recebidas</span>
+                  <div className="p-2 bg-amber-500/10 rounded-xl text-amber-400">
+                    <Bell className="w-4 h-4" />
                   </div>
                 </div>
-                <div className="text-2xl font-extrabold text-white mt-2">
-                  {employees.filter((e) => e.biometricEnrolled).length} de {employees.length}
+                <div className="text-2xl font-extrabold text-white mt-2">{notifications.length} Eventos</div>
+                <div className="text-[11px] text-amber-400 font-medium mt-1">
+                  {unreadCount} não lidas no sino
                 </div>
-                <div className="text-[11px] text-emerald-400 font-medium mt-1">Conformidade LGPD (192-d)</div>
               </div>
             </div>
 
@@ -757,13 +1059,15 @@ export default function DashboardPage() {
                   <h3 className="text-base font-bold text-white">Status da Frota em Tempo Real</h3>
                   <p className="text-xs text-slate-400">Veículos vinculados à empresa {currentUser.company}</p>
                 </div>
-                <button
-                  onClick={() => setIsVehicleModalOpen(true)}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Novo Carro</span>
-                </button>
+                {isMasterUser && (
+                  <button
+                    onClick={() => setIsVehicleModalOpen(true)}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Novo Carro</span>
+                  </button>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -845,7 +1149,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* TABELA DE RELATÓRIO */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
@@ -925,13 +1228,15 @@ export default function DashboardPage() {
                   Gerenciamento de veículos da empresa {currentUser.company}
                 </p>
               </div>
-              <button
-                onClick={() => setIsVehicleModalOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-600/20"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Registrar Novo Carro</span>
-              </button>
+              {isMasterUser && (
+                <button
+                  onClick={() => setIsVehicleModalOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-600/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Registrar Novo Carro</span>
+                </button>
+              )}
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
@@ -997,13 +1302,15 @@ export default function DashboardPage() {
                   Cadastros com senha padrão (CPF) e vetor facial 192 dimensões (LGPD)
                 </p>
               </div>
-              <button
-                onClick={() => setIsEmployeeModalOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-600/20"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Criar Novo Usuário</span>
-              </button>
+              {isMasterUser && (
+                <button
+                  onClick={() => setIsEmployeeModalOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-600/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Criar Novo Usuário</span>
+                </button>
+              )}
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
@@ -1288,7 +1595,6 @@ export default function DashboardPage() {
                     onChange={(e) => {
                       const formatted = formatCpf(e.target.value);
                       setNewEmpCpf(formatted);
-                      // Automaticamente define a senha padrão como o CPF!
                       setNewEmpPassword(formatted.replace(/\D/g, ''));
                     }}
                     placeholder="000.000.000-00"

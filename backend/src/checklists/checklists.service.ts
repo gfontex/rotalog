@@ -70,6 +70,26 @@ export class ChecklistsService {
         },
       });
 
+      // Registra notificação em tempo real para os gestores / administradores
+      const driver = this.prisma.user ? await this.prisma.user.findUnique({ where: { id: driverId }, select: { name: true } }) : null;
+      const driverName = driver?.name || 'Motorista';
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId,
+          userId: driverId,
+          action: 'INICIO_ROTA',
+          entityType: 'VEHICLE',
+          entityId: vehicle.id,
+          details: {
+            message: `${driverName} iniciou rota com o carro ${vehicle.brand} ${vehicle.model}, placa ${vehicle.plate}.`,
+            driverName,
+            vehiclePlate: vehicle.plate,
+            vehicleModel: `${vehicle.brand} ${vehicle.model}`,
+            type: 'INICIO_ROTA',
+          },
+        },
+      });
+
       return {
         checklist,
         usage,
@@ -125,6 +145,29 @@ export class ChecklistsService {
         data: {
           status: newVehicleStatus,
           currentMileage: Math.max(vehicle.currentMileage, dto.mileage),
+        },
+      });
+
+      // Registra notificação de encerramento da rota para os gestores
+      const exitDriver = this.prisma.user ? await this.prisma.user.findUnique({ where: { id: driverId }, select: { name: true } }) : null;
+      const exitDriverName = exitDriver?.name || 'Motorista';
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId,
+          userId: driverId,
+          action: 'FIM_ROTA',
+          entityType: 'VEHICLE',
+          entityId: vehicle.id,
+          details: {
+            message: `${exitDriverName} finalizou o uso do carro ${vehicle.brand} ${vehicle.model}, placa ${vehicle.plate}.`,
+            driverName: exitDriverName,
+            vehiclePlate: vehicle.plate,
+            vehicleModel: `${vehicle.brand} ${vehicle.model}`,
+            distanceKm: calculatedDistance,
+            durationMinutes: calculatedDuration,
+            hasProblem,
+            type: 'FIM_ROTA',
+          },
         },
       });
 

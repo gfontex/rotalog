@@ -36,6 +36,12 @@ export class UsagesController {
     return this.usagesService.getFleetStats(tenantId);
   }
 
+  @Get('notifications')
+  @Roles(Role.ADMIN, Role.FLEET_MANAGER)
+  async getNotifications(@CurrentUser('tenantId') tenantId: string) {
+    return this.usagesService.getNotifications(tenantId);
+  }
+
   @Post('start-pause')
   @Roles(Role.DRIVER, Role.FLEET_MANAGER, Role.ADMIN)
   async startPause(

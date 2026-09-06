@@ -73,12 +73,35 @@ export class UsagesService {
       throw new Error('Nenhuma rota ativa encontrada para este motorista.');
     }
 
-    return this.prisma.vehicleUsage.update({
+    const updated = await this.prisma.vehicleUsage.update({
       where: { id: active.id },
       data: {
         lunchStartTime: new Date(),
       },
+      include: {
+        driver: { select: { name: true } },
+        vehicle: { select: { plate: true, brand: true, model: true } },
+      },
     });
+
+    const driverName = updated.driver?.name || 'Motorista';
+    const vehName = updated.vehicle ? `${updated.vehicle.brand} ${updated.vehicle.model} (${updated.vehicle.plate})` : 'veículo';
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId: driverId,
+        action: 'INICIO_PAUSA_ALMOCO',
+        entityType: 'VEHICLE_USAGE',
+        entityId: active.id,
+        details: {
+          message: `${driverName} iniciou uma pausa para o almoço com o ${vehName}.`,
+          driverName,
+          type: 'INICIO_PAUSA_ALMOCO',
+        },
+      },
+    });
+
+    return updated;
   }
 
   /**
@@ -94,12 +117,49 @@ export class UsagesService {
     const durationMillis = now.getTime() - new Date(active.lunchStartTime).getTime();
     const totalLunchMinutes = Math.max(0, Math.round(durationMillis / 60000));
 
-    return this.prisma.vehicleUsage.update({
+    const updated = await this.prisma.vehicleUsage.update({
       where: { id: active.id },
       data: {
         lunchEndTime: now,
         totalLunchMinutes,
       },
+      include: {
+        driver: { select: { name: true } },
+        vehicle: { select: { plate: true, brand: true, model: true } },
+      },
+    });
+
+    const driverName = updated.driver?.name || 'Motorista';
+    const vehName = updated.vehicle ? `${updated.vehicle.brand} ${updated.vehicle.model} (${updated.vehicle.plate})` : 'veículo';
+    await this.prisma.auditLog.create({
+      data: {
+        tenantId,
+        userId: driverId,
+        action: 'FIM_PAUSA_ALMOCO',
+        entityType: 'VEHICLE_USAGE',
+        entityId: active.id,
+        details: {
+          message: `${driverName} finalizou a pausa para o almoço (${totalLunchMinutes} min) e retomou o ${vehName}.`,
+          driverName,
+          totalLunchMinutes,
+          type: 'FIM_PAUSA_ALMOCO',
+        },
+      },
+    });
+
+    return updated;
+  }
+
+  async getNotifications(tenantId: string) {
+    return this.prisma.auditLog.findMany({
+      where: {
+        tenantId,
+        action: {
+          in: ['INICIO_ROTA', 'FIM_ROTA', 'INICIO_PAUSA_ALMOCO', 'FIM_PAUSA_ALMOCO', 'ALERTA_AVARIA_VEICULO'],
+        },
+      },
+      orderBy: { timestamp: 'desc' },
+      take: 50,
     });
   }
 
