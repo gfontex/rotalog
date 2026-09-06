@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 import { Role } from '@prisma/client';
 
 export class CreateUserDto {
@@ -11,13 +11,12 @@ export class CreateUserDto {
   cpf: string;
 
   @IsEmail({}, { message: 'Forneça um e-mail válido' })
-  @IsNotEmpty()
-  email: string;
+  @IsOptional()
+  email?: string;
 
   @IsString()
-  @IsNotEmpty()
-  @MinLength(6, { message: 'A senha deve conter ao menos 6 caracteres' })
-  password: string;
+  @IsOptional()
+  password?: string;
 
   @IsEnum(Role)
   role: Role;
@@ -25,4 +24,8 @@ export class CreateUserDto {
   @IsString()
   @IsOptional()
   branchId?: string;
+
+  @IsArray()
+  @IsOptional()
+  embeddingVector?: number[];
 }

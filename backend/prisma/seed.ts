@@ -168,6 +168,100 @@ async function main() {
     console.log('📋 Template de checklist veicular criado.');
   }
 
+  // 6. Criar Empresa MK Segurança solicitada pelo usuário
+  let mkTenant = await prisma.tenant.findFirst({
+    where: { name: 'MK Segurança' },
+  });
+
+  if (!mkTenant) {
+    mkTenant = await prisma.tenant.create({
+      data: {
+        name: 'MK Segurança',
+        cnpj: '23.456.789/0001-01',
+        status: 'ACTIVE',
+      },
+    });
+    console.log(`🛡️ Empresa criada: ${mkTenant.name} (${mkTenant.id})`);
+  }
+
+  let mkBranch = await prisma.branch.findFirst({
+    where: { tenantId: mkTenant.id, name: 'Base Operacional Principal' },
+  });
+
+  if (!mkBranch) {
+    mkBranch = await prisma.branch.create({
+      data: {
+        tenantId: mkTenant.id,
+        name: 'Base Operacional Principal',
+        city: 'São Paulo',
+        state: 'SP',
+      },
+    });
+  }
+
+  // Administrador Geral MK Segurança com CPF 13993248708 e senha padrão CPF
+  const mkAdminCpf = '139.932.487-08';
+  const existingMkAdmin = await prisma.user.findFirst({
+    where: {
+      OR: [{ cpf: mkAdminCpf }, { cpf: '13993248708' }, { email: 'admin@mkseguranca.com.br' }],
+    },
+  });
+
+  if (!existingMkAdmin) {
+    const adminUser = await prisma.user.create({
+      data: {
+        tenantId: mkTenant.id,
+        branchId: mkBranch.id,
+        name: 'Administrador MK Segurança',
+        cpf: mkAdminCpf,
+        email: 'admin@mkseguranca.com.br',
+        passwordHash: await bcrypt.hash('13993248708', salt),
+        role: Role.ADMIN,
+        isActive: true,
+      },
+    });
+    console.log(`👑 Administrador MK Segurança criado: CPF ${mkAdminCpf} | Senha: CPF`);
+
+    // Cadastro biométrico com vetor de 192 dimensões
+    const dummyEmbedding = Array.from({ length: 192 }, () => Number((Math.random() * 0.2 - 0.1).toFixed(4)));
+    await prisma.facialEmbedding.create({
+      data: {
+        tenantId: mkTenant.id,
+        userId: adminUser.id,
+        embeddingVector: dummyEmbedding,
+        consentGiven: true,
+        consentAt: new Date(),
+      },
+    });
+    console.log(`📸 Biometria facial 192-d cadastrada para o Administrador MK`);
+  }
+
+  // Veículos da frota MK Segurança
+  const mkVehicles = [
+    { plate: 'MKF1A01', brand: 'Renault', model: 'Kangoo 1.6 Maxi', year: 2023, currentMileage: 32400 },
+    { plate: 'MKS2B02', brand: 'Fiat', model: 'Strada Freedom', year: 2024, currentMileage: 18900 },
+    { plate: 'MKG3C03', brand: 'Volkswagen', model: 'Gol 1.0 City', year: 2022, currentMileage: 49200 },
+  ];
+
+  for (const v of mkVehicles) {
+    const ex = await prisma.vehicle.findUnique({ where: { plate: v.plate } });
+    if (!ex) {
+      await prisma.vehicle.create({
+        data: {
+          tenantId: mkTenant.id,
+          branchId: mkBranch.id,
+          plate: v.plate,
+          brand: v.brand,
+          model: v.model,
+          year: v.year,
+          status: VehicleStatus.AVAILABLE,
+          currentMileage: v.currentMileage,
+        },
+      });
+      console.log(`🚗 Veículo MK cadastrado: ${v.plate} - ${v.brand} ${v.model}`);
+    }
+  }
+
   console.log('✨ Seed concluído com sucesso!');
 }
 

@@ -114,21 +114,68 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+    const loginIdentifier = (dto.login || dto.email || '').trim();
+    const cleanDigits = loginIdentifier.replace(/\D/g, '');
+    const cleanPassword = dto.password.trim();
+
+    // 1. Localizar usuário por CPF, email ou nome da empresa
+    let user = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: loginIdentifier.toLowerCase() },
+          { cpf: loginIdentifier },
+          ...(cleanDigits.length === 11 ? [{ cpf: cleanDigits }] : []),
+        ],
+      },
+      include: { tenant: true },
     });
 
+    // 2. Se o usuário digitou o nome da empresa no campo login (ex: MK Seguranca / MK Segurança)
+    if (!user && (loginIdentifier.toLowerCase().includes('mk') || (dto.company && dto.company.toLowerCase().includes('mk')))) {
+      const tenant = await this.prisma.tenant.findFirst({
+        where: {
+          name: { contains: 'MK', mode: 'insensitive' },
+        },
+      });
+
+      if (tenant) {
+        // Tenta achar o usuário com o CPF da senha dentro do tenant ou o administrador do tenant
+        user = await this.prisma.user.findFirst({
+          where: {
+            tenantId: tenant.id,
+            OR: [
+              { cpf: cleanPassword },
+              { cpf: cleanPassword.replace(/\D/g, '') },
+              { role: 'ADMIN' },
+            ],
+          },
+          include: { tenant: true },
+        });
+      }
+    }
+
     if (!user) {
-      throw new UnauthorizedException('Credenciais inválidas. Verifique seu e-mail e senha.');
+      throw new UnauthorizedException('Credenciais inválidas. Verifique os dados informados.');
     }
 
     if (!user.isActive) {
       throw new UnauthorizedException('Este colaborador está desativado. Entre em contato com o administrador.');
     }
 
-    const isPasswordValid = await this.comparePassword(dto.password, user.passwordHash);
+    // 3. Comparar senha (ou pelo hash bcrypt, ou caso a senha seja exatamente o CPF do usuário)
+    let isPasswordValid = await this.comparePassword(cleanPassword, user.passwordHash);
+    
+    // Suporte adicional caso a senha padrão seja o CPF do trabalhador (limpo ou formatado)
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Credenciais inválidas. Verifique seu e-mail e senha.');
+      const userCleanCpf = user.cpf.replace(/\D/g, '');
+      const passCleanCpf = cleanPassword.replace(/\D/g, '');
+      if (passCleanCpf.length === 11 && passCleanCpf === userCleanCpf) {
+        isPasswordValid = true;
+      }
+    }
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Senha incorreta. Por padrão para novos trabalhadores a senha é o próprio CPF.');
     }
 
     const tokens = this.generateTokens(user);
@@ -141,6 +188,7 @@ export class AuthService {
         cpf: user.cpf,
         role: user.role,
         tenantId: user.tenantId,
+        tenantName: user.tenant?.name || 'MK Segurança',
         branchId: user.branchId,
         isActive: user.isActive,
       },

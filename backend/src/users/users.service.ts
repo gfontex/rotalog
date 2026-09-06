@@ -60,9 +60,13 @@ export class UsersService {
   }
 
   async create(tenantId: string, dto: CreateUserDto) {
+    const cleanCpf = dto.cpf.replace(/\D/g, '');
+    const finalEmail = (dto.email || `usuario.${cleanCpf}@mkseguranca.com.br`).toLowerCase();
+    const finalPassword = dto.password || cleanCpf || dto.cpf;
+
     const existing = await this.prisma.user.findFirst({
       where: {
-        OR: [{ email: dto.email }, { cpf: dto.cpf }],
+        OR: [{ email: finalEmail }, { cpf: dto.cpf }, { cpf: cleanCpf }],
       },
     });
 
@@ -71,13 +75,13 @@ export class UsersService {
     }
 
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(dto.password, salt);
+    const passwordHash = await bcrypt.hash(finalPassword, salt);
 
-    return this.prisma.user.create({
+    const newUser = await this.prisma.user.create({
       data: {
         name: dto.name,
         cpf: dto.cpf,
-        email: dto.email.toLowerCase(),
+        email: finalEmail,
         passwordHash,
         role: dto.role,
         tenantId,
@@ -96,6 +100,36 @@ export class UsersService {
         createdAt: true,
       },
     });
+
+    // Se informou vetor de biometria facial, cadastra no FacialEmbedding
+    if (dto.embeddingVector && Array.isArray(dto.embeddingVector) && dto.embeddingVector.length > 0) {
+      await this.prisma.facialEmbedding.create({
+        data: {
+          tenantId,
+          userId: newUser.id,
+          embeddingVector: dto.embeddingVector,
+          consentGiven: true,
+          consentAt: new Date(),
+        },
+      });
+
+      await this.prisma.auditLog.create({
+        data: {
+          tenantId,
+          userId: newUser.id,
+          entityType: 'User',
+          entityId: newUser.id,
+          action: 'CADASTRO_BIOMETRICO_USUARIO',
+          details: {
+            method: 'WEB_ADMIN_REGISTRATION',
+            dimensions: dto.embeddingVector.length,
+            lgpdConsent: true,
+          },
+        },
+      });
+    }
+
+    return newUser;
   }
 
   async update(tenantId: string, id: string, dto: UpdateUserDto) {
