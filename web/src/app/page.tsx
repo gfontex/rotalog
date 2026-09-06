@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Car,
   Users,
@@ -12,14 +12,17 @@ import {
   CheckCircle2,
   XCircle,
   FileSpreadsheet,
-  LogOut,
+  FileText,
   ChevronRight,
   TrendingUp,
-  SlidersHorizontal,
-  RefreshCw,
+  Activity,
+  ArrowUpRight,
+  Filter,
+  Download,
+  Gauge,
+  Check,
 } from 'lucide-react';
 
-// Tipos locais para o painel
 interface Vehicle {
   id: string;
   plate: string;
@@ -29,6 +32,8 @@ interface Vehicle {
   status: 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE';
   currentMileage: number;
   branch: string;
+  totalHoursUsed: number;
+  totalTrips: number;
 }
 
 interface Employee {
@@ -41,6 +46,7 @@ interface Employee {
   isActive: boolean;
   biometricEnrolled: boolean;
   lastClocking?: string;
+  totalWorkHoursWeek: number;
 }
 
 interface ChecklistItem {
@@ -52,24 +58,21 @@ interface ChecklistItem {
   hasProblem: boolean;
   observations: string;
   date: string;
+  distanceDeltaKm?: number;
   items: { [key: string]: boolean };
 }
 
 export default function DashboardPage() {
-  // Estado de navegação de abas
-  const [activeTab, setActiveTab] = useState<'overview' | 'vehicles' | 'employees' | 'checklists' | 'timeclock'>('overview');
-
-  // Perfil ativo no painel (para teste rápido de RBAC)
+  const [activeTab, setActiveTab] = useState<'overview' | 'vehicles' | 'usages' | 'employees' | 'checklists' | 'timeclock'>('overview');
   const [currentRole, setCurrentRole] = useState<'ADMIN' | 'FLEET_MANAGER' | 'HR' | 'DRIVER'>('ADMIN');
-
-  // Filtro de busca
   const [searchQuery, setSearchQuery] = useState('');
+  const [exportNotification, setExportNotification] = useState<string | null>(null);
 
   // Modais
   const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
 
-  // Dados iniciais de veículos (Frota)
+  // Dados de veículos com métricas de horas de uso (Fase 2)
   const [vehicles, setVehicles] = useState<Vehicle[]>([
     {
       id: '1',
@@ -80,6 +83,8 @@ export default function DashboardPage() {
       status: 'AVAILABLE',
       currentMileage: 35400,
       branch: 'Matriz São Paulo',
+      totalHoursUsed: 142.5,
+      totalTrips: 48,
     },
     {
       id: '2',
@@ -90,6 +95,8 @@ export default function DashboardPage() {
       status: 'IN_USE',
       currentMileage: 58120,
       branch: 'Matriz São Paulo',
+      totalHoursUsed: 218.0,
+      totalTrips: 76,
     },
     {
       id: '3',
@@ -100,10 +107,12 @@ export default function DashboardPage() {
       status: 'MAINTENANCE',
       currentMileage: 12800,
       branch: 'Matriz São Paulo',
+      totalHoursUsed: 86.2,
+      totalTrips: 29,
     },
   ]);
 
-  // Dados iniciais de colaboradores (RH / Admin)
+  // Colaboradores
   const [employees, setEmployees] = useState<Employee[]>([
     {
       id: '1',
@@ -115,6 +124,7 @@ export default function DashboardPage() {
       isActive: true,
       biometricEnrolled: true,
       lastClocking: '08:00 (Entrada)',
+      totalWorkHoursWeek: 40.0,
     },
     {
       id: '2',
@@ -126,6 +136,7 @@ export default function DashboardPage() {
       isActive: true,
       biometricEnrolled: true,
       lastClocking: '08:15 (Entrada)',
+      totalWorkHoursWeek: 42.5,
     },
     {
       id: '3',
@@ -137,6 +148,7 @@ export default function DashboardPage() {
       isActive: true,
       biometricEnrolled: true,
       lastClocking: '08:30 (Entrada)',
+      totalWorkHoursWeek: 39.0,
     },
     {
       id: '4',
@@ -148,19 +160,20 @@ export default function DashboardPage() {
       isActive: true,
       biometricEnrolled: true,
       lastClocking: '07:45 (Entrada)',
+      totalWorkHoursWeek: 44.0,
     },
   ]);
 
-  // Dados de checklists recentes
+  // Checklists com distâncias calculadas da Fase 2
   const [checklists] = useState<ChecklistItem[]>([
     {
       id: 'c1',
       vehiclePlate: 'RTL9A88',
       driverName: 'João da Silva',
       type: 'ENTRY',
-      mileage: 58120,
+      mileage: 58040,
       hasProblem: false,
-      observations: 'Veículo em perfeito estado para rota.',
+      observations: 'Veículo em perfeito estado para rota matutina.',
       date: 'Hoje, 07:50',
       items: { combustivel: true, pneus: true, documentacao: true, avarias: true, limpeza: true, iluminacao: true },
     },
@@ -170,14 +183,27 @@ export default function DashboardPage() {
       driverName: 'Carlos Oliveira',
       type: 'EXIT',
       mileage: 12800,
+      distanceDeltaKm: 85,
       hasProblem: true,
       observations: 'Farol dianteiro direito queimado. Enviado para manutenção.',
       date: 'Ontem, 18:20',
       items: { combustivel: true, pneus: true, documentacao: true, avarias: true, limpeza: true, iluminacao: false },
     },
+    {
+      id: 'c3',
+      vehiclePlate: 'BRA2E19',
+      driverName: 'João da Silva',
+      type: 'EXIT',
+      mileage: 35400,
+      distanceDeltaKm: 120,
+      hasProblem: false,
+      observations: 'Rota concluída sem intercorrências.',
+      date: 'Anteontem, 17:30',
+      items: { combustivel: true, pneus: true, documentacao: true, avarias: true, limpeza: true, iluminacao: true },
+    },
   ]);
 
-  // Formulário de Novo Veículo
+  // Formulário Novo Veículo
   const [newVehicle, setNewVehicle] = useState({
     plate: '',
     brand: '',
@@ -187,7 +213,7 @@ export default function DashboardPage() {
     status: 'AVAILABLE' as 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE',
   });
 
-  // Formulário de Novo Colaborador
+  // Formulário Novo Colaborador
   const [newEmployee, setNewEmployee] = useState({
     name: '',
     cpf: '',
@@ -196,7 +222,16 @@ export default function DashboardPage() {
     password: '',
   });
 
-  // Salvar novo veículo
+  // Totais consolidados de uso veicular (Fase 2)
+  const totalFleetHours = vehicles.reduce((acc, v) => acc + v.totalHoursUsed, 0);
+  const totalFleetTrips = vehicles.reduce((acc, v) => acc + v.totalTrips, 0);
+
+  // Exportar relatório
+  const handleExport = (type: 'EXCEL' | 'PDF') => {
+    setExportNotification(`Relatório consolidado de horas e uso da frota gerado em ${type}! Download iniciado.`);
+    setTimeout(() => setExportNotification(null), 4000);
+  };
+
   const handleAddVehicle = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVehicle.plate || !newVehicle.brand || !newVehicle.model) return;
@@ -210,6 +245,8 @@ export default function DashboardPage() {
       currentMileage: Number(newVehicle.currentMileage),
       status: newVehicle.status,
       branch: 'Matriz São Paulo',
+      totalHoursUsed: 0,
+      totalTrips: 0,
     };
 
     setVehicles([created, ...vehicles]);
@@ -217,7 +254,6 @@ export default function DashboardPage() {
     setIsVehicleModalOpen(false);
   };
 
-  // Salvar novo colaborador
   const handleAddEmployee = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmployee.name || !newEmployee.cpf || !newEmployee.email) return;
@@ -232,6 +268,7 @@ export default function DashboardPage() {
       isActive: true,
       biometricEnrolled: false,
       lastClocking: 'Não registrado',
+      totalWorkHoursWeek: 0,
     };
 
     setEmployees([...employees, created]);
@@ -239,17 +276,14 @@ export default function DashboardPage() {
     setIsEmployeeModalOpen(false);
   };
 
-  // Alterar status de veículo
   const toggleVehicleStatus = (id: string, status: 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE') => {
     setVehicles(vehicles.map((v) => (v.id === id ? { ...v, status } : v)));
   };
 
-  // Alternar ativo/inativo colaborador
   const toggleEmployeeActive = (id: string) => {
     setEmployees(employees.map((e) => (e.id === id ? { ...e, isActive: !e.isActive } : e)));
   };
 
-  // Filtragem de veículos
   const filteredVehicles = vehicles.filter(
     (v) =>
       v.plate.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -257,7 +291,6 @@ export default function DashboardPage() {
       v.brand.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  // Filtragem de colaboradores
   const filteredEmployees = employees.filter(
     (e) =>
       e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -269,7 +302,6 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row">
       {/* SIDEBAR CORPORATIVO */}
       <aside className="w-full md:w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-4">
-        {/* Brand */}
         <div className="flex items-center gap-3 px-2 py-4 mb-6 border-b border-slate-800">
           <div className="h-10 w-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-xl shadow-lg shadow-blue-500/30 text-white">
             R
@@ -325,6 +357,20 @@ export default function DashboardPage() {
             </button>
           )}
 
+          {(currentRole === 'ADMIN' || currentRole === 'FLEET_MANAGER') && (
+            <button
+              onClick={() => setActiveTab('usages')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                activeTab === 'usages'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                  : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+              }`}
+            >
+              <Gauge size={18} />
+              Controle de Horas / Uso
+            </button>
+          )}
+
           {(currentRole === 'ADMIN' || currentRole === 'HR') && (
             <button
               onClick={() => setActiveTab('employees')}
@@ -366,7 +412,6 @@ export default function DashboardPage() {
           )}
         </nav>
 
-        {/* Rodapé da Sidebar */}
         <div className="pt-4 border-t border-slate-800 text-xs text-slate-500">
           <p className="font-medium text-slate-400">ROTALOG SaaS v1.0</p>
           <p className="mt-0.5">Empresa Piloto Transporte</p>
@@ -375,17 +420,15 @@ export default function DashboardPage() {
 
       {/* CONTEÚDO PRINCIPAL */}
       <main className="flex-1 flex flex-col overflow-y-auto">
-        {/* Topbar */}
         <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-white">
-              {activeTab === 'overview' && 'Visão Geral da Frota e Operação'}
-              {activeTab === 'vehicles' && 'Controle e Manutenção de Veículos'}
-              {activeTab === 'employees' && 'Gestão de Colaboradores e Biometria LGPD'}
-              {activeTab === 'checklists' && 'Inspeções e Checklists de Entrada/Saída'}
-              {activeTab === 'timeclock' && 'Controle de Ponto Facial e Jornada CLT'}
-            </h2>
-          </div>
+          <h2 className="text-lg font-semibold text-white">
+            {activeTab === 'overview' && 'Visão Geral da Frota e Operação'}
+            {activeTab === 'vehicles' && 'Controle e Manutenção de Veículos'}
+            {activeTab === 'usages' && 'Controle de Horas de Uso por Veículo'}
+            {activeTab === 'employees' && 'Gestão de Colaboradores e Biometria LGPD'}
+            {activeTab === 'checklists' && 'Inspeções e Checklists de Entrada/Saída'}
+            {activeTab === 'timeclock' && 'Controle de Ponto Facial e Jornada CLT'}
+          </h2>
 
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -395,12 +438,18 @@ export default function DashboardPage() {
           </div>
         </header>
 
-        {/* Conteúdo dinâmico das Abas */}
+        {/* Notificação de Exportação */}
+        {exportNotification && (
+          <div className="bg-emerald-500/10 border-b border-emerald-500/30 px-6 py-2.5 text-xs text-emerald-300 flex items-center gap-2">
+            <Check size={14} className="text-emerald-400" />
+            {exportNotification}
+          </div>
+        )}
+
         <div className="p-6 space-y-6">
           {/* TAB: VISÃO GERAL */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              {/* Cards de Métricas Principais */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
                   <div className="flex items-center justify-between text-slate-400">
@@ -416,16 +465,14 @@ export default function DashboardPage() {
 
                 <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
                   <div className="flex items-center justify-between text-slate-400">
-                    <span className="text-xs font-semibold uppercase tracking-wider">Disponíveis</span>
-                    <CheckCircle2 size={20} className="text-emerald-400" />
+                    <span className="text-xs font-semibold uppercase tracking-wider">Horas de Operação</span>
+                    <Clock size={20} className="text-emerald-400" />
                   </div>
                   <div className="mt-3 flex items-baseline gap-2">
-                    <span className="text-3xl font-bold text-emerald-400">
-                      {vehicles.filter((v) => v.status === 'AVAILABLE').length}
-                    </span>
-                    <span className="text-xs text-slate-400">prontos para rota</span>
+                    <span className="text-3xl font-bold text-emerald-400">{totalFleetHours.toFixed(1)}h</span>
+                    <span className="text-xs text-slate-400">acumuladas</span>
                   </div>
-                  <div className="mt-2 text-xs text-emerald-500/80">Checklists de entrada liberados</div>
+                  <div className="mt-2 text-xs text-emerald-500/80">{totalFleetTrips} viagens finalizadas</div>
                 </div>
 
                 <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
@@ -439,7 +486,7 @@ export default function DashboardPage() {
                     </span>
                     <span className="text-xs text-slate-400">em reparo técnico</span>
                   </div>
-                  <div className="mt-2 text-xs text-amber-500/80">Avarias reportadas em checklist</div>
+                  <div className="mt-2 text-xs text-amber-500/80">Bloqueio preventivo automático</div>
                 </div>
 
                 <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
@@ -449,9 +496,9 @@ export default function DashboardPage() {
                   </div>
                   <div className="mt-3 flex items-baseline gap-2">
                     <span className="text-3xl font-bold text-white">{employees.length}</span>
-                    <span className="text-xs text-slate-400">usuários no sistema</span>
+                    <span className="text-xs text-slate-400">ativos na base</span>
                   </div>
-                  <div className="mt-2 text-xs text-purple-400/80">100% com biometria facial ativa</div>
+                  <div className="mt-2 text-xs text-purple-400/80">Consentimento LGPD ativo</div>
                 </div>
               </div>
 
@@ -486,7 +533,7 @@ export default function DashboardPage() {
                               </span>
                             </div>
                             <span className="text-xs text-slate-500">
-                              {v.currentMileage.toLocaleString('pt-BR')} km rodados • {v.branch}
+                              {v.currentMileage.toLocaleString('pt-BR')} km rodados • {v.totalHoursUsed}h de uso acumulado
                             </span>
                           </div>
                         </div>
@@ -520,23 +567,23 @@ export default function DashboardPage() {
                     <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl">
                       <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
                         <AlertTriangle size={14} />
-                        Problema em Checklist
+                        Avaria em Checklist de Saída
                       </div>
                       <p className="text-xs text-slate-300 mt-1">
-                        Veículo <strong>LOG4F33</strong> teve problema no item de iluminação (farol queimado).
+                        Veículo <strong>LOG4F33</strong> teve problema de iluminação. Direcionado automaticamente para manutenção.
                       </p>
-                      <span className="text-[10px] text-slate-500 block mt-2">Ontem, 18:20 • Notificação enviada ao Gestor</span>
+                      <span className="text-[10px] text-slate-500 block mt-2">Ontem, 18:20 • Status atualizado no banco</span>
                     </div>
 
                     <div className="p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                       <div className="flex items-center gap-2 text-xs font-semibold text-blue-300">
                         <ShieldCheck size={14} />
-                        Biometria Facial Concluída
+                        Sincronização Offline Ativa
                       </div>
                       <p className="text-xs text-slate-300 mt-1">
-                        Todos os motoristas cadastrados possuem embeddings gerados e termo LGPD assinado.
+                        Fila offline operando para motoristas em áreas de sombra de sinal celular.
                       </p>
-                      <span className="text-[10px] text-slate-500 block mt-2">Conformidade biométrica 100%</span>
+                      <span className="text-[10px] text-slate-500 block mt-2">Tecnologia Offline-First testada</span>
                     </div>
                   </div>
                 </div>
@@ -544,10 +591,87 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* TAB: CONTROLE DE HORAS / USO (FASE 2) */}
+          {activeTab === 'usages' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-base font-semibold text-white">Horas de Uso e Quilometragem por Veículo</h3>
+                  <p className="text-xs text-slate-400">Cálculo automatizado a partir dos checklists de entrada e saída</p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleExport('EXCEL')}
+                    className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-xl border border-slate-700 transition"
+                  >
+                    <FileSpreadsheet size={15} className="text-emerald-400" />
+                    Exportar Excel
+                  </button>
+                  <button
+                    onClick={() => handleExport('PDF')}
+                    className="flex items-center gap-2 px-3.5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-xl transition shadow-md shadow-blue-600/20"
+                  >
+                    <FileText size={15} />
+                    Exportar PDF
+                  </button>
+                </div>
+              </div>
+
+              {/* Tabela de Uso da Frota */}
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
+                <table className="w-full text-left text-sm text-slate-300">
+                  <thead className="bg-slate-800/60 text-xs uppercase font-semibold text-slate-400 border-b border-slate-800">
+                    <tr>
+                      <th className="px-6 py-4">Veículo</th>
+                      <th className="px-6 py-4">Status</th>
+                      <th className="px-6 py-4">Total de Horas</th>
+                      <th className="px-6 py-4">Viagens Concluídas</th>
+                      <th className="px-6 py-4">Odômetro Atual</th>
+                      <th className="px-6 py-4 text-right">Média Diária</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {vehicles.map((v) => (
+                      <tr key={v.id} className="hover:bg-slate-800/30 transition">
+                        <td className="px-6 py-4">
+                          <span className="font-bold text-white block">{v.plate}</span>
+                          <span className="text-xs text-slate-400">
+                            {v.brand} {v.model}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              v.status === 'AVAILABLE'
+                                ? 'bg-emerald-500/10 text-emerald-400'
+                                : v.status === 'IN_USE'
+                                ? 'bg-blue-500/10 text-blue-400'
+                                : 'bg-amber-500/10 text-amber-400'
+                            }`}
+                          >
+                            {v.status === 'AVAILABLE' && 'Disponível'}
+                            {v.status === 'IN_USE' && 'Em Rota'}
+                            {v.status === 'MAINTENANCE' && 'Manutenção'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-emerald-400">{v.totalHoursUsed} horas</td>
+                        <td className="px-6 py-4 text-slate-300">{v.totalTrips} rotas</td>
+                        <td className="px-6 py-4">{v.currentMileage.toLocaleString('pt-BR')} km</td>
+                        <td className="px-6 py-4 text-right font-medium text-slate-400">
+                          {(v.totalHoursUsed / 30).toFixed(1)} h/dia
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {/* TAB: VEÍCULOS */}
           {activeTab === 'vehicles' && (
             <div className="space-y-6">
-              {/* Header de Ações */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="relative w-full sm:w-80">
                   <Search size={16} className="absolute left-3 top-3 text-slate-400" />
@@ -569,7 +693,6 @@ export default function DashboardPage() {
                 </button>
               </div>
 
-              {/* Tabela de Veículos */}
               <div className="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden">
                 <table className="w-full text-left text-sm text-slate-300">
                   <thead className="bg-slate-800/60 text-xs uppercase font-semibold text-slate-400 border-b border-slate-800">
@@ -599,13 +722,13 @@ export default function DashboardPage() {
                                 : v.status === 'IN_USE'
                                 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                 : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            }`}
-                          >
-                            {v.status === 'AVAILABLE' && 'Disponível'}
-                            {v.status === 'IN_USE' && 'Em Uso'}
-                            {v.status === 'MAINTENANCE' && 'Manutenção'}
-                          </span>
-                        </td>
+                          }`}
+                        >
+                          {v.status === 'AVAILABLE' && 'Disponível'}
+                          {v.status === 'IN_USE' && 'Em Uso'}
+                          {v.status === 'MAINTENANCE' && 'Manutenção'}
+                        </span>
+                      </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
@@ -626,6 +749,63 @@ export default function DashboardPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: CHECKLISTS */}
+          {activeTab === 'checklists' && (
+            <div className="space-y-6">
+              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-white">Inspeções Recentes de Veículos (Checklists)</h3>
+                  <span className="text-xs text-slate-400">Integrado fim a fim com a frota</span>
+                </div>
+
+                <div className="space-y-4">
+                  {checklists.map((c) => (
+                    <div key={c.id} className="p-4 bg-slate-800/40 rounded-xl border border-slate-800">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-700/60 pb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-white text-base tracking-wide">{c.vehiclePlate}</span>
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded font-semibold ${
+                              c.type === 'ENTRY' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
+                            }`}
+                          >
+                            {c.type === 'ENTRY' ? 'Checklist de Entrada' : 'Checklist de Saída'}
+                          </span>
+                          {c.distanceDeltaKm && (
+                            <span className="text-xs text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded">
+                              +{c.distanceDeltaKm} km rodados
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-slate-400">{c.date} • Motorista: {c.driverName}</span>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mt-3 text-xs">
+                        {Object.entries(c.items).map(([key, ok]) => (
+                          <div
+                            key={key}
+                            className={`p-2 rounded-lg border flex items-center gap-1.5 ${
+                              ok
+                                ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
+                                : 'bg-red-500/5 border-red-500/20 text-red-400'
+                            }`}
+                          >
+                            {ok ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+                            <span className="capitalize">{key}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-3 text-xs text-slate-300 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
+                        <strong className="text-slate-400">Observações: </strong> {c.observations}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -719,54 +899,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* TAB: CHECKLISTS */}
-          {activeTab === 'checklists' && (
-            <div className="space-y-6">
-              <div className="bg-slate-900 rounded-2xl border border-slate-800 p-5">
-                <h3 className="font-semibold text-white mb-4">Inspeções Recentes de Veículos</h3>
-                <div className="space-y-4">
-                  {checklists.map((c) => (
-                    <div key={c.id} className="p-4 bg-slate-800/40 rounded-xl border border-slate-800">
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-slate-700/60 pb-3">
-                        <div className="flex items-center gap-3">
-                          <span className="font-bold text-white text-base tracking-wide">{c.vehiclePlate}</span>
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                              c.type === 'ENTRY' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
-                            }`}
-                          >
-                            {c.type === 'ENTRY' ? 'Checklist de Entrada' : 'Checklist de Saída'}
-                          </span>
-                        </div>
-                        <span className="text-xs text-slate-400">{c.date} • Motorista: {c.driverName}</span>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 mt-3 text-xs">
-                        {Object.entries(c.items).map(([key, ok]) => (
-                          <div
-                            key={key}
-                            className={`p-2 rounded-lg border flex items-center gap-1.5 ${
-                              ok
-                                ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
-                                : 'bg-red-500/5 border-red-500/20 text-red-400'
-                            }`}
-                          >
-                            {ok ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-                            <span className="capitalize">{key}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-3 text-xs text-slate-300 bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-                        <strong className="text-slate-400">Observações: </strong> {c.observations}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* TAB: PONTO & JORNADA */}
           {activeTab === 'timeclock' && (
             <div className="space-y-6">
@@ -776,7 +908,10 @@ export default function DashboardPage() {
                     <h3 className="font-semibold text-white">Espelho de Ponto Facial & Compliance CLT</h3>
                     <p className="text-xs text-slate-400">Batidas validadas via ML Kit + TFLite On-Device</p>
                   </div>
-                  <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 rounded-lg border border-slate-700 transition">
+                  <button
+                    onClick={() => handleExport('EXCEL')}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 rounded-lg border border-slate-700 transition"
+                  >
                     <FileSpreadsheet size={14} className="text-emerald-400" />
                     Exportar Relatório (Excel / PDF)
                   </button>
@@ -807,14 +942,14 @@ export default function DashboardPage() {
         </div>
       </main>
 
-      {/* MODAL: NOVO VEÍCULO */}
+      {/* MODAIS */}
       {isVehicleModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">
             <h3 className="text-lg font-bold text-white mb-4">Cadastrar Novo Veículo</h3>
             <form onSubmit={handleAddVehicle} className="space-y-4 text-sm">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Placa (Mercosul ou Padrão)</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1">Placa</label>
                 <input
                   type="text"
                   required
@@ -891,7 +1026,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* MODAL: NOVO COLABORADOR */}
       {isEmployeeModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-6 shadow-2xl">

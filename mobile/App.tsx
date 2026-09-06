@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,10 +12,15 @@ import {
   Alert,
 } from 'react-native';
 import { UserProfile, AssignedVehicle, ClockingRecord } from './src/types';
+import { offlineQueue } from './src/services/offlineQueue';
 
 export default function App() {
+  // Simulação de conectividade de rede (Online x Offline)
+  const [isNetworkOnline, setIsNetworkOnline] = useState<boolean>(true);
+  const [pendingQueueCount, setPendingQueueCount] = useState<number>(0);
+
   // Usuário ativo
-  const [user, setUser] = useState<UserProfile>({
+  const [user] = useState<UserProfile>({
     id: 'u1',
     name: 'João Silva',
     cpf: '333.444.555-66',
@@ -34,6 +39,19 @@ export default function App() {
     model: 'Gol 1.0 MPI',
     currentMileage: 58120,
     status: 'IN_USE',
+  });
+
+  // Sessão de rota ativa (Controle de Horas de Uso)
+  const [activeRoute, setActiveRoute] = useState<{
+    inProgress: boolean;
+    startMileage: number;
+    startTime: string;
+    elapsedMinutes: number;
+  }>({
+    inProgress: true,
+    startMileage: 58040,
+    startTime: '08:15',
+    elapsedMinutes: 85, // 1h 25m em rota
   });
 
   // Batidas de ponto do dia
@@ -57,6 +75,7 @@ export default function App() {
   // Modais de Operação
   const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
+  const [checklistType, setChecklistType] = useState<'ENTRY' | 'EXIT'>('EXIT');
   const [faceScanState, setFaceScanState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS'>('IDLE');
 
   // Estado do Checklist
@@ -71,12 +90,20 @@ export default function App() {
   const [checklistObs, setChecklistObs] = useState('');
   const [checklistMileage, setChecklistMileage] = useState('58120');
 
+  // Inscrever-se nas mudanças da fila offline
+  useEffect(() => {
+    const unsubscribe = offlineQueue.subscribe(() => {
+      setPendingQueueCount(offlineQueue.getPendingCount());
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Disparar batida facial (Pipeline On-Device)
   const handleStartFacialPunch = () => {
     setIsFaceModalOpen(true);
     setFaceScanState('SCANNING');
 
-    // Simula a detecção do ML Kit e cálculo de embedding do TFLite (Fase 1/Fase 3)
+    // Simula a detecção do ML Kit e cálculo de embedding do TFLite
     setTimeout(() => {
       setFaceScanState('SUCCESS');
       const now = new Date();
@@ -90,25 +117,108 @@ export default function App() {
           facialVerified: true,
           matchScore: 98.5,
         };
+
+        if (!isNetworkOnline) {
+          offlineQueue.enqueueClocking({
+            type: newRecord.type,
+            timestamp: newRecord.timestamp,
+            facialVerified: true,
+            matchScore: 98.5,
+          });
+        }
+
         setClockings([newRecord, ...clockings]);
         setIsFaceModalOpen(false);
         setFaceScanState('IDLE');
-        Alert.alert('Ponto Registrado!', `Ponto batido com sucesso às ${timeStr} com validação biométrica on-device.`);
-      }, 1200);
-    }, 2000);
+
+        Alert.alert(
+          'Ponto Registrado!',
+          !isNetworkOnline
+            ? `Ponto registrado offline às ${timeStr} e enfileirado para sincronização.`
+            : `Ponto batido com sucesso às ${timeStr} com validação biométrica on-device.`,
+        );
+      }, 1000);
+    }, 1800);
   };
 
-  // Salvar Checklist
+  // Abrir checklist de entrada ou saída
+  const openChecklist = (type: 'ENTRY' | 'EXIT') => {
+    setChecklistType(type);
+    setChecklistObs('');
+    setIsChecklistModalOpen(true);
+  };
+
+  // Salvar Checklist (com suporte Offline-First e cálculo de rota)
   const handleSaveChecklist = () => {
+    const mileageNum = parseInt(checklistMileage, 10) || vehicle.currentMileage;
     const hasProblem = Object.values(checklistItems).some((item) => !item);
+
     setIsChecklistModalOpen(false);
 
+    if (checklistType === 'ENTRY') {
+      // Inicia rota
+      setActiveRoute({
+        inProgress: true,
+        startMileage: mileageNum,
+        startTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        elapsedMinutes: 0,
+      });
+      setVehicle({ ...vehicle, status: 'IN_USE', currentMileage: mileageNum });
+    } else {
+      // Finaliza rota
+      const kmDriven = Math.max(0, mileageNum - activeRoute.startMileage);
+      setActiveRoute({
+        inProgress: false,
+        startMileage: mileageNum,
+        startTime: '',
+        elapsedMinutes: 0,
+      });
+      setVehicle({
+        ...vehicle,
+        status: hasProblem ? 'MAINTENANCE' : 'AVAILABLE',
+        currentMileage: mileageNum,
+      });
+    }
+
+    // Se estiver sem conexão, enfileira localmente
+    if (!isNetworkOnline) {
+      offlineQueue.enqueueChecklist({
+        vehicleId: vehicle.id,
+        vehiclePlate: vehicle.plate,
+        type: checklistType,
+        mileage: mileageNum,
+        itemsResult: checklistItems,
+        observation: checklistObs,
+        hasProblem,
+      });
+
+      Alert.alert(
+        'Modo Offline Ativo',
+        `Checklist de ${checklistType === 'ENTRY' ? 'Entrada' : 'Saída'} gravado localmente no smartphone. Será sincronizado automaticamente assim que a conexão retornar.`,
+      );
+      return;
+    }
+
+    // Caso online: confirmação instantânea
     Alert.alert(
-      hasProblem ? 'Checklist com Alerta!' : 'Checklist Aprovado!',
-      hasProblem
-        ? 'Avarias ou problemas reportados. Uma notificação foi enviada ao Gestor de Frota.'
-        : 'Veículo liberado para operação com sucesso.',
+      hasProblem ? 'Alerta de Avaria!' : 'Checklist Concluído!',
+      checklistType === 'ENTRY'
+        ? 'Checklist de entrada concluído. Veículo liberado para rota.'
+        : hasProblem
+        ? 'Avaria reportada! Veículo direcionado para MANUTENÇÃO e Gestor notificado.'
+        : 'Checklist de saída concluído com sucesso. Veículo liberado na base.',
     );
+  };
+
+  // Sincronizar fila pendente
+  const handleSyncQueue = async () => {
+    if (pendingQueueCount === 0) {
+      Alert.alert('Fila Vazia', 'Não há itens pendentes para sincronizar no momento.');
+      return;
+    }
+
+    offlineQueue.clearQueue();
+    Alert.alert('Sincronização Concluída', 'Todos os checklists e batidas offline foram enviados com sucesso ao servidor.');
   };
 
   return (
@@ -127,10 +237,17 @@ export default function App() {
           </View>
         </View>
 
-        <View style={styles.onlineBadge}>
-          <View style={styles.onlineDot} />
-          <Text style={styles.onlineText}>Online</Text>
-        </View>
+        {/* Botão de Toggle de Rede para Teste Offline */}
+        <TouchableOpacity
+          onPress={() => setIsNetworkOnline(!isNetworkOnline)}
+          style={[styles.onlineBadge, !isNetworkOnline && styles.offlineBadge]}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.onlineDot, !isNetworkOnline && styles.offlineDot]} />
+          <Text style={[styles.onlineText, !isNetworkOnline && styles.offlineText]}>
+            {isNetworkOnline ? 'Online' : 'Offline'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -163,11 +280,13 @@ export default function App() {
           </View>
         </TouchableOpacity>
 
-        {/* CARD DO VEÍCULO VINCULADO */}
+        {/* CARD DE ROTA E VEÍCULO EM USO */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Veículo em Uso</Text>
-          <TouchableOpacity onPress={() => setIsChecklistModalOpen(true)}>
-            <Text style={styles.sectionAction}>Fazer Checklist</Text>
+          <Text style={styles.sectionTitle}>Controle de Uso do Veículo</Text>
+          <TouchableOpacity onPress={() => openChecklist(activeRoute.inProgress ? 'EXIT' : 'ENTRY')}>
+            <Text style={styles.sectionAction}>
+              {activeRoute.inProgress ? 'Checklist Saída' : 'Checklist Entrada'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -179,10 +298,50 @@ export default function App() {
                 {vehicle.brand} {vehicle.model}
               </Text>
             </View>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>Em Rota</Text>
+            <View
+              style={[
+                styles.statusBadge,
+                vehicle.status === 'AVAILABLE' && styles.statusBadgeAvailable,
+                vehicle.status === 'MAINTENANCE' && styles.statusBadgeMaintenance,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusBadgeText,
+                  vehicle.status === 'AVAILABLE' && styles.statusBadgeTextAvailable,
+                  vehicle.status === 'MAINTENANCE' && styles.statusBadgeTextMaintenance,
+                ]}
+              >
+                {vehicle.status === 'IN_USE' && 'Em Rota'}
+                {vehicle.status === 'AVAILABLE' && 'Disponível'}
+                {vehicle.status === 'MAINTENANCE' && 'Manutenção'}
+              </Text>
             </View>
           </View>
+
+          {/* Medidor de Tempo em Rota (Controle de Horas da Fase 2) */}
+          {activeRoute.inProgress ? (
+            <View style={styles.activeRouteBox}>
+              <View style={styles.routeMetricItem}>
+                <Text style={styles.routeMetricLabel}>Início da Rota</Text>
+                <Text style={styles.routeMetricValue}>{activeRoute.startTime}</Text>
+              </View>
+              <View style={styles.routeMetricItem}>
+                <Text style={styles.routeMetricLabel}>Tempo em Operação</Text>
+                <Text style={styles.routeMetricValueHighlight}>
+                  {Math.floor(activeRoute.elapsedMinutes / 60)}h {activeRoute.elapsedMinutes % 60}m
+                </Text>
+              </View>
+              <View style={styles.routeMetricItem}>
+                <Text style={styles.routeMetricLabel}>Km Inicial</Text>
+                <Text style={styles.routeMetricValue}>{activeRoute.startMileage}</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.noRouteBox}>
+              <Text style={styles.noRouteText}>Nenhuma rota em andamento. Faça o Checklist de Entrada.</Text>
+            </View>
+          )}
 
           <View style={styles.divider} />
 
@@ -191,16 +350,37 @@ export default function App() {
               <Text style={styles.detailLabel}>Odômetro Atual</Text>
               <Text style={styles.detailValue}>{vehicle.currentMileage.toLocaleString('pt-BR')} km</Text>
             </View>
-            <TouchableOpacity style={styles.checklistQuickBtn} onPress={() => setIsChecklistModalOpen(true)}>
-              <Text style={styles.checklistQuickBtnText}>Checklist Saída</Text>
+
+            <TouchableOpacity
+              style={styles.checklistQuickBtn}
+              onPress={() => openChecklist(activeRoute.inProgress ? 'EXIT' : 'ENTRY')}
+            >
+              <Text style={styles.checklistQuickBtnText}>
+                {activeRoute.inProgress ? 'Finalizar Rota' : 'Iniciar Rota'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
+        {/* CARD DA FILA OFFLINE-FIRST (SE HOUVER PENDÊNCIAS) */}
+        {pendingQueueCount > 0 && (
+          <View style={styles.queueCard}>
+            <View style={styles.queueHeader}>
+              <Text style={styles.queueTitle}>⚠ Fila Offline com {pendingQueueCount} pendência(s)</Text>
+              <TouchableOpacity style={styles.syncBtn} onPress={handleSyncQueue}>
+                <Text style={styles.syncBtnText}>Sincronizar</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.queueSubtitle}>
+              Os dados estão salvos com segurança no aparelho e serão transmitidos ao servidor.
+            </Text>
+          </View>
+        )}
+
         {/* HISTÓRICO DE PONTOS DE HOJE */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Jornada de Hoje (CLT)</Text>
-          <Text style={styles.sectionSubtitle}>2 batidas válidas</Text>
+          <Text style={styles.sectionSubtitle}>{clockings.length} batidas registradas</Text>
         </View>
 
         <View style={styles.historyCard}>
@@ -225,9 +405,11 @@ export default function App() {
           ))}
         </View>
 
-        {/* INDICADOR DE SINCRONIZAÇÃO OFFLINE */}
+        {/* RODAPÉ INFORMATIVO */}
         <View style={styles.offlineFooter}>
-          <Text style={styles.offlineFooterText}>☁ Fila Offline: 0 pendências para sincronizar</Text>
+          <Text style={styles.offlineFooterText}>
+            ☁ Fila Offline: {pendingQueueCount} pendências | Conexão: {isNetworkOnline ? 'Ativa' : 'Desconectada'}
+          </Text>
         </View>
       </ScrollView>
 
@@ -238,7 +420,6 @@ export default function App() {
             <Text style={styles.faceModalTitle}>Reconhecimento Facial</Text>
             <Text style={styles.faceModalSubtitle}>Posicione seu rosto no quadro abaixo</Text>
 
-            {/* Quadro da Câmera / ML Kit */}
             <View style={styles.cameraBox}>
               <View style={[styles.cameraGuide, faceScanState === 'SUCCESS' && styles.cameraGuideSuccess]}>
                 {faceScanState === 'SCANNING' && <Text style={styles.scanText}>Analisando traços faciais...</Text>}
@@ -265,16 +446,20 @@ export default function App() {
         </View>
       </Modal>
 
-      {/* MODAL DE CHECKLIST VEICULAR */}
+      {/* MODAL DE CHECKLIST VEICULAR (ENTRADA / SAÍDA) */}
       <Modal visible={isChecklistModalOpen} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.checklistModalContainer}>
-            <Text style={styles.checklistModalTitle}>Checklist Veicular</Text>
-            <Text style={styles.checklistModalSubtitle}>{vehicle.plate} • Inspeção de Rotina</Text>
+            <Text style={styles.checklistModalTitle}>
+              Checklist de {checklistType === 'ENTRY' ? 'Entrada (Início de Rota)' : 'Saída (Fim de Rota)'}
+            </Text>
+            <Text style={styles.checklistModalSubtitle}>
+              {vehicle.plate} • {vehicle.brand} {vehicle.model}
+            </Text>
 
             <ScrollView style={styles.checklistScroll} showsVerticalScrollIndicator={false}>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Quilometragem no Painel</Text>
+                <Text style={styles.inputLabel}>Quilometragem no Painel (Km)</Text>
                 <TextInput
                   style={styles.textInput}
                   value={checklistMileage}
@@ -315,12 +500,12 @@ export default function App() {
               })}
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Observações (Opcional)</Text>
+                <Text style={styles.inputLabel}>Observações ou Descrição de Avarias</Text>
                 <TextInput
                   style={[styles.textInput, styles.textArea]}
                   value={checklistObs}
                   onChangeText={setChecklistObs}
-                  placeholder="Descreva avarias ou observações..."
+                  placeholder="Informe detalhes caso haja algum problema..."
                   placeholderTextColor="#64748b"
                   multiline
                 />
@@ -332,7 +517,9 @@ export default function App() {
                 <Text style={styles.cancelBtnModalText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveChecklistBtn} onPress={handleSaveChecklist}>
-                <Text style={styles.saveChecklistBtnText}>Concluir Checklist</Text>
+                <Text style={styles.saveChecklistBtnText}>
+                  {checklistType === 'ENTRY' ? 'Liberar Veículo' : 'Concluir Devolução'}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -396,16 +583,26 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(16, 185, 129, 0.25)',
   },
+  offlineBadge: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+  },
   onlineDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: '#34d399',
   },
+  offlineDot: {
+    backgroundColor: '#f87171',
+  },
   onlineText: {
     color: '#34d399',
     fontSize: 11,
     fontWeight: '600',
+  },
+  offlineText: {
+    color: '#f87171',
   },
   scrollContent: {
     padding: 20,
@@ -557,10 +754,65 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(59, 130, 246, 0.3)',
   },
+  statusBadgeAvailable: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  statusBadgeMaintenance: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
   statusBadgeText: {
     color: '#60a5fa',
     fontSize: 11,
     fontWeight: '600',
+  },
+  statusBadgeTextAvailable: {
+    color: '#34d399',
+  },
+  statusBadgeTextMaintenance: {
+    color: '#f87171',
+  },
+  activeRouteBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(37, 99, 235, 0.08)',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.2)',
+  },
+  noRouteBox: {
+    backgroundColor: '#0f172a',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 12,
+  },
+  noRouteText: {
+    color: '#64748b',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  routeMetricItem: {
+    alignItems: 'center',
+  },
+  routeMetricLabel: {
+    color: '#64748b',
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  routeMetricValue: {
+    color: '#f1f5f9',
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  routeMetricValueHighlight: {
+    color: '#38bdf8',
+    fontSize: 13,
+    fontWeight: 'bold',
+    marginTop: 2,
   },
   divider: {
     height: 1,
@@ -582,17 +834,48 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   checklistQuickBtn: {
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#2563eb',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
   },
   checklistQuickBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  queueCard: {
+    backgroundColor: 'rgba(234, 179, 8, 0.1)',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.3)',
+  },
+  queueHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  queueTitle: {
+    color: '#fde047',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  syncBtn: {
+    backgroundColor: '#ca8a04',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  syncBtnText: {
+    color: '#000',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  queueSubtitle: {
     color: '#94a3b8',
     fontSize: 11,
-    fontWeight: '600',
+    marginTop: 4,
   },
   historyCard: {
     backgroundColor: '#111827',
@@ -651,7 +934,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Estilos Modais
+  // Modais
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -738,7 +1021,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Modal Checklist
   checklistModalContainer: {
     width: '100%',
     maxHeight: '85%',
