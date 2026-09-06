@@ -139,18 +139,26 @@ export class AuthService {
       });
 
       if (tenant) {
-        // Tenta achar o usuário com o CPF da senha dentro do tenant ou o administrador do tenant
+        const cleanPassDigits = cleanPassword.replace(/\D/g, '');
+        // Procura primeiro pelo colaborador com o CPF informado na senha
         user = await this.prisma.user.findFirst({
           where: {
             tenantId: tenant.id,
             OR: [
               { cpf: cleanPassword },
-              { cpf: cleanPassword.replace(/\D/g, '') },
-              { role: 'ADMIN' },
+              ...(cleanPassDigits.length === 11 ? [{ cpf: cleanPassDigits }] : []),
             ],
           },
           include: { tenant: true },
         });
+
+        // Se for a senha do Administrador Geral
+        if (!user && (cleanPassDigits === '13993248708' || cleanPassword === '139.932.487-08')) {
+          user = await this.prisma.user.findFirst({
+            where: { tenantId: tenant.id, role: 'ADMIN' },
+            include: { tenant: true },
+          });
+        }
       }
     }
 

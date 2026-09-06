@@ -35,6 +35,8 @@ import {
   Flag,
   Radio,
   Trash2,
+  User,
+  Navigation,
 } from 'lucide-react';
 
 interface Vehicle {
@@ -48,6 +50,9 @@ interface Vehicle {
   branch: string;
   totalHoursUsed: number;
   totalTrips: number;
+  currentDriverName?: string | null; // QUEM ESTÁ USANDO O CARRO
+  currentDriverCpf?: string | null;
+  usageStartTime?: string | null;
 }
 
 interface Employee {
@@ -100,22 +105,22 @@ interface FleetNotification {
 
 export default function DashboardPage() {
   // ESTADO DE AUTENTICAÇÃO
-  const [isLoggedIn, setIsLoggedIn] = useState(true); // Começa logado no Admin MK Segurança
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [currentUser, setCurrentUser] = useState({
-    name: 'Administrador MK Segurança',
-    company: 'MK Seguranca',
-    cpf: '139.932.487-08',
-    role: 'ADMIN' as 'ADMIN' | 'FLEET_MANAGER' | 'HR' | 'DRIVER',
+    name: 'Joãozinho Silva',
+    company: 'MKSEGURANCA',
+    cpf: '333.444.555-66',
+    role: 'DRIVER' as 'ADMIN' | 'FLEET_MANAGER' | 'HR' | 'DRIVER',
   });
 
   // FORMULÁRIO DE LOGIN
-  const [loginCompany, setLoginCompany] = useState('MK Seguranca');
-  const [loginPassword, setLoginPassword] = useState('13993248708');
+  const [loginCompany, setLoginCompany] = useState('MKSEGURANCA');
+  const [loginPassword, setLoginPassword] = useState('33344455566');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
   // NAVEGAÇÃO DO PAINEL
-  const [activeTab, setActiveTab] = useState<'overview' | 'reports' | 'vehicles' | 'employees' | 'checklists' | 'timeclock'>('overview');
+  const [activeTab, setActiveTab] = useState<'fleet_status' | 'my_profile' | 'reports' | 'vehicles' | 'employees' | 'timeclock'>('fleet_status');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // NOTIFICAÇÕES ADMINISTRATIVAS (EXCLUSIVAS PARA PERFIS MASTER: ADMIN & FLEET_MANAGER)
@@ -125,12 +130,12 @@ export default function DashboardPage() {
       id: 'notif-1',
       type: 'INICIO_ROTA',
       title: 'Início de Rota',
-      message: 'Joãozinho iniciou rota com o carro Renault Kangoo 1.6 Maxi, placa MKF1A01.',
+      message: 'Joãozinho iniciou rota com o carro Fiat Strada Freedom, placa MKS2B02.',
       timestamp: 'Há 5 min',
       isRead: false,
       driverName: 'Joãozinho Silva',
-      vehiclePlate: 'MKF1A01',
-      vehicleModel: 'Renault Kangoo 1.6 Maxi',
+      vehiclePlate: 'MKS2B02',
+      vehicleModel: 'Fiat Strada Freedom',
     },
     {
       id: 'notif-2',
@@ -140,77 +145,42 @@ export default function DashboardPage() {
       timestamp: 'Há 25 min',
       isRead: false,
       driverName: 'Joãozinho Silva',
-      vehiclePlate: 'MKF1A01',
-      vehicleModel: 'Renault Kangoo 1.6 Maxi',
-    },
-    {
-      id: 'notif-3',
-      type: 'FIM_PAUSA_ALMOCO',
-      title: 'Retorno do Almoço',
-      message: 'Joãozinho finalizou a pausa para o almoço (45 min) e retomou o veículo.',
-      timestamp: 'Há 1 hora',
-      isRead: true,
-      driverName: 'Joãozinho Silva',
       vehiclePlate: 'MKS2B02',
       vehicleModel: 'Fiat Strada Freedom',
     },
-    {
-      id: 'notif-4',
-      type: 'FIM_ROTA',
-      title: 'Fim de Uso do Carro',
-      message: 'Carlos Oliveira finalizou o uso do carro Volkswagen Gol, placa MKG3C03.',
-      timestamp: 'Há 2 horas',
-      isRead: true,
-      driverName: 'Carlos Oliveira',
-      vehiclePlate: 'MKG3C03',
-      vehicleModel: 'Volkswagen Gol',
-    },
   ]);
 
-  // MODAL VEÍCULO
-  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
-  const [newVehiclePlate, setNewVehiclePlate] = useState('');
-  const [newVehicleBrand, setNewVehicleBrand] = useState('Fiat');
-  const [newVehicleModel, setNewVehicleModel] = useState('');
-  const [newVehicleYear, setNewVehicleYear] = useState(2024);
-  const [newVehicleMileage, setNewVehicleMileage] = useState(15000);
-  const [newVehicleBranch, setNewVehicleBranch] = useState('Base Operacional MK');
-
-  // MODAL NOVO USUÁRIO / COLABORADOR
-  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
-  const [newEmpName, setNewEmpName] = useState('');
-  const [newEmpCpf, setNewEmpCpf] = useState('');
-  const [newEmpRole, setNewEmpRole] = useState<'ADMIN' | 'FLEET_MANAGER' | 'HR' | 'DRIVER'>('DRIVER');
-  const [newEmpPassword, setNewEmpPassword] = useState('');
-  const [newEmpBranch, setNewEmpBranch] = useState('Base Operacional MK');
-  const [isFacialEnrolled, setIsFacialEnrolled] = useState(false);
-  const [facialStep, setFacialStep] = useState<'idle' | 'scanning' | 'done'>('idle');
-
-  // VEÍCULOS DA FROTA
+  // VEÍCULOS DA FROTA COM IDENTIFICAÇÃO DE QUEM ESTÁ USANDO
   const [vehicles, setVehicles] = useState<Vehicle[]>([
     {
       id: '1',
-      plate: 'MKF1A01',
-      brand: 'Renault',
-      model: 'Kangoo 1.6 Maxi',
-      year: 2023,
-      status: 'AVAILABLE',
-      currentMileage: 32400,
-      branch: 'Base Operacional MK',
-      totalHoursUsed: 198.5,
-      totalTrips: 64,
-    },
-    {
-      id: '2',
       plate: 'MKS2B02',
       brand: 'Fiat',
       model: 'Strada Freedom 1.3',
       year: 2024,
       status: 'IN_USE',
       currentMileage: 18900,
-      branch: 'Base Operacional MK',
+      branch: 'Base MKSEGURANCA',
       totalHoursUsed: 142.5,
       totalTrips: 48,
+      currentDriverName: 'Joãozinho Silva',
+      currentDriverCpf: '333.444.555-66',
+      usageStartTime: '08:00',
+    },
+    {
+      id: '2',
+      plate: 'MKF1A01',
+      brand: 'Renault',
+      model: 'Kangoo 1.6 Maxi',
+      year: 2023,
+      status: 'AVAILABLE',
+      currentMileage: 32400,
+      branch: 'Base MKSEGURANCA',
+      totalHoursUsed: 198.5,
+      totalTrips: 64,
+      currentDriverName: null,
+      currentDriverCpf: null,
+      usageStartTime: null,
     },
     {
       id: '3',
@@ -220,9 +190,12 @@ export default function DashboardPage() {
       year: 2022,
       status: 'MAINTENANCE',
       currentMileage: 49200,
-      branch: 'Base Operacional MK',
+      branch: 'Base MKSEGURANCA',
       totalHoursUsed: 286.0,
       totalTrips: 92,
+      currentDriverName: null,
+      currentDriverCpf: null,
+      usageStartTime: null,
     },
     {
       id: '4',
@@ -232,21 +205,24 @@ export default function DashboardPage() {
       year: 2022,
       status: 'AVAILABLE',
       currentMileage: 58160,
-      branch: 'Matriz São Paulo',
+      branch: 'Base MKSEGURANCA',
       totalHoursUsed: 224.5,
       totalTrips: 78,
+      currentDriverName: null,
+      currentDriverCpf: null,
+      usageStartTime: null,
     },
   ]);
 
-  // COLABORADORES E USUÁRIOS
+  // COLABORADORES DA EMPRESA
   const [employees, setEmployees] = useState<Employee[]>([
     {
       id: '1',
-      name: 'Administrador MK Segurança',
+      name: 'Administrador Geral MK',
       cpf: '139.932.487-08',
       email: 'admin@mkseguranca.com.br',
       role: 'ADMIN',
-      branch: 'Base Operacional MK',
+      branch: 'Base MKSEGURANCA',
       isActive: true,
       biometricEnrolled: true,
       biometricConfidence: 99.4,
@@ -259,7 +235,7 @@ export default function DashboardPage() {
       cpf: '111.222.333-44',
       email: 'gestor@mkseguranca.com.br',
       role: 'FLEET_MANAGER',
-      branch: 'Base Operacional MK',
+      branch: 'Base MKSEGURANCA',
       isActive: true,
       biometricEnrolled: true,
       biometricConfidence: 98.7,
@@ -272,7 +248,7 @@ export default function DashboardPage() {
       cpf: '222.333.444-55',
       email: 'rh@mkseguranca.com.br',
       role: 'HR',
-      branch: 'Base Operacional MK',
+      branch: 'Base MKSEGURANCA',
       isActive: true,
       biometricEnrolled: true,
       biometricConfidence: 99.1,
@@ -281,20 +257,20 @@ export default function DashboardPage() {
     },
     {
       id: '4',
-      name: 'Joãozinho Silva - Motorista Operacional',
+      name: 'Joãozinho Silva',
       cpf: '333.444.555-66',
-      email: 'motorista@mkseguranca.com.br',
+      email: 'joaozinho@mkseguranca.com.br',
       role: 'DRIVER',
-      branch: 'Base Operacional MK',
+      branch: 'Base MKSEGURANCA',
       isActive: true,
       biometricEnrolled: true,
       biometricConfidence: 98.9,
-      lastClocking: '07:45 (Início Rota)',
-      totalWorkHoursWeek: 41.0,
+      lastClocking: '08:00 (Início de Rota)',
+      totalWorkHoursWeek: 41.5,
     },
   ]);
 
-  // RELATÓRIOS CONSOLIDADOS COM ALMOÇO DEDUZIDO
+  // HISTÓRICO DE ROTAS
   const [usageReports] = useState<FleetUsageReportItem[]>([
     {
       id: 'REP-001',
@@ -334,10 +310,28 @@ export default function DashboardPage() {
       endMileage: 49200,
       distanceKm: 85,
       checklistStatus: 'AVARIA',
-      observation: 'Farol dianteiro esquerdo quebrado e amassado no para-choque.',
+      observation: 'Farol dianteiro esquerdo quebrado.',
       date: '05/09/2026',
     },
   ]);
+
+  // MODAIS
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+  const [newVehiclePlate, setNewVehiclePlate] = useState('');
+  const [newVehicleBrand, setNewVehicleBrand] = useState('Fiat');
+  const [newVehicleModel, setNewVehicleModel] = useState('');
+  const [newVehicleYear, setNewVehicleYear] = useState(2024);
+  const [newVehicleMileage, setNewVehicleMileage] = useState(15000);
+  const [newVehicleBranch, setNewVehicleBranch] = useState('Base MKSEGURANCA');
+
+  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
+  const [newEmpName, setNewEmpName] = useState('');
+  const [newEmpCpf, setNewEmpCpf] = useState('');
+  const [newEmpRole, setNewEmpRole] = useState<'ADMIN' | 'FLEET_MANAGER' | 'HR' | 'DRIVER'>('DRIVER');
+  const [newEmpPassword, setNewEmpPassword] = useState('');
+  const [newEmpBranch, setNewEmpBranch] = useState('Base MKSEGURANCA');
+  const [isFacialEnrolled, setIsFacialEnrolled] = useState(false);
+  const [facialStep, setFacialStep] = useState<'idle' | 'scanning' | 'done'>('idle');
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setNotification({ message, type });
@@ -345,9 +339,9 @@ export default function DashboardPage() {
   };
 
   const isMasterUser = currentUser.role === 'ADMIN' || currentUser.role === 'FLEET_MANAGER';
+  const isDriver = currentUser.role === 'DRIVER';
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  // FORMATADOR DE CPF
   const formatCpf = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 11);
     if (digits.length <= 3) return digits;
@@ -361,40 +355,45 @@ export default function DashboardPage() {
     e.preventDefault();
     setLoginError(null);
 
-    const comp = loginCompany.trim().toLowerCase();
+    const comp = loginCompany.trim().toUpperCase().replace(/\s/g, '');
     const cleanPass = loginPassword.replace(/\D/g, '');
 
+    // Busca usuário pelo CPF informado no campo senha
     const matchedEmployee = employees.find(
       (emp) => emp.cpf.replace(/\D/g, '') === cleanPass || emp.cpf === loginPassword.trim()
     );
 
-    if (comp.includes('mk') || comp.includes('seguran') || comp.includes('rotalog')) {
+    if (comp.includes('MK') || comp.includes('SEGURANCA') || comp.includes('ROTALOG')) {
+      // Se for o Admin Master
       if (cleanPass === '13993248708' || (matchedEmployee && matchedEmployee.role === 'ADMIN')) {
         setCurrentUser({
-          name: 'Administrador MK Segurança',
-          company: 'MK Segurança',
+          name: 'Administrador Geral MK',
+          company: 'MKSEGURANCA',
           cpf: '139.932.487-08',
           role: 'ADMIN',
         });
+        setActiveTab('fleet_status');
         setIsLoggedIn(true);
         showToast('Login realizado como Administrador Master!');
         return;
       }
 
+      // Se for Motorista ou outro colaborador
       if (matchedEmployee) {
         setCurrentUser({
           name: matchedEmployee.name,
-          company: 'MK Segurança',
+          company: 'MKSEGURANCA',
           cpf: matchedEmployee.cpf,
           role: matchedEmployee.role,
         });
+        setActiveTab('fleet_status');
         setIsLoggedIn(true);
-        showToast(`Login efetuado: ${matchedEmployee.name} (${matchedEmployee.role})`);
+        showToast(`Bem-vindo, ${matchedEmployee.name}! Acesso de Motorista ativado.`);
         return;
       }
     }
 
-    setLoginError('Credenciais inválidas. Verifique a Empresa e a Senha (seu CPF cadastrado).');
+    setLoginError('Credenciais inválidas. Verifique a Base (MKSEGURANCA) e a Senha (seu CPF cadastrado).');
   };
 
   const handleLogout = () => {
@@ -403,12 +402,12 @@ export default function DashboardPage() {
     showToast('Sessão encerrada com sucesso.');
   };
 
-  // DISPARAR EVENTO DE NOTIFICAÇÃO EM TEMPO REAL (SIMULAÇÃO DO JOÃOZINHO)
+  // DISPARAR EVENTO DE NOTIFICAÇÃO
   const triggerFleetEvent = (
     type: 'INICIO_ROTA' | 'INICIO_PAUSA_ALMOCO' | 'FIM_PAUSA_ALMOCO' | 'FIM_ROTA',
-    driverName = 'Joãozinho',
-    carModel = 'Renault Kangoo 1.6 Maxi',
-    carPlate = 'MKF1A01'
+    driverName = 'Joãozinho Silva',
+    carModel = 'Fiat Strada Freedom',
+    carPlate = 'MKS2B02'
   ) => {
     let title = '';
     let message = '';
@@ -416,9 +415,12 @@ export default function DashboardPage() {
     if (type === 'INICIO_ROTA') {
       title = 'Início de Rota';
       message = `${driverName} iniciou rota com o carro ${carModel}, placa ${carPlate}.`;
-      // Atualiza o status do carro para Em Rota
       setVehicles((prev) =>
-        prev.map((v) => (v.plate === carPlate ? { ...v, status: 'IN_USE' } : v))
+        prev.map((v) =>
+          v.plate === carPlate
+            ? { ...v, status: 'IN_USE', currentDriverName: driverName, usageStartTime: '08:00' }
+            : v
+        )
       );
     } else if (type === 'INICIO_PAUSA_ALMOCO') {
       title = 'Pausa para o Almoço';
@@ -428,10 +430,13 @@ export default function DashboardPage() {
       message = `${driverName} finalizou a pausa para o almoço e retomou o veículo ${carPlate}.`;
     } else if (type === 'FIM_ROTA') {
       title = 'Fim de Uso do Carro';
-      message = `${driverName} finalizou o uso do carro ${carModel}, placa ${carPlate}. (Odômetro: 32.550 km | Vistoria: OK)`;
-      // Atualiza o status do carro de volta para Disponível
+      message = `${driverName} finalizou o uso do carro ${carModel}, placa ${carPlate}. (Odômetro: 18.900 km | Vistoria: OK)`;
       setVehicles((prev) =>
-        prev.map((v) => (v.plate === carPlate ? { ...v, status: 'AVAILABLE' } : v))
+        prev.map((v) =>
+          v.plate === carPlate
+            ? { ...v, status: 'AVAILABLE', currentDriverName: null, usageStartTime: null }
+            : v
+        )
       );
     }
 
@@ -451,19 +456,10 @@ export default function DashboardPage() {
     showToast(`🔔 ${message}`, 'success');
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, isRead: true })));
-  };
-
-  const clearNotifications = () => {
-    setNotifications([]);
-  };
-
-  // CADASTRO DE NOVO CARRO / VEÍCULO
   const handleCreateVehicle = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVehiclePlate.trim() || !newVehicleModel.trim()) {
-      showToast('Preencha a placa e o modelo do veículo.', 'error');
+      showToast('Preencha a placa e o modelo.', 'error');
       return;
     }
 
@@ -478,29 +474,24 @@ export default function DashboardPage() {
       branch: newVehicleBranch,
       totalHoursUsed: 0,
       totalTrips: 0,
+      currentDriverName: null,
     };
 
     setVehicles([newVeh, ...vehicles]);
     setIsVehicleModalOpen(false);
     setNewVehiclePlate('');
     setNewVehicleModel('');
-    showToast(`Veículo ${newVeh.plate} cadastrado com sucesso na frota!`);
+    showToast(`Veículo ${newVeh.plate} cadastrado na frota!`);
   };
 
-  // CADASTRO DE NOVO USUÁRIO / COLABORADOR COM BIOMETRIA
   const handleCreateEmployee = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmpName.trim() || !newEmpCpf.trim()) {
-      showToast('Preencha o nome e o CPF do funcionário.', 'error');
+      showToast('Preencha o nome e o CPF do colaborador.', 'error');
       return;
     }
 
     const cleanCpf = newEmpCpf.replace(/\D/g, '');
-    if (cleanCpf.length < 11) {
-      showToast('Informe um CPF válido com 11 dígitos.', 'error');
-      return;
-    }
-
     const newEmp: Employee = {
       id: String(employees.length + 1),
       name: newEmpName.trim(),
@@ -522,47 +513,20 @@ export default function DashboardPage() {
     setNewEmpPassword('');
     setIsFacialEnrolled(false);
     setFacialStep('idle');
-    showToast(`Colaborador ${newEmp.name} cadastrado! Senha padrão definida como CPF.`);
+    showToast(`Colaborador ${newEmp.name} cadastrado com sucesso!`);
   };
 
-  // SIMULAÇÃO DA CAPTURA FACIAL ON-DEVICE (GOOGLE ML KIT + MOBILENET)
   const handleTriggerFacialScan = () => {
     setFacialStep('scanning');
     setTimeout(() => {
       setFacialStep('done');
       setIsFacialEnrolled(true);
-      showToast('Face detectada e vetor biométrico 192-d registrado com sucesso!');
+      showToast('Face detectada e vetor biométrico 192-d registrado!');
     }, 1800);
   };
 
-  // EXPORTAÇÃO EXCEL (.CSV)
-  const handleExportCSV = () => {
-    const headers = 'Data;Motorista;CPF;Veiculo;Inicio;Fim;Almoco;Horas_Liquidas;Km_Percorrido;Vistoria\n';
-    const rows = usageReports
-      .map(
-        (r) =>
-          `${r.date};${r.driverName};${r.driverCpf};${r.vehiclePlate} (${r.vehicleModel});${r.startTime};${r.endTime};${r.lunchDurationMinutes}min;${r.netDrivingHours}h;${r.distanceKm}km;${r.checklistStatus}`
-      )
-      .join('\n');
-
-    const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Relatorio_Frota_MK_Seguranca_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Planilha Excel (.csv) exportada com sucesso!');
-  };
-
-  // EXPORTAÇÃO PDF / IMPRESSÃO
-  const handleExportPDF = () => {
-    window.print();
-  };
-
   // ==========================================
-  // TELA 1: LOGIN (QUANDO NÃO ESTIVER AUTENTICADO)
+  // TELA 1: LOGIN (BASE: MKSEGURANCA | SENHA: CPF)
   // ==========================================
   if (!isLoggedIn) {
     return (
@@ -577,15 +541,15 @@ export default function DashboardPage() {
             </div>
             <h1 className="text-3xl font-extrabold text-white tracking-tight">ROTALOG</h1>
             <p className="text-slate-400 text-sm mt-1.5">
-              Gestão de Frota, Biometria On-Device & Controle CLT
+              Base Operacional • Gestão de Frota & Ponto CLT
             </p>
           </div>
 
           <div className="bg-slate-900/90 border border-slate-800/80 rounded-3xl p-8 backdrop-blur-xl shadow-2xl">
-            <h2 className="text-xl font-bold text-white mb-2">Acesse sua Conta</h2>
-            <p className="text-xs text-slate-400 mb-6">
-              Digite o nome da empresa e utilize o seu <strong>CPF cadastrado</strong> como senha.
-            </p>
+            <h2 className="text-xl font-bold text-white mb-1.5">Acesso ao Sistema</h2>
+            <div className="p-3 bg-sky-500/10 border border-sky-500/20 rounded-xl mb-5 text-xs text-sky-300">
+              <strong>Regra de Acesso:</strong> Base: <span className="font-mono font-bold">MKSEGURANCA</span> | Senha: <span className="font-mono font-bold">Seu CPF</span>
+            </div>
 
             {loginError && (
               <div className="mb-5 p-3.5 bg-rose-500/15 border border-rose-500/30 rounded-xl flex items-center gap-3 text-rose-300 text-xs font-medium">
@@ -597,7 +561,7 @@ export default function DashboardPage() {
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Empresa / Login
+                  Base / Empresa
                 </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -607,8 +571,8 @@ export default function DashboardPage() {
                     type="text"
                     value={loginCompany}
                     onChange={(e) => setLoginCompany(e.target.value)}
-                    placeholder="Ex: MK Seguranca"
-                    className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
+                    placeholder="MKSEGURANCA"
+                    className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white font-mono font-bold uppercase placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
                     required
                   />
                 </div>
@@ -626,7 +590,7 @@ export default function DashboardPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="Ex: 13993248708 ou formatado"
+                    placeholder="Digite seu CPF (ex: 333.444.555-66)"
                     className="w-full pl-10 pr-10 py-3 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all font-mono"
                     required
                   />
@@ -639,7 +603,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1.5">
-                  * Por padrão, a senha de acesso é o próprio CPF cadastrado.
+                  * A senha padrão de qualquer colaborador é o seu próprio CPF cadastrado.
                 </p>
               </div>
 
@@ -654,37 +618,37 @@ export default function DashboardPage() {
 
             <div className="mt-6 pt-5 border-t border-slate-800/80">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2.5">
-                ⚡ Acesso Rápido de Demonstração (1 Clique):
+                ⚡ Escolha um Acesso Rápido para Testar:
               </span>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <button
                   type="button"
                   onClick={() => {
-                    setLoginCompany('MK Seguranca');
-                    setLoginPassword('13993248708');
+                    setLoginCompany('MKSEGURANCA');
+                    setLoginPassword('33344455566');
                   }}
-                  className="p-2.5 bg-slate-800/50 hover:bg-slate-800 text-left rounded-xl border border-slate-700/60 transition-colors"
+                  className="p-2.5 bg-slate-800/50 hover:bg-slate-800 text-left rounded-xl border border-emerald-500/40 transition-colors"
                 >
-                  <span className="font-bold text-sky-400 block">👑 Administrador Master</span>
-                  <span className="text-slate-300 text-[10px] block">CPF: 139.932.487-08</span>
+                  <span className="font-bold text-emerald-400 block">🚚 Motorista Joãozinho</span>
+                  <span className="text-slate-300 text-[10px] block">Acesso restrito pessoal</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setLoginCompany('MK Seguranca');
-                    setLoginPassword('33344455566');
+                    setLoginCompany('MKSEGURANCA');
+                    setLoginPassword('13993248708');
                   }}
-                  className="p-2.5 bg-slate-800/50 hover:bg-slate-800 text-left rounded-xl border border-slate-700/60 transition-colors"
+                  className="p-2.5 bg-slate-800/50 hover:bg-slate-800 text-left rounded-xl border border-sky-500/40 transition-colors"
                 >
-                  <span className="font-bold text-emerald-400 block">🚚 Motorista Joãozinho</span>
-                  <span className="text-slate-300 text-[10px] block">CPF: 333.444.555-66</span>
+                  <span className="font-bold text-sky-400 block">👑 Administrador Master</span>
+                  <span className="text-slate-300 text-[10px] block">Acesso administrativo total</span>
                 </button>
               </div>
             </div>
           </div>
 
           <div className="text-center mt-6 text-xs text-slate-400">
-            © 2026 ROTALOG — Multi-Tenant SaaS • Totalmente compatível com LGPD & Portaria 671 MTE
+            © 2026 ROTALOG — Base MKSEGURANCA • LGPD & Portaria 671 MTE
           </div>
         </div>
       </div>
@@ -692,7 +656,7 @@ export default function DashboardPage() {
   }
 
   // ==========================================
-  // TELA 2: PAINEL GERENCIAL DO SISTEMA (LOGADO)
+  // TELA 2: PAINEL DO SISTEMA (LOGADO)
   // ==========================================
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-sky-500 selection:text-white">
@@ -716,7 +680,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* CABEÇALHO SUPERIOR EXECUTIVO */}
+      {/* CABEÇALHO SUPERIOR */}
       <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -726,20 +690,23 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-black text-lg tracking-tight text-white">ROTALOG</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                  {currentUser.company}
+                <span className="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                  Base: {currentUser.company}
                 </span>
+                {isDriver && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    Acesso Motorista
+                  </span>
+                )}
               </div>
               <span className="text-[11px] text-slate-400 block -mt-0.5">
-                Painel Integrado de Frota, Biometria & Notificações Administrativas
+                {isDriver ? 'Quadro de Veículos & Meu Painel Pessoal' : 'Painel de Gestão da Frota & Notificações'}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* ========================================================================= */}
-            {/* SINO DE NOTIFICAÇÕES (EXCLUSIVO PARA USUÁRIOS MASTER: ADMIN & GESTOR) */}
-            {/* ========================================================================= */}
+            {/* SINO DE NOTIFICAÇÕES (APENAS PARA USUÁRIOS MASTER: ADMIN E GESTOR) */}
             {isMasterUser && (
               <div className="relative">
                 <button
@@ -756,95 +723,30 @@ export default function DashboardPage() {
                   )}
                 </button>
 
-                {/* PAINEL DROPDOWN DE NOTIFICAÇÕES */}
                 {isNotificationOpen && (
                   <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
                     <div className="p-3.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-sky-500/10 rounded-lg text-sky-400">
-                          <Radio className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <span className="font-bold text-xs text-white block">Eventos da Frota</span>
-                          <span className="text-[10px] text-slate-400">Exclusivo para Gestores Master</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        {unreadCount > 0 && (
-                          <button
-                            onClick={markAllAsRead}
-                            className="text-[10px] font-semibold text-sky-400 hover:underline px-2 py-1"
-                          >
-                            Ler todas
-                          </button>
-                        )}
-                        <button
-                          onClick={clearNotifications}
-                          title="Limpar todas"
-                          className="p-1 hover:text-rose-400 text-slate-500 rounded"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <span className="font-bold text-xs text-white">Eventos da Frota (Master)</span>
+                      <button
+                        onClick={() => setNotifications([])}
+                        className="text-[10px] text-slate-400 hover:text-rose-400"
+                      >
+                        Limpar
+                      </button>
                     </div>
-
                     <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/60 text-xs">
-                      {notifications.length === 0 ? (
-                        <div className="p-8 text-center text-slate-500 text-xs">
-                          Nenhuma notificação recente da frota.
-                        </div>
-                      ) : (
-                        notifications.map((n) => (
-                          <div
-                            key={n.id}
-                            className={`p-3.5 transition-colors flex items-start gap-3 ${
-                              n.isRead ? 'bg-slate-900/40 opacity-75' : 'bg-slate-800/30'
-                            }`}
-                          >
-                            <div className="mt-0.5 shrink-0">
-                              {n.type === 'INICIO_ROTA' && (
-                                <div className="p-2 bg-sky-500/10 text-sky-400 rounded-xl">
-                                  <Car className="w-4 h-4" />
-                                </div>
-                              )}
-                              {n.type === 'INICIO_PAUSA_ALMOCO' && (
-                                <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl">
-                                  <Coffee className="w-4 h-4" />
-                                </div>
-                              )}
-                              {n.type === 'FIM_PAUSA_ALMOCO' && (
-                                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-xl">
-                                  <CheckCircle2 className="w-4 h-4" />
-                                </div>
-                              )}
-                              {n.type === 'FIM_ROTA' && (
-                                <div className="p-2 bg-purple-500/10 text-purple-400 rounded-xl">
-                                  <Flag className="w-4 h-4" />
-                                </div>
-                              )}
-                              {n.type === 'ALERTA_AVARIA' && (
-                                <div className="p-2 bg-rose-500/10 text-rose-400 rounded-xl">
-                                  <AlertTriangle className="w-4 h-4" />
-                                </div>
-                              )}
+                      {notifications.map((n) => (
+                        <div key={n.id} className="p-3.5 bg-slate-900/40 flex items-start gap-3">
+                          <Car className="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold text-slate-200 text-xs">{n.title}</span>
+                              <span className="text-[10px] text-slate-500">{n.timestamp}</span>
                             </div>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-0.5">
-                                <span className="font-bold text-slate-200 text-xs">{n.title}</span>
-                                <span className="text-[10px] text-slate-500">{n.timestamp}</span>
-                              </div>
-                              <p className="text-slate-300 text-[11px] leading-relaxed">{n.message}</p>
-                            </div>
+                            <p className="text-slate-300 text-[11px] mt-0.5">{n.message}</p>
                           </div>
-                        ))
-                      )}
-                    </div>
-
-                    <div className="p-2 bg-slate-950 border-t border-slate-800 text-center">
-                      <span className="text-[10px] text-slate-400">
-                        Monitoramento em tempo real via Telemetria ROTALOG
-                      </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -859,7 +761,7 @@ export default function DashboardPage() {
                   className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                     isMasterUser
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                      : 'bg-slate-800 text-slate-300 border border-slate-700'
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                   }`}
                 >
                   {currentUser.role}
@@ -870,7 +772,7 @@ export default function DashboardPage() {
 
             <button
               onClick={handleLogout}
-              title="Encerrar Sessão"
+              title="Sair da Conta"
               className="p-2.5 bg-slate-800 hover:bg-rose-950/40 hover:text-rose-400 hover:border-rose-500/30 border border-slate-700/60 rounded-xl text-slate-300 transition-colors flex items-center gap-1.5 text-xs font-medium"
             >
               <LogOut className="w-4 h-4" />
@@ -880,42 +782,97 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* BARRA DE NAVEGAÇÃO DE ABAS */}
+      {/* BARRA DE NAVEGAÇÃO SEGREGADA POR PERFIL */}
       <div className="bg-slate-900/40 border-b border-slate-800/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between overflow-x-auto py-2">
           <nav className="flex items-center gap-1">
-            {[
-              { id: 'overview', label: 'Dashboard Geral', icon: TrendingUp },
-              { id: 'reports', label: 'Relatórios de Uso / Almoço', icon: FileSpreadsheet },
-              { id: 'vehicles', label: 'Gestão de Veículos (Carros)', icon: Car },
-              { id: 'employees', label: 'Colaboradores & Biometria', icon: Users },
-              { id: 'timeclock', label: 'Espelho de Ponto CLT', icon: Clock },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
+            {/* 1. ABA COMUM PARA TODOS: QUADRO DA FROTA (VER CARROS EM USO E POR QUEM) */}
+            <button
+              onClick={() => setActiveTab('fleet_status')}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                activeTab === 'fleet_status'
+                  ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+              }`}
+            >
+              <Car className="w-4 h-4" />
+              <span>Quadro de Carros em Uso</span>
+            </button>
+
+            {/* 2. ABAS EXCLUSIVAS DO MOTORISTA (APENAS DADOS DELE) */}
+            {isDriver && (
+              <>
                 <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
+                  onClick={() => setActiveTab('my_profile')}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                    isActive
+                    activeTab === 'my_profile'
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Meus Dados & Minhas Horas</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('timeclock')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                    activeTab === 'timeclock'
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>Meu Ponto CLT</span>
+                </button>
+              </>
+            )}
+
+            {/* 3. ABAS EXCLUSIVAS DE GESTORES / MASTER */}
+            {isMasterUser && (
+              <>
+                <button
+                  onClick={() => setActiveTab('reports')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                    activeTab === 'reports'
                       ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Relatório Geral da Frota</span>
                 </button>
-              );
-            })}
+                <button
+                  onClick={() => setActiveTab('employees')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                    activeTab === 'employees'
+                      ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Colaboradores & Biometria</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('timeclock')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                    activeTab === 'timeclock'
+                      ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+                  }`}
+                >
+                  <Clock className="w-4 h-4" />
+                  <span>Espelho de Ponto Geral</span>
+                </button>
+              </>
+            )}
           </nav>
 
-          {/* BOTÕES RÁPIDOS DE CADASTRO PARA ADMIN / GESTOR */}
+          {/* BOTÕES ADMINISTRATIVOS APENAS PARA MASTER */}
           {isMasterUser && (
             <div className="flex items-center gap-2 ml-4">
               <button
                 onClick={() => setIsVehicleModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-white rounded-lg text-xs font-bold border border-slate-700 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-lg text-xs font-bold border border-slate-700 transition-colors shadow-sm"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Registrar Carro</span>
@@ -935,280 +892,216 @@ export default function DashboardPage() {
       {/* CONTEÚDO PRINCIPAL */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         {/* ========================================================================= */}
-        {/* BARRA DE SIMULAÇÃO DE EVENTOS DO MOTORISTA "JOÃOZINHO" (EXCLUSIVA MASTER) */}
+        {/* SEÇÃO PRINCIPAL: QUADRO DE CARROS (EM USO E POR QUEM)                    */}
+        {/* Visível tanto para o Motorista quanto para a Gestão                      */}
         {/* ========================================================================= */}
-        {isMasterUser && (
-          <div className="p-4 bg-gradient-to-r from-slate-900 via-sky-950/40 to-slate-900 border border-sky-500/30 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                <h3 className="font-extrabold text-sm text-white">
-                  Central de Notificações da Frota (Simulador em Tempo Real)
-                </h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded border border-amber-500/30">
-                  Apenas Usuários Master
-                </span>
-              </div>
-              <p className="text-xs text-slate-300">
-                Teste as notificações de uso do veículo pelo motorista <strong>Joãozinho</strong> conforme sua regra:
-              </p>
-            </div>
-
-            {/* BOTÕES DE DISPARO DAS 4 ETAPAS DE NOTIFICAÇÃO */}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => triggerFleetEvent('INICIO_ROTA', 'Joãozinho', 'Renault Kangoo', 'MKF1A01')}
-                className="px-3 py-2 bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-              >
-                <Car className="w-3.5 h-3.5 text-sky-400" />
-                <span>1. Início de Rota</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => triggerFleetEvent('INICIO_PAUSA_ALMOCO', 'Joãozinho')}
-                className="px-3 py-2 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-              >
-                <Coffee className="w-3.5 h-3.5 text-amber-400" />
-                <span>2. Pausa Almoço</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => triggerFleetEvent('FIM_PAUSA_ALMOCO', 'Joãozinho', 'Renault Kangoo', 'MKF1A01')}
-                className="px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>3. Retomou Almoço</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => triggerFleetEvent('FIM_ROTA', 'Joãozinho', 'Renault Kangoo', 'MKF1A01')}
-                className="px-3 py-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-              >
-                <Flag className="w-3.5 h-3.5 text-purple-400" />
-                <span>4. Fim de Uso</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ======================================= */}
-        {/* ABA: DASHBOARD GERAL                    */}
-        {/* ======================================= */}
-        {activeTab === 'overview' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">Total de Carros</span>
-                  <div className="p-2 bg-sky-500/10 rounded-xl text-sky-400">
-                    <Car className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="text-2xl font-extrabold text-white mt-2">{vehicles.length} Veículos</div>
-                <div className="text-[11px] text-emerald-400 font-medium mt-1">
-                  {vehicles.filter((v) => v.status === 'AVAILABLE').length} disponíveis na garagem
-                </div>
-              </div>
-
-              <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">Em Rota Ativa</span>
-                  <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-400">
-                    <Clock className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="text-2xl font-extrabold text-white mt-2">
-                  {vehicles.filter((v) => v.status === 'IN_USE').length} Em Trânsito
-                </div>
-                <div className="text-[11px] text-slate-400 mt-1">Notificações operacionais ativas</div>
-              </div>
-
-              <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">Colaboradores Ativos</span>
-                  <div className="p-2 bg-purple-500/10 rounded-xl text-purple-400">
-                    <Users className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="text-2xl font-extrabold text-white mt-2">{employees.length} Cadastrados</div>
-                <div className="text-[11px] text-purple-400 mt-1">100% com senha padrão CPF</div>
-              </div>
-
-              <div className="p-5 bg-slate-900/80 border border-slate-800 rounded-2xl">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400">Notificações Recebidas</span>
-                  <div className="p-2 bg-amber-500/10 rounded-xl text-amber-400">
-                    <Bell className="w-4 h-4" />
-                  </div>
-                </div>
-                <div className="text-2xl font-extrabold text-white mt-2">{notifications.length} Eventos</div>
-                <div className="text-[11px] text-amber-400 font-medium mt-1">
-                  {unreadCount} não lidas no sino
-                </div>
-              </div>
-            </div>
-
-            {/* VISÃO RÁPIDA DOS CARROS */}
-            <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="text-base font-bold text-white">Status da Frota em Tempo Real</h3>
-                  <p className="text-xs text-slate-400">Veículos vinculados à empresa {currentUser.company}</p>
-                </div>
-                {isMasterUser && (
-                  <button
-                    onClick={() => setIsVehicleModalOpen(true)}
-                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold rounded-xl border border-slate-700 flex items-center gap-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Novo Carro</span>
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                {vehicles.map((v) => (
-                  <div
-                    key={v.id}
-                    className="p-4 bg-slate-950/70 border border-slate-800/80 rounded-xl flex flex-col justify-between hover:border-slate-700 transition-all"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-mono font-bold text-sm text-white px-2 py-0.5 bg-slate-800 rounded border border-slate-700">
-                          {v.plate}
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            v.status === 'AVAILABLE'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : v.status === 'IN_USE'
-                              ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
-                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                          }`}
-                        >
-                          {v.status === 'AVAILABLE'
-                            ? 'DISPONÍVEL'
-                            : v.status === 'IN_USE'
-                            ? 'EM ROTA'
-                            : 'OFICINA'}
-                        </span>
-                      </div>
-                      <div className="font-semibold text-xs text-slate-200">
-                        {v.brand} {v.model} ({v.year})
-                      </div>
-                      <div className="text-[11px] text-slate-400 mt-1">
-                        Hodômetro: {v.currentMileage.toLocaleString('pt-BR')} km
-                      </div>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Total em rota:</span>
-                      <span className="font-bold text-slate-200">{v.totalHoursUsed}h</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ======================================= */}
-        {/* ABA: RELATÓRIOS CONSOLIDADOS            */}
-        {/* ======================================= */}
-        {activeTab === 'reports' && (
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
+        {activeTab === 'fleet_status' && (
+          <div className="space-y-5">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h2 className="text-base font-bold text-white">
-                  Relatório Consolidado de Horas ao Volante & Intervalos
+                <h2 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Car className="w-5 h-5 text-sky-400" />
+                  <span>Quadro de Carros em Tempo Real — Base MKSEGURANCA</span>
                 </h2>
-                <p className="text-xs text-slate-400">
-                  Cálculo automático de almoço deduzido (Opção A) e validações faciais
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Consulte se cada veículo está sendo utilizado no momento e <strong>por qual motorista</strong>.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleExportCSV}
-                  className="flex items-center gap-2 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-600/20"
+              {/* SIMULADOR MASTER CASO ESTEJA COMO ADMIN */}
+              {isMasterUser && (
+                <div className="flex items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800">
+                  <span className="text-[10px] text-slate-400 px-2 font-semibold">Simular Joãozinho:</span>
+                  <button
+                    onClick={() => triggerFleetEvent('INICIO_ROTA')}
+                    className="px-2.5 py-1 bg-sky-500/20 text-sky-300 rounded text-[11px] font-bold hover:bg-sky-500/30"
+                  >
+                    Iniciar Rota
+                  </button>
+                  <button
+                    onClick={() => triggerFleetEvent('FIM_ROTA')}
+                    className="px-2.5 py-1 bg-purple-500/20 text-purple-300 rounded text-[11px] font-bold hover:bg-purple-500/30"
+                  >
+                    Finalizar
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* GRID DE CARROS COM IDENTIFICAÇÃO DE USO E CONDUTOR */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {vehicles.map((v) => (
+                <div
+                  key={v.id}
+                  className={`p-5 rounded-2xl border transition-all flex flex-col justify-between ${
+                    v.status === 'IN_USE'
+                      ? 'bg-slate-900/90 border-sky-500/40 shadow-lg shadow-sky-500/5'
+                      : v.status === 'AVAILABLE'
+                      ? 'bg-slate-900/60 border-slate-800 hover:border-emerald-500/40'
+                      : 'bg-slate-900/40 border-rose-950/60'
+                  }`}
                 >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span>Exportar Excel (.csv)</span>
-                </button>
-                <button
-                  onClick={handleExportPDF}
-                  className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all border border-slate-700"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Exportar PDF / Imprimir</span>
-                </button>
+                  <div>
+                    {/* PLACA E STATUS */}
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 font-mono font-black text-sm text-white tracking-wide">
+                        {v.plate}
+                      </span>
+                      <span
+                        className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase ${
+                          v.status === 'IN_USE'
+                            ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30'
+                            : v.status === 'AVAILABLE'
+                            ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                            : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                        }`}
+                      >
+                        {v.status === 'IN_USE'
+                          ? '● EM USO AGORA'
+                          : v.status === 'AVAILABLE'
+                          ? '● DISPONÍVEL'
+                          : '● OFICINA / AVARIA'}
+                      </span>
+                    </div>
+
+                    <div className="text-base font-bold text-white">
+                      {v.brand} {v.model}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      Ano {v.year} • {v.currentMileage.toLocaleString('pt-BR')} km rodados
+                    </div>
+
+                    {/* BLOCO EM DESTAQUE: QUEM ESTÁ USANDO O CARRO */}
+                    <div className="mt-4 p-3.5 rounded-xl border bg-slate-950/90 border-slate-800">
+                      {v.status === 'IN_USE' ? (
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-400 block">
+                            🚗 Utilizado por:
+                          </span>
+                          <span className="text-sm font-black text-white block">
+                            {v.currentDriverName || 'Motorista em trânsito'}
+                          </span>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1">
+                            <Clock className="w-3.5 h-3.5 text-sky-400" />
+                            <span>Em rota desde às {v.usageStartTime || '08:00'}</span>
+                          </div>
+                        </div>
+                      ) : v.status === 'AVAILABLE' ? (
+                        <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span>Livre na garagem. Pronto para rota.</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-xs text-rose-400 font-semibold">
+                          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                          <span>Em manutenção na oficina autorizada.</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* AÇÕES DE MOTORISTA */}
+                  {isDriver && (
+                    <div className="mt-4 pt-3 border-t border-slate-800/80">
+                      {v.status === 'AVAILABLE' ? (
+                        <button
+                          onClick={() => {
+                            triggerFleetEvent('INICIO_ROTA', currentUser.name, `${v.brand} ${v.model}`, v.plate);
+                            showToast(`Você iniciou a rota com o veículo ${v.plate}!`);
+                          }}
+                          className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Navigation className="w-3.5 h-3.5" />
+                          <span>Pegar este Carro (Iniciar Rota)</span>
+                        </button>
+                      ) : v.currentDriverName === currentUser.name ? (
+                        <button
+                          onClick={() => {
+                            triggerFleetEvent('FIM_ROTA', currentUser.name, `${v.brand} ${v.model}`, v.plate);
+                            showToast(`Você devolveu o veículo ${v.plate} na garagem!`);
+                          }}
+                          className="w-full py-2.5 px-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                        >
+                          <Flag className="w-3.5 h-3.5" />
+                          <span>Finalizar Meu Uso (Devolver Carro)</span>
+                        </button>
+                      ) : (
+                        <div className="text-center py-2 text-[11px] text-slate-500 font-medium">
+                          Indisponível para reserva no momento
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ABA EXCLUSIVA DO MOTORISTA: MEUS DADOS PESSOAIS & MINHAS HORAS           */}
+        {/* O motorista só tem acesso às informações dele                            */}
+        {/* ========================================================================= */}
+        {activeTab === 'my_profile' && isDriver && (
+          <div className="space-y-5">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-emerald-500/20">
+                  {currentUser.name.slice(0, 2).toUpperCase()}
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">{currentUser.name}</h2>
+                  <p className="text-xs text-slate-400">
+                    Cargo: <strong>Motorista Operacional</strong> • Base: <strong>MKSEGURANCA</strong>
+                  </p>
+                  <p className="text-xs text-slate-400 font-mono mt-0.5">CPF: {currentUser.cpf}</p>
+                </div>
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+            {/* MINHAS MÉTRICAS DE TRABALHO */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-xs text-slate-400 font-medium">Horas Rodadas na Semana</span>
+                <div className="text-2xl font-black text-emerald-400 mt-1">41.5h</div>
+                <span className="text-[11px] text-slate-500">Dentro da jornada regular CLT</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-xs text-slate-400 font-medium">Intervalo de Almoço (Art. 71)</span>
+                <div className="text-2xl font-black text-white mt-1">1h00 diária</div>
+                <span className="text-[11px] text-emerald-400 font-medium">Cumprido regularmente</span>
+              </div>
+              <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                <span className="text-xs text-slate-400 font-medium">Biometria Facial Cadastrada</span>
+                <div className="text-2xl font-black text-sky-400 mt-1">100% Ativa</div>
+                <span className="text-[11px] text-slate-400">Confiança 98.9% on-device</span>
+              </div>
+            </div>
+
+            {/* APENAS O HISTÓRICO DAS MINHAS ROTAS */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <h3 className="font-bold text-sm text-white mb-3">Minhas Últimas Viagens</h3>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="bg-slate-950/80 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-semibold">
-                      <th className="py-3 px-4">Data</th>
-                      <th className="py-3 px-4">Motorista & CPF</th>
-                      <th className="py-3 px-4">Biometria</th>
-                      <th className="py-3 px-4">Veículo</th>
-                      <th className="py-3 px-4">Início / Fim</th>
-                      <th className="py-3 px-4">Almoço (Opção A)</th>
-                      <th className="py-3 px-4">Horas Líquidas</th>
-                      <th className="py-3 px-4">Km Rodado</th>
-                      <th className="py-3 px-4">Inspeção</th>
+                    <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-semibold">
+                      <th className="py-2.5 px-3">Data</th>
+                      <th className="py-2.5 px-3">Carro Utilizado</th>
+                      <th className="py-2.5 px-3">Horário</th>
+                      <th className="py-2.5 px-3">Almoço</th>
+                      <th className="py-2.5 px-3">Horas Líquidas</th>
+                      <th className="py-2.5 px-3">Distância</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/80">
-                    {usageReports.map((r) => (
-                      <tr key={r.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="py-3.5 px-4 font-mono font-bold text-slate-300">{r.date}</td>
-                        <td className="py-3.5 px-4">
-                          <span className="font-bold text-white block">{r.driverName}</span>
-                          <span className="text-[11px] text-slate-400 font-mono">{r.driverCpf}</span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Facial 99%
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="font-mono font-bold text-slate-200 block">{r.vehiclePlate}</span>
-                          <span className="text-[11px] text-slate-400">{r.vehicleModel}</span>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-slate-300">
-                          {r.startTime} às {r.endTime}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className="inline-flex items-center gap-1 font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
-                            <Coffee className="w-3 h-3" />
-                            {r.lunchDurationMinutes} min deduzidos
-                          </span>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono font-black text-emerald-400 text-sm">
-                          {r.netDrivingHours}h
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-slate-300">{r.distanceKm} km</td>
-                        <td className="py-3.5 px-4">
-                          <span
-                            className={`px-2 py-0.5 rounded font-bold text-[10px] ${
-                              r.checklistStatus === 'OK'
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                            }`}
-                          >
-                            {r.checklistStatus === 'OK' ? '100% APROVADO' : 'AVARIA REPORTADA'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    <tr className="hover:bg-slate-800/40">
+                      <td className="py-3 px-3 font-mono font-bold text-slate-300">06/09/2026</td>
+                      <td className="py-3 px-3 font-bold text-white">MKS2B02 (Fiat Strada)</td>
+                      <td className="py-3 px-3 font-mono text-slate-400">08:00 às 17:30</td>
+                      <td className="py-3 px-3 text-amber-400 font-bold">60 min</td>
+                      <td className="py-3 px-3 font-mono font-black text-emerald-400">8.5h</td>
+                      <td className="py-3 px-3 font-mono text-slate-300">150 km</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -1216,72 +1109,107 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ======================================= */}
-        {/* ABA: GESTÃO DE VEÍCULOS (CARROS)       */}
-        {/* ======================================= */}
-        {activeTab === 'vehicles' && (
+        {/* ========================================================================= */}
+        {/* ABA: PONTO ELETRÔNICO CLT (SE MOTORISTA, APENAS O DELE; SE MASTER, GERAL) */}
+        {/* ========================================================================= */}
+        {activeTab === 'timeclock' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
+            <div className="bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
+              <h2 className="text-base font-bold text-white">
+                {isDriver ? 'Meu Espelho de Ponto Eletrônico' : 'Espelho de Ponto Geral da Frota'}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {isDriver
+                  ? 'Visualização estrita das suas batidas com biometria facial e horas CLT.'
+                  : 'Conferência de jornada 8h, tolerância de 10 min (Art. 58) e horas extras de todos.'}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {employees
+                .filter((e) => (isDriver ? e.cpf === currentUser.cpf : true))
+                .map((e) => (
+                  <div key={e.id} className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <span className="font-bold text-white text-sm block">{e.name}</span>
+                        <span className="text-xs text-slate-400 font-mono">CPF: {e.cpf}</span>
+                      </div>
+                      <span className="text-xs font-bold text-emerald-400 px-2.5 py-1 bg-emerald-500/10 rounded-lg">
+                        {e.totalWorkHoursWeek}h semanais
+                      </span>
+                    </div>
+
+                    <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 space-y-2 text-xs">
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>Jornada Diária Prevista:</span>
+                        <span className="font-bold">8h00</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>Intervalo Intrajornada (Art. 71):</span>
+                        <span className="font-bold text-emerald-400">1h00 (Cumprido)</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-300">
+                        <span>Validação Biométrica Facial:</span>
+                        <span className="font-bold text-sky-400">100% On-Device</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* ABA EXCLUSIVA DE GESTORES: RELATÓRIOS GERAIS DA FROTA                     */}
+        {/* ========================================================================= */}
+        {activeTab === 'reports' && isMasterUser && (
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
               <div>
-                <h2 className="text-base font-bold text-white">Carros Cadastrados na Frota</h2>
-                <p className="text-xs text-slate-400">
-                  Gerenciamento de veículos da empresa {currentUser.company}
-                </p>
+                <h2 className="text-base font-bold text-white">Relatório Geral da Frota MKSEGURANCA</h2>
+                <p className="text-xs text-slate-400">Consolidado de todas as rotas e intervalos</p>
               </div>
-              {isMasterUser && (
-                <button
-                  onClick={() => setIsVehicleModalOpen(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-600/20"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Registrar Novo Carro</span>
-                </button>
-              )}
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-slate-950/80 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-semibold">
-                    <th className="py-3 px-4">Placa</th>
-                    <th className="py-3 px-4">Marca e Modelo</th>
-                    <th className="py-3 px-4">Ano</th>
-                    <th className="py-3 px-4">Status Atual</th>
-                    <th className="py-3 px-4">Odômetro Atual</th>
-                    <th className="py-3 px-4">Base / Garagem</th>
-                    <th className="py-3 px-4">Horas em Trânsito</th>
+                  <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-semibold">
+                    <th className="py-3 px-4">Data</th>
+                    <th className="py-3 px-4">Motorista</th>
+                    <th className="py-3 px-4">Veículo</th>
+                    <th className="py-3 px-4">Horários</th>
+                    <th className="py-3 px-4">Almoço</th>
+                    <th className="py-3 px-4">Horas Líquidas</th>
+                    <th className="py-3 px-4">Vistoria</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
-                  {vehicles.map((v) => (
-                    <tr key={v.id} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-bold text-white">{v.plate}</td>
-                      <td className="py-3.5 px-4 font-semibold text-slate-200">
-                        {v.brand} {v.model}
+                  {usageReports.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-800/40">
+                      <td className="py-3.5 px-4 font-mono font-bold text-slate-300">{r.date}</td>
+                      <td className="py-3.5 px-4">
+                        <span className="font-bold text-white block">{r.driverName}</span>
+                        <span className="text-[11px] text-slate-400 font-mono">{r.driverCpf}</span>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-400">{v.year}</td>
+                      <td className="py-3.5 px-4 font-bold text-slate-200">{r.vehiclePlate}</td>
+                      <td className="py-3.5 px-4 font-mono text-slate-300">
+                        {r.startTime} às {r.endTime}
+                      </td>
+                      <td className="py-3.5 px-4 text-amber-400 font-bold">{r.lunchDurationMinutes} min</td>
+                      <td className="py-3.5 px-4 font-mono font-black text-emerald-400">{r.netDrivingHours}h</td>
                       <td className="py-3.5 px-4">
                         <span
-                          className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                            v.status === 'AVAILABLE'
+                          className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                            r.checklistStatus === 'OK'
                               ? 'bg-emerald-500/10 text-emerald-400'
-                              : v.status === 'IN_USE'
-                              ? 'bg-sky-500/10 text-sky-400'
                               : 'bg-rose-500/10 text-rose-400'
                           }`}
                         >
-                          {v.status === 'AVAILABLE'
-                            ? 'Disponível'
-                            : v.status === 'IN_USE'
-                            ? 'Em Rota'
-                            : 'Oficina'}
+                          {r.checklistStatus}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-300">
-                        {v.currentMileage.toLocaleString('pt-BR')} km
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-400">{v.branch}</td>
-                      <td className="py-3.5 px-4 font-mono font-bold text-sky-400">{v.totalHoursUsed}h</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1290,78 +1218,57 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* ======================================= */}
-        {/* ABA: COLABORADORES & BIOMETRIA FACIAL  */}
-        {/* ======================================= */}
-        {activeTab === 'employees' && (
+        {/* ========================================================================= */}
+        {/* ABA EXCLUSIVA DE GESTORES: TODOS OS COLABORADORES DA EMPRESA              */}
+        {/* ========================================================================= */}
+        {activeTab === 'employees' && isMasterUser && (
           <div className="space-y-4">
             <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
               <div>
-                <h2 className="text-base font-bold text-white">Usuários & Biometria Facial</h2>
-                <p className="text-xs text-slate-400">
-                  Cadastros com senha padrão (CPF) e vetor facial 192 dimensões (LGPD)
-                </p>
+                <h2 className="text-base font-bold text-white">Gestão de Colaboradores & Biometria</h2>
+                <p className="text-xs text-slate-400">Usuários cadastrados na Base MKSEGURANCA</p>
               </div>
-              {isMasterUser && (
-                <button
-                  onClick={() => setIsEmployeeModalOpen(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-sky-600/20"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Criar Novo Usuário</span>
-                </button>
-              )}
+              <button
+                onClick={() => setIsEmployeeModalOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Novo Usuário</span>
+              </button>
             </div>
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="bg-slate-950/80 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-semibold">
-                    <th className="py-3 px-4">Nome do Colaborador</th>
-                    <th className="py-3 px-4">CPF (Senha Padrão)</th>
-                    <th className="py-3 px-4">Cargo / Perfil</th>
-                    <th className="py-3 px-4">Biometria Facial (192-d)</th>
-                    <th className="py-3 px-4">Status Conta</th>
-                    <th className="py-3 px-4">Última Batida de Ponto</th>
+                  <tr className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-semibold">
+                    <th className="py-3 px-4">Nome</th>
+                    <th className="py-3 px-4">CPF (Senha)</th>
+                    <th className="py-3 px-4">Cargo</th>
+                    <th className="py-3 px-4">Biometria</th>
+                    <th className="py-3 px-4">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
                   {employees.map((e) => (
-                    <tr key={e.id} className="hover:bg-slate-800/40 transition-colors">
+                    <tr key={e.id} className="hover:bg-slate-800/40">
+                      <td className="py-3.5 px-4 font-bold text-white">{e.name}</td>
+                      <td className="py-3.5 px-4 font-mono text-slate-300">{e.cpf}</td>
                       <td className="py-3.5 px-4">
-                        <span className="font-bold text-white block">{e.name}</span>
-                        <span className="text-[11px] text-slate-400">{e.email}</span>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-300">
-                        <div className="flex items-center gap-1.5">
-                          <span>{e.cpf}</span>
-                          <span className="text-[9px] px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded">
-                            SENHA
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-slate-800 text-slate-300 border border-slate-700">
+                        <span className="px-2 py-0.5 rounded font-bold text-[10px] bg-slate-800 text-slate-300">
                           {e.role}
                         </span>
                       </td>
                       <td className="py-3.5 px-4">
                         {e.biometricEnrolled ? (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                          <span className="text-emerald-400 font-semibold flex items-center gap-1">
                             <CheckCircle2 className="w-3.5 h-3.5" />
-                            Cadastrada ({e.biometricConfidence || 99}%)
+                            Cadastrada (192-d)
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            Pendente
-                          </span>
+                          <span className="text-amber-400 font-semibold">Pendente</span>
                         )}
                       </td>
-                      <td className="py-3.5 px-4">
-                        <span className="text-emerald-400 font-bold text-[10px]">Ativo</span>
-                      </td>
-                      <td className="py-3.5 px-4 text-slate-400 font-mono">{e.lastClocking}</td>
+                      <td className="py-3.5 px-4 text-emerald-400 font-bold">Ativo</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1369,173 +1276,47 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
-
-        {/* ======================================= */}
-        {/* ABA: PONTO ELETRÔNICO CLT               */}
-        {/* ======================================= */}
-        {activeTab === 'timeclock' && (
-          <div className="space-y-4">
-            <div className="bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
-              <h2 className="text-base font-bold text-white">Espelho de Ponto Eletrônico (Portaria 671 MTE)</h2>
-              <p className="text-xs text-slate-400">
-                Auditoria de horários diários, tolerância de 10 min (Art. 58) e teto de horas extras (Art. 59)
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {employees.map((e) => (
-                <div key={e.id} className="p-4 bg-slate-900 border border-slate-800 rounded-2xl">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <span className="font-bold text-white text-sm block">{e.name}</span>
-                      <span className="text-xs text-slate-400 font-mono">CPF: {e.cpf}</span>
-                    </div>
-                    <span className="text-xs font-bold text-sky-400 px-2.5 py-1 bg-sky-500/10 rounded-lg">
-                      {e.totalWorkHoursWeek}h semanais
-                    </span>
-                  </div>
-
-                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 space-y-2 text-xs">
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Jornada Diária Prevista:</span>
-                      <span className="font-bold">8h00</span>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Intervalo Intrajornada (Art. 71):</span>
-                      <span className="font-bold text-emerald-400">1h00 (Cumprido)</span>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-300">
-                      <span>Validação Biométrica Facial:</span>
-                      <span className="font-bold text-sky-400">100% On-Device</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </main>
 
-      {/* ========================================== */}
-      {/* MODAL 1: REGISTRAR CARRO (ADMIN/GESTOR)    */}
-      {/* ========================================== */}
+      {/* MODAL NOVO VEÍCULO (MASTER) */}
       {isVehicleModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-sky-500/10 text-sky-400 rounded-xl">
-                  <Car className="w-5 h-5" />
-                </div>
-                <h3 className="text-lg font-bold text-white">Cadastrar Novo Carro na Frota</h3>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl p-6">
+            <h3 className="text-lg font-bold text-white mb-4">Cadastrar Novo Carro</h3>
+            <form onSubmit={handleCreateVehicle} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Placa</label>
+                <input
+                  type="text"
+                  value={newVehiclePlate}
+                  onChange={(e) => setNewVehiclePlate(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white uppercase font-mono"
+                  required
+                />
               </div>
-              <button
-                onClick={() => setIsVehicleModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateVehicle} className="mt-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Placa do Veículo *
-                  </label>
-                  <input
-                    type="text"
-                    value={newVehiclePlate}
-                    onChange={(e) => setNewVehiclePlate(e.target.value)}
-                    placeholder="Ex: MKF1A01"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white uppercase font-mono focus:border-sky-500 focus:outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Marca *
-                  </label>
-                  <select
-                    value={newVehicleBrand}
-                    onChange={(e) => setNewVehicleBrand(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-sky-500 focus:outline-none"
-                  >
-                    <option value="Fiat">Fiat</option>
-                    <option value="Renault">Renault</option>
-                    <option value="Volkswagen">Volkswagen</option>
-                    <option value="Chevrolet">Chevrolet</option>
-                    <option value="Toyota">Toyota</option>
-                    <option value="Ford">Ford</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Modelo</label>
+                <input
+                  type="text"
+                  value={newVehicleModel}
+                  onChange={(e) => setNewVehicleModel(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
+                  required
+                />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Modelo *
-                  </label>
-                  <input
-                    type="text"
-                    value={newVehicleModel}
-                    onChange={(e) => setNewVehicleModel(e.target.value)}
-                    placeholder="Ex: Fiorino 1.4 EVO"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-sky-500 focus:outline-none"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Ano de Fabricação
-                  </label>
-                  <input
-                    type="number"
-                    value={newVehicleYear}
-                    onChange={(e) => setNewVehicleYear(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-sky-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Odômetro Atual (Km)
-                  </label>
-                  <input
-                    type="number"
-                    value={newVehicleMileage}
-                    onChange={(e) => setNewVehicleMileage(Number(e.target.value))}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white font-mono focus:border-sky-500 focus:outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Base / Garagem
-                  </label>
-                  <input
-                    type="text"
-                    value={newVehicleBranch}
-                    onChange={(e) => setNewVehicleBranch(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-sky-500 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-800">
+              <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
                   onClick={() => setIsVehicleModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-700"
+                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-sky-600/20"
+                  className="px-4 py-2 bg-sky-600 text-white rounded-xl text-xs font-bold"
                 >
-                  Salvar Carro na Frota
+                  Salvar
                 </button>
               </div>
             </form>
@@ -1543,165 +1324,69 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* ========================================== */}
-      {/* MODAL 2: CRIAR NOVO USUÁRIO + BIOMETRIA   */}
-      {/* ========================================== */}
+      {/* MODAL NOVO USUÁRIO (MASTER) */}
       {isEmployeeModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-xl rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-sky-500/10 text-sky-400 rounded-xl">
-                  <Users className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">Criar Novo Usuário / Colaborador</h3>
-                  <p className="text-xs text-slate-400">
-                    Definição de cargo, senha padrão (CPF) e biometria facial
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsEmployeeModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateEmployee} className="mt-5 space-y-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-3xl p-6">
+            <h3 className="text-lg font-bold text-white mb-4">Criar Novo Usuário</h3>
+            <form onSubmit={handleCreateEmployee} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Nome Completo do Funcionário *
-                </label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Nome Completo</label>
                 <input
                   type="text"
                   value={newEmpName}
                   onChange={(e) => setNewEmpName(e.target.value)}
-                  placeholder="Ex: Rogério da Costa Martins"
-                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-sky-500 focus:outline-none"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
                   required
                 />
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    CPF do Funcionário *
-                  </label>
-                  <input
-                    type="text"
-                    value={newEmpCpf}
-                    onChange={(e) => {
-                      const formatted = formatCpf(e.target.value);
-                      setNewEmpCpf(formatted);
-                      setNewEmpPassword(formatted.replace(/\D/g, ''));
-                    }}
-                    placeholder="000.000.000-00"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white font-mono focus:border-sky-500 focus:outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Cargo / Perfil de Acesso *
-                  </label>
-                  <select
-                    value={newEmpRole}
-                    onChange={(e) => setNewEmpRole(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-white focus:border-sky-500 focus:outline-none"
-                  >
-                    <option value="DRIVER">Motorista Operacional</option>
-                    <option value="FLEET_MANAGER">Gestor de Frota</option>
-                    <option value="HR">RH / Financeiro</option>
-                    <option value="ADMIN">Administrador</option>
-                  </select>
-                </div>
-              </div>
-
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Senha de Acesso (Padrão: CPF do Trabalhador)
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={newEmpPassword}
-                    onChange={(e) => setNewEmpPassword(e.target.value)}
-                    placeholder="Auto-preenchida com o CPF"
-                    className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-sm text-slate-300 font-mono focus:border-sky-500 focus:outline-none"
-                  />
-                </div>
-                <p className="text-[11px] text-sky-400 mt-1">
-                  ✓ Por padrão da empresa, a senha de login do funcionário é o próprio CPF cadastrado.
-                </p>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">CPF (Senha Padrão)</label>
+                <input
+                  type="text"
+                  value={newEmpCpf}
+                  onChange={(e) => setNewEmpCpf(formatCpf(e.target.value))}
+                  placeholder="000.000.000-00"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white font-mono"
+                  required
+                />
               </div>
-
-              {/* SEÇÃO DE BIOMETRIA FACIAL ON-DEVICE */}
-              <div className="p-4 bg-slate-950 rounded-2xl border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Camera className="w-4 h-4 text-sky-400" />
-                    <span className="text-xs font-bold text-white">Cadastrar Facial do Funcionário</span>
-                  </div>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">
-                    LGPD Compliant
-                  </span>
-                </div>
-
-                <p className="text-[11px] text-slate-400">
-                  O sistema extrai um vetor matemático de 192 dimensões (MobileFaceNet). Nenhuma foto é armazenada.
-                </p>
-
-                {facialStep === 'idle' && (
-                  <button
-                    type="button"
-                    onClick={handleTriggerFacialScan}
-                    className="w-full py-3 px-4 bg-slate-800 hover:bg-slate-700 text-sky-400 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border border-slate-700/80 transition-all"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>Iniciar Captura Facial (Webcam / Foto)</span>
-                  </button>
-                )}
-
-                {facialStep === 'scanning' && (
-                  <div className="py-4 px-3 bg-sky-950/40 border border-sky-500/30 rounded-xl flex items-center justify-center gap-3 text-sky-300 text-xs">
-                    <div className="w-4 h-4 border-2 border-sky-400 border-t-transparent rounded-full animate-spin" />
-                    <span>Detectando rosto e gerando vetor biométrico 192-d...</span>
-                  </div>
-                )}
-
-                {facialStep === 'done' && (
-                  <div className="py-3 px-4 bg-emerald-950/40 border border-emerald-500/30 rounded-xl flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 text-emerald-300 font-semibold">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      <span>Biometria Facial Cadastrada (192 floats)</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setFacialStep('idle')}
-                      className="text-[11px] text-slate-400 hover:text-white underline"
-                    >
-                      Refazer
-                    </button>
-                  </div>
-                )}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Cargo</label>
+                <select
+                  value={newEmpRole}
+                  onChange={(e) => setNewEmpRole(e.target.value as any)}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white"
+                >
+                  <option value="DRIVER">Motorista Operacional</option>
+                  <option value="FLEET_MANAGER">Gestor de Frota</option>
+                  <option value="HR">RH / Folha</option>
+                  <option value="ADMIN">Administrador Master</option>
+                </select>
               </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-800">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-xs text-white font-bold block mb-1">Biometria Facial</span>
+                <button
+                  type="button"
+                  onClick={handleTriggerFacialScan}
+                  className="w-full py-2 bg-slate-800 text-sky-400 rounded-lg text-xs font-bold"
+                >
+                  {isFacialEnrolled ? '✓ Biometria 192-d Cadastrada' : 'Iniciar Captura Facial'}
+                </button>
+              </div>
+              <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
                   onClick={() => setIsEmployeeModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold hover:bg-slate-700"
+                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl text-xs"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-sky-600/20"
+                  className="px-4 py-2 bg-sky-600 text-white rounded-xl text-xs font-bold"
                 >
-                  Cadastrar Colaborador
+                  Salvar Usuário
                 </button>
               </div>
             </form>
