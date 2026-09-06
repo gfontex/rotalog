@@ -64,6 +64,45 @@ export class UsagesService {
     });
   }
 
+  /**
+   * Inicia a Pausa de Almoço/Intervalo na rota em andamento (Opção A: 1 clique ágil)
+   */
+  async startPause(tenantId: string, driverId: string) {
+    const active = await this.getActiveUsage(tenantId, driverId);
+    if (!active) {
+      throw new Error('Nenhuma rota ativa encontrada para este motorista.');
+    }
+
+    return this.prisma.vehicleUsage.update({
+      where: { id: active.id },
+      data: {
+        lunchStartTime: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Retoma a rota encerrando a Pausa de Almoço e calculando a duração do intervalo
+   */
+  async endPause(tenantId: string, driverId: string) {
+    const active = await this.getActiveUsage(tenantId, driverId);
+    if (!active || !active.lunchStartTime) {
+      throw new Error('Nenhuma pausa em andamento para este motorista.');
+    }
+
+    const now = new Date();
+    const durationMillis = now.getTime() - new Date(active.lunchStartTime).getTime();
+    const totalLunchMinutes = Math.max(0, Math.round(durationMillis / 60000));
+
+    return this.prisma.vehicleUsage.update({
+      where: { id: active.id },
+      data: {
+        lunchEndTime: now,
+        totalLunchMinutes,
+      },
+    });
+  }
+
   async getFleetStats(tenantId: string) {
     const usages = await this.prisma.vehicleUsage.findMany({
       where: {

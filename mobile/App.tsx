@@ -14,12 +14,21 @@ import {
 import { UserProfile, AssignedVehicle, ClockingRecord } from './src/types';
 import { offlineQueue } from './src/services/offlineQueue';
 
+interface FleetVehicle {
+  id: string;
+  plate: string;
+  brand: string;
+  model: string;
+  currentMileage: number;
+  status: 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE';
+}
+
 export default function App() {
   // Simulação de conectividade de rede (Online x Offline)
   const [isNetworkOnline, setIsNetworkOnline] = useState<boolean>(true);
   const [pendingQueueCount, setPendingQueueCount] = useState<number>(0);
 
-  // Usuário ativo
+  // Usuário ativo (Motorista)
   const [user] = useState<UserProfile>({
     id: 'u1',
     name: 'João Silva',
@@ -31,54 +40,70 @@ export default function App() {
     biometricEnrolled: true,
   });
 
-  // Veículo vinculado
-  const [vehicle, setVehicle] = useState<AssignedVehicle>({
-    id: 'v1',
-    plate: 'RTL9A88',
-    brand: 'Volkswagen',
-    model: 'Gol 1.0 MPI',
-    currentMileage: 58120,
-    status: 'IN_USE',
-  });
-
-  // Sessão de rota ativa (Controle de Horas de Uso)
-  const [activeRoute, setActiveRoute] = useState<{
-    inProgress: boolean;
-    startMileage: number;
-    startTime: string;
-    elapsedMinutes: number;
-  }>({
-    inProgress: true,
-    startMileage: 58040,
-    startTime: '08:15',
-    elapsedMinutes: 85, // 1h 25m em rota
-  });
-
-  // Batidas de ponto do dia
-  const [clockings, setClockings] = useState<ClockingRecord[]>([
+  // Lista de veículos disponíveis para seleção (Passo 1 do fluxo)
+  const [availableVehicles, setAvailableVehicles] = useState<FleetVehicle[]>([
     {
-      id: '1',
-      type: 'IN',
-      timestamp: '07:45',
-      facialVerified: true,
-      matchScore: 98.8,
+      id: 'v1',
+      plate: 'RTL9A88',
+      brand: 'Volkswagen',
+      model: 'Gol 1.0 MPI',
+      currentMileage: 58040,
+      status: 'AVAILABLE',
     },
     {
-      id: '2',
-      type: 'LUNCH_OUT',
-      timestamp: '12:02',
-      facialVerified: true,
-      matchScore: 99.1,
+      id: 'v2',
+      plate: 'BRA2E19',
+      brand: 'Fiat',
+      model: 'Strada Freedom 1.3',
+      currentMileage: 35400,
+      status: 'AVAILABLE',
+    },
+    {
+      id: 'v3',
+      plate: 'LOG4F33',
+      brand: 'Chevrolet',
+      model: 'Onix Plus Premier',
+      currentMileage: 12800,
+      status: 'MAINTENANCE',
     },
   ]);
 
-  // Modais de Operação
+  // Veículo selecionado pelo motorista
+  const [selectedVehicle, setSelectedVehicle] = useState<FleetVehicle | null>(null);
+
+  // Sessão de rota ativa (Controle de Horas de Uso e Pausa de Almoço)
+  const [activeRoute, setActiveRoute] = useState<{
+    inProgress: boolean;
+    vehicleId: string;
+    vehiclePlate: string;
+    vehicleModel: string;
+    startMileage: number;
+    startTime: string;
+    elapsedMinutes: number;
+    isOnLunch: boolean;
+    lunchStartTime: string | null;
+    totalLunchMinutes: number;
+  }>({
+    inProgress: false,
+    vehicleId: '',
+    vehiclePlate: '',
+    vehicleModel: '',
+    startMileage: 0,
+    startTime: '',
+    elapsedMinutes: 0,
+    isOnLunch: false,
+    lunchStartTime: null,
+    totalLunchMinutes: 0,
+  });
+
+  // Modais do Fluxo Operacional
+  const [isVehicleSelectModalOpen, setIsVehicleSelectModalOpen] = useState(false);
   const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
-  const [checklistType, setChecklistType] = useState<'ENTRY' | 'EXIT'>('EXIT');
+  const [checklistType, setChecklistType] = useState<'ENTRY' | 'EXIT'>('ENTRY');
   const [faceScanState, setFaceScanState] = useState<'IDLE' | 'SCANNING' | 'SUCCESS'>('IDLE');
 
-  // Estado do Checklist
+  // Estado dos Itens do Checklist
   const [checklistItems, setChecklistItems] = useState<{ [key: string]: boolean }>({
     combustivel: true,
     pneus: true,
@@ -88,9 +113,21 @@ export default function App() {
     iluminacao: true,
   });
   const [checklistObs, setChecklistObs] = useState('');
-  const [checklistMileage, setChecklistMileage] = useState('58120');
+  const [checklistMileage, setChecklistMileage] = useState('');
 
-  // Inscrever-se nas mudanças da fila offline
+  // Histórico de saídas do dia
+  const [recentTrips, setRecentTrips] = useState<
+    Array<{
+      plate: string;
+      model: string;
+      startTime: string;
+      endTime: string;
+      duration: string;
+      lunchDuration: string;
+      kmDriven: number;
+    }>
+  >([]);
+
   useEffect(() => {
     const unsubscribe = offlineQueue.subscribe(() => {
       setPendingQueueCount(offlineQueue.getPendingCount());
@@ -98,134 +135,168 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Disparar batida facial (Pipeline On-Device)
-  const handleStartFacialPunch = () => {
+  // 1. Iniciar Processo: Selecionar Veículo
+  const handleStartRouteProcess = () => {
+    setIsVehicleSelectModalOpen(true);
+  };
+
+  // 2. Escolher o Veículo na lista e disparar Biometria Facial
+  const handleSelectVehicle = (vehicle: FleetVehicle) => {
+    if (vehicle.status === 'MAINTENANCE') {
+      Alert.alert('Veículo em Manutenção', 'Este veículo está em reparo técnico e não pode ser liberado.');
+      return;
+    }
+    setSelectedVehicle(vehicle);
+    setChecklistMileage(String(vehicle.currentMileage));
+    setIsVehicleSelectModalOpen(false);
+
+    // Avança para a Validação Facial On-Device
     setIsFaceModalOpen(true);
     setFaceScanState('SCANNING');
 
-    // Simula a detecção do ML Kit e cálculo de embedding do TFLite
     setTimeout(() => {
       setFaceScanState('SUCCESS');
-      const now = new Date();
-      const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
       setTimeout(() => {
-        const newRecord: ClockingRecord = {
-          id: String(Date.now()),
-          type: clockings.length % 2 === 0 ? 'IN' : 'OUT',
-          timestamp: timeStr,
-          facialVerified: true,
-          matchScore: 98.5,
-        };
-
-        if (!isNetworkOnline) {
-          offlineQueue.enqueueClocking({
-            type: newRecord.type,
-            timestamp: newRecord.timestamp,
-            facialVerified: true,
-            matchScore: 98.5,
-          });
-        }
-
-        setClockings([newRecord, ...clockings]);
         setIsFaceModalOpen(false);
         setFaceScanState('IDLE');
-
-        Alert.alert(
-          'Ponto Registrado!',
-          !isNetworkOnline
-            ? `Ponto registrado offline às ${timeStr} e enfileirado para sincronização.`
-            : `Ponto batido com sucesso às ${timeStr} com validação biométrica on-device.`,
-        );
-      }, 1000);
-    }, 1800);
+        // Avança para o Checklist de Entrada
+        setChecklistType('ENTRY');
+        setChecklistObs('');
+        setIsChecklistModalOpen(true);
+      }, 900);
+    }, 1600);
   };
 
-  // Abrir checklist de entrada ou saída
-  const openChecklist = (type: 'ENTRY' | 'EXIT') => {
-    setChecklistType(type);
-    setChecklistObs('');
-    setIsChecklistModalOpen(true);
-  };
-
-  // Salvar Checklist (com suporte Offline-First e cálculo de rota)
+  // 3. Salvar Checklist (Entrada ou Saída)
   const handleSaveChecklist = () => {
-    const mileageNum = parseInt(checklistMileage, 10) || vehicle.currentMileage;
+    const mileageNum = parseInt(checklistMileage, 10) || (selectedVehicle?.currentMileage ?? 0);
     const hasProblem = Object.values(checklistItems).some((item) => !item);
 
     setIsChecklistModalOpen(false);
 
     if (checklistType === 'ENTRY') {
-      // Inicia rota
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
       setActiveRoute({
         inProgress: true,
+        vehicleId: selectedVehicle!.id,
+        vehiclePlate: selectedVehicle!.plate,
+        vehicleModel: `${selectedVehicle!.brand} ${selectedVehicle!.model}`,
         startMileage: mileageNum,
-        startTime: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+        startTime: timeStr,
         elapsedMinutes: 0,
+        isOnLunch: false,
+        lunchStartTime: null,
+        totalLunchMinutes: 0,
       });
-      setVehicle({ ...vehicle, status: 'IN_USE', currentMileage: mileageNum });
-    } else {
-      // Finaliza rota
-      const kmDriven = Math.max(0, mileageNum - activeRoute.startMileage);
-      setActiveRoute({
-        inProgress: false,
-        startMileage: mileageNum,
-        startTime: '',
-        elapsedMinutes: 0,
-      });
-      setVehicle({
-        ...vehicle,
-        status: hasProblem ? 'MAINTENANCE' : 'AVAILABLE',
-        currentMileage: mileageNum,
-      });
-    }
 
-    // Se estiver sem conexão, enfileira localmente
-    if (!isNetworkOnline) {
-      offlineQueue.enqueueChecklist({
-        vehicleId: vehicle.id,
-        vehiclePlate: vehicle.plate,
-        type: checklistType,
-        mileage: mileageNum,
-        itemsResult: checklistItems,
-        observation: checklistObs,
-        hasProblem,
-      });
+      // Atualiza status do veículo
+      setAvailableVehicles(
+        availableVehicles.map((v) =>
+          v.id === selectedVehicle!.id ? { ...v, status: 'IN_USE', currentMileage: mileageNum } : v,
+        ),
+      );
 
       Alert.alert(
-        'Modo Offline Ativo',
-        `Checklist de ${checklistType === 'ENTRY' ? 'Entrada' : 'Saída'} gravado localmente no smartphone. Será sincronizado automaticamente assim que a conexão retornar.`,
+        'Veículo Liberado!',
+        `Checklist de entrada concluído para o veículo ${selectedVehicle!.plate}. Boa rota!`,
       );
-      return;
-    }
+    } else {
+      // Checklist de Saída / Fim de Rota
+      const kmDriven = Math.max(0, mileageNum - activeRoute.startMileage);
+      const now = new Date();
+      const endTimeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    // Caso online: confirmação instantânea
-    Alert.alert(
-      hasProblem ? 'Alerta de Avaria!' : 'Checklist Concluído!',
-      checklistType === 'ENTRY'
-        ? 'Checklist de entrada concluído. Veículo liberado para rota.'
-        : hasProblem
-        ? 'Avaria reportada! Veículo direcionado para MANUTENÇÃO e Gestor notificado.'
-        : 'Checklist de saída concluído com sucesso. Veículo liberado na base.',
-    );
+      // Salva no histórico de viagens
+      setRecentTrips([
+        {
+          plate: activeRoute.vehiclePlate,
+          model: activeRoute.vehicleModel,
+          startTime: activeRoute.startTime,
+          endTime: endTimeStr,
+          duration: `${Math.max(1, activeRoute.elapsedMinutes)} min`,
+          lunchDuration:
+            activeRoute.totalLunchMinutes > 0 ? `${activeRoute.totalLunchMinutes} min` : 'Sem intervalo',
+          kmDriven,
+        },
+        ...recentTrips,
+      ]);
+
+      // Atualiza o veículo na frota
+      setAvailableVehicles(
+        availableVehicles.map((v) =>
+          v.id === activeRoute.vehicleId
+            ? {
+                ...v,
+                status: hasProblem ? 'MAINTENANCE' : 'AVAILABLE',
+                currentMileage: mileageNum,
+              }
+            : v,
+        ),
+      );
+
+      // Reseta rota ativa
+      setActiveRoute({
+        inProgress: false,
+        vehicleId: '',
+        vehiclePlate: '',
+        vehicleModel: '',
+        startMileage: 0,
+        startTime: '',
+        elapsedMinutes: 0,
+        isOnLunch: false,
+        lunchStartTime: null,
+        totalLunchMinutes: 0,
+      });
+      setSelectedVehicle(null);
+
+      Alert.alert(
+        hasProblem ? 'Avaria Reportada!' : 'Rota Concluída!',
+        hasProblem
+          ? `Checklist finalizado com alerta. Veículo direcionado para MANUTENÇÃO.`
+          : `Veículo devolvido na base. Foram rodados ${kmDriven} km.`,
+      );
+    }
   };
 
-  // Sincronizar fila pendente
-  const handleSyncQueue = async () => {
-    if (pendingQueueCount === 0) {
-      Alert.alert('Fila Vazia', 'Não há itens pendentes para sincronizar no momento.');
-      return;
-    }
+  // 4. Controle de Pausa / Almoço (Opção A: 1 clique ágil)
+  const handleToggleLunch = () => {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-    offlineQueue.clearQueue();
-    Alert.alert('Sincronização Concluída', 'Todos os checklists e batidas offline foram enviados com sucesso ao servidor.');
+    if (!activeRoute.isOnLunch) {
+      // Iniciar Pausa de Almoço
+      setActiveRoute({
+        ...activeRoute,
+        isOnLunch: true,
+        lunchStartTime: timeStr,
+      });
+      Alert.alert('Almoço / Pausa Iniciado', `Intervalo registrado às ${timeStr}. Bom apetite!`);
+    } else {
+      // Retomar Rota
+      const pauseDuration = 45; // Simulação de 45 minutos de almoço
+      setActiveRoute({
+        ...activeRoute,
+        isOnLunch: false,
+        totalLunchMinutes: activeRoute.totalLunchMinutes + pauseDuration,
+      });
+      Alert.alert('Rota Retomada!', `Intervalo encerrado às ${timeStr} (${pauseDuration} min registrados).`);
+    }
+  };
+
+  // Abrir checklist de saída para finalizar o carro
+  const handleOpenExitChecklist = () => {
+    setChecklistType('EXIT');
+    setChecklistObs('');
+    setIsChecklistModalOpen(true);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#090d16" />
 
-      {/* HEADER CORPORATIVO */}
+      {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.logoBadge}>
@@ -237,7 +308,6 @@ export default function App() {
           </View>
         </View>
 
-        {/* Botão de Toggle de Rede para Teste Offline */}
         <TouchableOpacity
           onPress={() => setIsNetworkOnline(!isNetworkOnline)}
           style={[styles.onlineBadge, !isNetworkOnline && styles.offlineBadge]}
@@ -263,149 +333,141 @@ export default function App() {
               <Text style={styles.driverBranch}>{user.branchName}</Text>
             </View>
           </View>
-
           <View style={styles.biometricBadge}>
             <Text style={styles.biometricBadgeText}>✓ Biometria Facial Registrada (LGPD)</Text>
           </View>
         </View>
 
-        {/* BOTÃO PRINCIPAL: BATER PONTO COM RECONHECIMENTO FACIAL */}
-        <TouchableOpacity style={styles.punchButton} onPress={handleStartFacialPunch} activeOpacity={0.85}>
-          <View style={styles.punchIconCircle}>
-            <Text style={styles.punchIconText}>👤</Text>
-          </View>
-          <View style={styles.punchTextContainer}>
-            <Text style={styles.punchTitle}>Bater Ponto Facial</Text>
-            <Text style={styles.punchSubtitle}>Validação 100% on-device (ML Kit + TFLite)</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* CARD DE ROTA E VEÍCULO EM USO */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Controle de Uso do Veículo</Text>
-          <TouchableOpacity onPress={() => openChecklist(activeRoute.inProgress ? 'EXIT' : 'ENTRY')}>
-            <Text style={styles.sectionAction}>
-              {activeRoute.inProgress ? 'Checklist Saída' : 'Checklist Entrada'}
+        {/* ÁREA DE OPERAÇÃO: ROTA ATIVA OU INICIAR NOVA UTILIZAÇÃO */}
+        {!activeRoute.inProgress ? (
+          /* NENHUM CARRO EM USO: BOTÃO PARA PEGAR CARRO */
+          <View style={styles.startActionCard}>
+            <Text style={styles.startCardTitle}>Nenhum veículo em uso</Text>
+            <Text style={styles.startCardSubtitle}>
+              Selecione o modelo e a placa do carro para realizar a validação facial e o checklist de entrada.
             </Text>
-          </TouchableOpacity>
-        </View>
 
-        <View style={styles.vehicleCard}>
-          <View style={styles.vehicleRow}>
-            <View>
-              <Text style={styles.vehiclePlate}>{vehicle.plate}</Text>
-              <Text style={styles.vehicleModel}>
-                {vehicle.brand} {vehicle.model}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.statusBadge,
-                vehicle.status === 'AVAILABLE' && styles.statusBadgeAvailable,
-                vehicle.status === 'MAINTENANCE' && styles.statusBadgeMaintenance,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusBadgeText,
-                  vehicle.status === 'AVAILABLE' && styles.statusBadgeTextAvailable,
-                  vehicle.status === 'MAINTENANCE' && styles.statusBadgeTextMaintenance,
-                ]}
-              >
-                {vehicle.status === 'IN_USE' && 'Em Rota'}
-                {vehicle.status === 'AVAILABLE' && 'Disponível'}
-                {vehicle.status === 'MAINTENANCE' && 'Manutenção'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Medidor de Tempo em Rota (Controle de Horas da Fase 2) */}
-          {activeRoute.inProgress ? (
-            <View style={styles.activeRouteBox}>
-              <View style={styles.routeMetricItem}>
-                <Text style={styles.routeMetricLabel}>Início da Rota</Text>
-                <Text style={styles.routeMetricValue}>{activeRoute.startTime}</Text>
+            <TouchableOpacity style={styles.primaryActionButton} onPress={handleStartRouteProcess}>
+              <Text style={styles.primaryActionIcon}>🚗</Text>
+              <View>
+                <Text style={styles.primaryActionText}>Selecionar Veículo & Iniciar</Text>
+                <Text style={styles.primaryActionSub}>Reconhecimento facial + Checklist</Text>
               </View>
-              <View style={styles.routeMetricItem}>
-                <Text style={styles.routeMetricLabel}>Tempo em Operação</Text>
-                <Text style={styles.routeMetricValueHighlight}>
-                  {Math.floor(activeRoute.elapsedMinutes / 60)}h {activeRoute.elapsedMinutes % 60}m
-                </Text>
-              </View>
-              <View style={styles.routeMetricItem}>
-                <Text style={styles.routeMetricLabel}>Km Inicial</Text>
-                <Text style={styles.routeMetricValue}>{activeRoute.startMileage}</Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.noRouteBox}>
-              <Text style={styles.noRouteText}>Nenhuma rota em andamento. Faça o Checklist de Entrada.</Text>
-            </View>
-          )}
-
-          <View style={styles.divider} />
-
-          <View style={styles.vehicleDetailsRow}>
-            <View>
-              <Text style={styles.detailLabel}>Odômetro Atual</Text>
-              <Text style={styles.detailValue}>{vehicle.currentMileage.toLocaleString('pt-BR')} km</Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.checklistQuickBtn}
-              onPress={() => openChecklist(activeRoute.inProgress ? 'EXIT' : 'ENTRY')}
-            >
-              <Text style={styles.checklistQuickBtnText}>
-                {activeRoute.inProgress ? 'Finalizar Rota' : 'Iniciar Rota'}
-              </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        ) : (
+          /* VEÍCULO EM USO: PAINEL DE CONTROLE DE ROTA */
+          <View style={styles.activeRouteCard}>
+            <View style={styles.activeRouteHeader}>
+              <View>
+                <Text style={styles.activeRoutePlate}>{activeRoute.vehiclePlate}</Text>
+                <Text style={styles.activeRouteModel}>{activeRoute.vehicleModel}</Text>
+              </View>
+              <View
+                style={[
+                  styles.activeRouteBadge,
+                  activeRoute.isOnLunch && styles.activeRouteBadgeLunch,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.activeRouteBadgeText,
+                    activeRoute.isOnLunch && styles.activeRouteBadgeTextLunch,
+                  ]}
+                >
+                  {activeRoute.isOnLunch ? 'Em Pausa (Almoço)' : 'Em Rota'}
+                </Text>
+              </View>
+            </View>
 
-        {/* CARD DA FILA OFFLINE-FIRST (SE HOUVER PENDÊNCIAS) */}
-        {pendingQueueCount > 0 && (
-          <View style={styles.queueCard}>
-            <View style={styles.queueHeader}>
-              <Text style={styles.queueTitle}>⚠ Fila Offline com {pendingQueueCount} pendência(s)</Text>
-              <TouchableOpacity style={styles.syncBtn} onPress={handleSyncQueue}>
-                <Text style={styles.syncBtnText}>Sincronizar</Text>
+            {/* Banner se estiver em almoço */}
+            {activeRoute.isOnLunch && (
+              <View style={styles.lunchAlertBanner}>
+                <Text style={styles.lunchAlertText}>
+                  🍽 Intervalo de Almoço em andamento desde às {activeRoute.lunchStartTime}
+                </Text>
+              </View>
+            )}
+
+            {/* Métricas da Rota */}
+            <View style={styles.metricsRow}>
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Saída da Base</Text>
+                <Text style={styles.metricVal}>{activeRoute.startTime}</Text>
+              </View>
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Km Inicial</Text>
+                <Text style={styles.metricVal}>{activeRoute.startMileage}</Text>
+              </View>
+              <View style={styles.metricItem}>
+                <Text style={styles.metricLabel}>Pausa Almoço</Text>
+                <Text style={styles.metricVal}>
+                  {activeRoute.totalLunchMinutes > 0 ? `${activeRoute.totalLunchMinutes} min` : '0 min'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* BOTÕES DE AÇÃO NA ROTA: ALMOÇO (OPÇÃO A) E FINALIZAR */}
+            <View style={styles.routeActionButtonsRow}>
+              {/* Botão de Almoço / Pausa (Opção A: 1 clique rápido) */}
+              <TouchableOpacity
+                style={[
+                  styles.lunchActionButton,
+                  activeRoute.isOnLunch && styles.lunchActionButtonActive,
+                ]}
+                onPress={handleToggleLunch}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.lunchActionIcon}>{activeRoute.isOnLunch ? '▶' : '⏸'}</Text>
+                <Text style={styles.lunchActionText}>
+                  {activeRoute.isOnLunch ? 'Retomar Rota' : 'Pausa / Almoço'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Botão de Finalizar Checklist de Saída */}
+              <TouchableOpacity
+                style={styles.finishRouteButton}
+                onPress={handleOpenExitChecklist}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.finishRouteIcon}>🏁</Text>
+                <Text style={styles.finishRouteText}>Devolver Carro</Text>
               </TouchableOpacity>
             </View>
-            <Text style={styles.queueSubtitle}>
-              Os dados estão salvos com segurança no aparelho e serão transmitidos ao servidor.
-            </Text>
           </View>
         )}
 
-        {/* HISTÓRICO DE PONTOS DE HOJE */}
+        {/* HISTÓRICO DE ROTAS E DEVOLUÇÕES DE HOJE */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Jornada de Hoje (CLT)</Text>
-          <Text style={styles.sectionSubtitle}>{clockings.length} batidas registradas</Text>
+          <Text style={styles.sectionTitle}>Histórico de Viagens de Hoje</Text>
+          <Text style={styles.sectionSubtitle}>{recentTrips.length} concluídas</Text>
         </View>
 
         <View style={styles.historyCard}>
-          {clockings.map((c, index) => (
-            <View key={c.id} style={[styles.clockingRow, index > 0 && styles.clockingRowBorder]}>
-              <View style={styles.clockingLeft}>
-                <View style={styles.clockingIconBox}>
-                  <Text style={styles.clockingIcon}>⏰</Text>
-                </View>
+          {recentTrips.length === 0 ? (
+            <View style={styles.emptyHistory}>
+              <Text style={styles.emptyHistoryText}>Nenhuma rota finalizada hoje ainda.</Text>
+            </View>
+          ) : (
+            recentTrips.map((trip, idx) => (
+              <View key={idx} style={[styles.tripRow, idx > 0 && styles.tripRowBorder]}>
                 <View>
-                  <Text style={styles.clockingType}>
-                    {c.type === 'IN' && 'Entrada de Turno'}
-                    {c.type === 'OUT' && 'Saída de Turno'}
-                    {c.type === 'LUNCH_OUT' && 'Pausa Almoço (Saída)'}
-                    {c.type === 'LUNCH_IN' && 'Retorno Almoço (Entrada)'}
+                  <Text style={styles.tripPlate}>{trip.plate} • {trip.model}</Text>
+                  <Text style={styles.tripMeta}>
+                    {trip.startTime} às {trip.endTime} • Almoço: {trip.lunchDuration}
                   </Text>
-                  <Text style={styles.clockingMatch}>Biometria: {c.matchScore}% de similaridade</Text>
+                </View>
+                <View style={styles.tripStats}>
+                  <Text style={styles.tripKm}>+{trip.kmDriven} km</Text>
+                  <Text style={styles.tripDuration}>{trip.duration}</Text>
                 </View>
               </View>
-              <Text style={styles.clockingTime}>{c.timestamp}</Text>
-            </View>
-          ))}
+            ))
+          )}
         </View>
 
-        {/* RODAPÉ INFORMATIVO */}
         <View style={styles.offlineFooter}>
           <Text style={styles.offlineFooterText}>
             ☁ Fila Offline: {pendingQueueCount} pendências | Conexão: {isNetworkOnline ? 'Ativa' : 'Desconectada'}
@@ -413,12 +475,73 @@ export default function App() {
         </View>
       </ScrollView>
 
-      {/* MODAL DE RECONHECIMENTO FACIAL ON-DEVICE */}
+      {/* MODAL 1: SELEÇÃO DE VEÍCULO (PLACA E MODELO) */}
+      <Modal visible={isVehicleSelectModalOpen} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.vehicleSelectContainer}>
+            <Text style={styles.modalTitle}>Selecione o Veículo</Text>
+            <Text style={styles.modalSubtitle}>Escolha o carro que você vai conduzir:</Text>
+
+            <View style={styles.vehicleList}>
+              {availableVehicles.map((v) => (
+                <TouchableOpacity
+                  key={v.id}
+                  style={[
+                    styles.vehicleSelectItem,
+                    v.status === 'MAINTENANCE' && styles.vehicleSelectItemDisabled,
+                  ]}
+                  onPress={() => handleSelectVehicle(v)}
+                  disabled={v.status === 'MAINTENANCE'}
+                >
+                  <View style={styles.vehicleSelectLeft}>
+                    <View style={styles.vehicleSelectIconBox}>
+                      <Text style={styles.vehicleSelectIcon}>🚗</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.vehicleSelectPlate}>{v.plate}</Text>
+                      <Text style={styles.vehicleSelectModel}>
+                        {v.brand} {v.model}
+                      </Text>
+                      <Text style={styles.vehicleSelectKm}>{v.currentMileage.toLocaleString('pt-BR')} km</Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={[
+                      styles.vehicleStatusBadge,
+                      v.status === 'AVAILABLE' && styles.statusAvailable,
+                      v.status === 'IN_USE' && styles.statusInUse,
+                      v.status === 'MAINTENANCE' && styles.statusMaintenance,
+                    ]}
+                  >
+                    <Text style={styles.vehicleStatusBadgeText}>
+                      {v.status === 'AVAILABLE' && 'Liberado'}
+                      {v.status === 'IN_USE' && 'Em Uso'}
+                      {v.status === 'MAINTENANCE' && 'Oficina'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.closeModalBtn}
+              onPress={() => setIsVehicleSelectModalOpen(false)}
+            >
+              <Text style={styles.closeModalBtnText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL 2: RECONHECIMENTO FACIAL ON-DEVICE */}
       <Modal visible={isFaceModalOpen} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.faceModalContainer}>
-            <Text style={styles.faceModalTitle}>Reconhecimento Facial</Text>
-            <Text style={styles.faceModalSubtitle}>Posicione seu rosto no quadro abaixo</Text>
+            <Text style={styles.faceModalTitle}>Validação Facial do Motorista</Text>
+            <Text style={styles.faceModalSubtitle}>
+              Veículo: {selectedVehicle?.plate} ({selectedVehicle?.model})
+            </Text>
 
             <View style={styles.cameraBox}>
               <View style={[styles.cameraGuide, faceScanState === 'SUCCESS' && styles.cameraGuideSuccess]}>
@@ -428,33 +551,23 @@ export default function App() {
             </View>
 
             <View style={styles.pipelineInfo}>
-              <Text style={styles.pipelineText}>⚙ ML Kit: Rosto Detectado</Text>
-              <Text style={styles.pipelineText}>⚙ TFLite MobileFaceNet: Vetor Gerado</Text>
-              <Text style={styles.pipelineText}>🔒 LGPD: Nenhuma foto é transmitida</Text>
+              <Text style={styles.pipelineText}>⚙ ML Kit: Face identificada</Text>
+              <Text style={styles.pipelineText}>⚙ TFLite: Vetor comparado on-device</Text>
+              <Text style={styles.pipelineText}>🔒 LGPD: Nenhuma imagem armazenada</Text>
             </View>
-
-            <TouchableOpacity
-              style={styles.cancelBtn}
-              onPress={() => {
-                setIsFaceModalOpen(false);
-                setFaceScanState('IDLE');
-              }}
-            >
-              <Text style={styles.cancelBtnText}>Cancelar</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* MODAL DE CHECKLIST VEICULAR (ENTRADA / SAÍDA) */}
+      {/* MODAL 3: CHECKLIST DE ENTRADA OU SAÍDA */}
       <Modal visible={isChecklistModalOpen} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.checklistModalContainer}>
             <Text style={styles.checklistModalTitle}>
-              Checklist de {checklistType === 'ENTRY' ? 'Entrada (Início de Rota)' : 'Saída (Fim de Rota)'}
+              Checklist de {checklistType === 'ENTRY' ? 'Entrada (Início de Rota)' : 'Saída (Devolução do Carro)'}
             </Text>
             <Text style={styles.checklistModalSubtitle}>
-              {vehicle.plate} • {vehicle.brand} {vehicle.model}
+              {checklistType === 'ENTRY' ? selectedVehicle?.plate : activeRoute.vehiclePlate} • Vistoria Obrigatória
             </Text>
 
             <ScrollView style={styles.checklistScroll} showsVerticalScrollIndicator={false}>
@@ -500,12 +613,12 @@ export default function App() {
               })}
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Observações ou Descrição de Avarias</Text>
+                <Text style={styles.inputLabel}>Observações ou Avarias</Text>
                 <TextInput
                   style={[styles.textInput, styles.textArea]}
                   value={checklistObs}
                   onChangeText={setChecklistObs}
-                  placeholder="Informe detalhes caso haja algum problema..."
+                  placeholder="Descreva detalhes..."
                   placeholderTextColor="#64748b"
                   multiline
                 />
@@ -518,7 +631,7 @@ export default function App() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveChecklistBtn} onPress={handleSaveChecklist}>
                 <Text style={styles.saveChecklistBtnText}>
-                  {checklistType === 'ENTRY' ? 'Liberar Veículo' : 'Concluir Devolução'}
+                  {checklistType === 'ENTRY' ? 'Concluir e Liberar' : 'Finalizar e Devolver'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -665,42 +778,190 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  punchButton: {
-    backgroundColor: '#2563eb',
+
+  // CARD INICIAL
+  startActionCard: {
+    backgroundColor: '#111827',
     borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+    alignItems: 'center',
+  },
+  startCardTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  startCardSubtitle: {
+    color: '#94a3b8',
+    fontSize: 12,
+    textAlign: 'center',
+    marginVertical: 10,
+    lineHeight: 18,
+  },
+  primaryActionButton: {
+    width: '100%',
+    backgroundColor: '#2563eb',
+    borderRadius: 14,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     shadowColor: '#2563eb',
     shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowRadius: 8,
+    elevation: 5,
+    marginTop: 6,
   },
-  punchIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  primaryActionIcon: {
+    fontSize: 24,
   },
-  punchIconText: {
-    fontSize: 20,
-  },
-  punchTextContainer: {
-    flex: 1,
-  },
-  punchTitle: {
+  primaryActionText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
   },
-  punchSubtitle: {
+  primaryActionSub: {
     color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 11,
     marginTop: 2,
   },
+
+  // CARD ROTA ATIVA
+  activeRouteCard: {
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#2563eb',
+  },
+  activeRouteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  activeRoutePlate: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  activeRouteModel: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  activeRouteBadge: {
+    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(37, 99, 235, 0.3)',
+  },
+  activeRouteBadgeLunch: {
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    borderColor: 'rgba(234, 179, 8, 0.3)',
+  },
+  activeRouteBadgeText: {
+    color: '#60a5fa',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  activeRouteBadgeTextLunch: {
+    color: '#facc15',
+  },
+  lunchAlertBanner: {
+    backgroundColor: 'rgba(234, 179, 8, 0.1)',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.25)',
+  },
+  lunchAlertText: {
+    color: '#fde047',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+  },
+  metricItem: {
+    alignItems: 'center',
+  },
+  metricLabel: {
+    color: '#64748b',
+    fontSize: 10,
+    textTransform: 'uppercase',
+  },
+  metricVal: {
+    color: '#f1f5f9',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 2,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#1f2937',
+    marginVertical: 14,
+  },
+  routeActionButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  lunchActionButton: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  lunchActionButtonActive: {
+    backgroundColor: '#854d0e',
+    borderColor: '#ca8a04',
+  },
+  lunchActionIcon: {
+    color: '#fde047',
+    fontSize: 14,
+  },
+  lunchActionText: {
+    color: '#f1f5f9',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  finishRouteButton: {
+    flex: 1,
+    backgroundColor: '#2563eb',
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  finishRouteIcon: {
+    fontSize: 14,
+  },
+  finishRouteText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+
+  // HISTÓRICO
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -709,173 +970,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: '#f1f5f9',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  sectionAction: {
-    color: '#38bdf8',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   sectionSubtitle: {
     color: '#64748b',
     fontSize: 12,
-  },
-  vehicleCard: {
-    backgroundColor: '#111827',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-  },
-  vehicleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  vehiclePlate: {
-    color: '#f8fafc',
-    fontSize: 18,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  vehicleModel: {
-    color: '#94a3b8',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  statusBadge: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(59, 130, 246, 0.3)',
-  },
-  statusBadgeAvailable: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-  },
-  statusBadgeMaintenance: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderColor: 'rgba(239, 68, 68, 0.3)',
-  },
-  statusBadgeText: {
-    color: '#60a5fa',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  statusBadgeTextAvailable: {
-    color: '#34d399',
-  },
-  statusBadgeTextMaintenance: {
-    color: '#f87171',
-  },
-  activeRouteBox: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(37, 99, 235, 0.08)',
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(37, 99, 235, 0.2)',
-  },
-  noRouteBox: {
-    backgroundColor: '#0f172a',
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 12,
-  },
-  noRouteText: {
-    color: '#64748b',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  routeMetricItem: {
-    alignItems: 'center',
-  },
-  routeMetricLabel: {
-    color: '#64748b',
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  routeMetricValue: {
-    color: '#f1f5f9',
-    fontSize: 13,
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  routeMetricValueHighlight: {
-    color: '#38bdf8',
-    fontSize: 13,
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#1f2937',
-    marginVertical: 12,
-  },
-  vehicleDetailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  detailLabel: {
-    color: '#64748b',
-    fontSize: 11,
-  },
-  detailValue: {
-    color: '#f1f5f9',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  checklistQuickBtn: {
-    backgroundColor: '#2563eb',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 8,
-  },
-  checklistQuickBtnText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  queueCard: {
-    backgroundColor: 'rgba(234, 179, 8, 0.1)',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(234, 179, 8, 0.3)',
-  },
-  queueHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  queueTitle: {
-    color: '#fde047',
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-  syncBtn: {
-    backgroundColor: '#ca8a04',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  syncBtnText: {
-    color: '#000',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  queueSubtitle: {
-    color: '#94a3b8',
-    fontSize: 11,
-    marginTop: 4,
   },
   historyCard: {
     backgroundColor: '#111827',
@@ -884,45 +986,45 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1f2937',
   },
-  clockingRow: {
+  emptyHistory: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyHistoryText: {
+    color: '#64748b',
+    fontSize: 12,
+  },
+  tripRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 12,
   },
-  clockingRowBorder: {
+  tripRowBorder: {
     borderTopWidth: 1,
     borderTopColor: '#1f2937',
   },
-  clockingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  clockingIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: '#1e293b',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clockingIcon: {
-    fontSize: 14,
-  },
-  clockingType: {
+  tripPlate: {
     color: '#f8fafc',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  clockingMatch: {
-    color: '#34d399',
-    fontSize: 11,
-  },
-  clockingTime: {
-    color: '#38bdf8',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: 'bold',
+  },
+  tripMeta: {
+    color: '#64748b',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  tripStats: {
+    alignItems: 'flex-end',
+  },
+  tripKm: {
+    color: '#34d399',
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  tripDuration: {
+    color: '#38bdf8',
+    fontSize: 11,
   },
   offlineFooter: {
     alignItems: 'center',
@@ -934,7 +1036,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Modais
+  // MODAL SELEÇÃO DE VEÍCULO
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -942,6 +1044,104 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  vehicleSelectContainer: {
+    width: '100%',
+    backgroundColor: '#111827',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#1f2937',
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  modalSubtitle: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  vehicleList: {
+    gap: 10,
+    marginVertical: 6,
+  },
+  vehicleSelectItem: {
+    backgroundColor: '#0f172a',
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  vehicleSelectItemDisabled: {
+    opacity: 0.5,
+  },
+  vehicleSelectLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  vehicleSelectIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#1e293b',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vehicleSelectIcon: {
+    fontSize: 18,
+  },
+  vehicleSelectPlate: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  vehicleSelectModel: {
+    color: '#94a3b8',
+    fontSize: 12,
+  },
+  vehicleSelectKm: {
+    color: '#64748b',
+    fontSize: 11,
+  },
+  vehicleStatusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  statusAvailable: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+  },
+  statusInUse: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  statusMaintenance: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+  },
+  vehicleStatusBadgeText: {
+    color: '#94a3b8',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  closeModalBtn: {
+    marginTop: 14,
+    paddingVertical: 12,
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  closeModalBtnText: {
+    color: '#94a3b8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // MODAL FACIAL
   faceModalContainer: {
     width: '100%',
     backgroundColor: '#111827',
@@ -957,16 +1157,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   faceModalSubtitle: {
-    color: '#94a3b8',
+    color: '#38bdf8',
     fontSize: 12,
     marginTop: 4,
   },
   cameraBox: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     backgroundColor: '#090d16',
-    marginVertical: 20,
+    marginVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -974,9 +1174,9 @@ const styles = StyleSheet.create({
     borderColor: '#1e293b',
   },
   cameraGuide: {
-    width: 180,
-    height: 180,
-    borderRadius: 90,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
     borderWidth: 2,
     borderColor: '#38bdf8',
     borderStyle: 'dashed',
@@ -1003,24 +1203,13 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     gap: 4,
-    marginBottom: 16,
   },
   pipelineText: {
     color: '#64748b',
     fontSize: 11,
   },
-  cancelBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    backgroundColor: '#1e293b',
-  },
-  cancelBtnText: {
-    color: '#94a3b8',
-    fontSize: 13,
-    fontWeight: '600',
-  },
 
+  // MODAL CHECKLIST
   checklistModalContainer: {
     width: '100%',
     maxHeight: '85%',
@@ -1062,7 +1251,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   textArea: {
-    height: 70,
+    height: 60,
     textAlignVertical: 'top',
   },
   checklistSectionTitle: {

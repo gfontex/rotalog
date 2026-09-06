@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { UsagesService } from './usages.service.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
@@ -34,5 +34,23 @@ export class UsagesController {
   @Roles(Role.FLEET_MANAGER, Role.ADMIN, Role.HR)
   async getFleetStats(@CurrentUser('tenantId') tenantId: string) {
     return this.usagesService.getFleetStats(tenantId);
+  }
+
+  @Post('start-pause')
+  @Roles(Role.DRIVER, Role.FLEET_MANAGER, Role.ADMIN)
+  async startPause(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('id') driverId: string,
+  ) {
+    return this.usagesService.startPause(tenantId, driverId);
+  }
+
+  @Post('end-pause')
+  @Roles(Role.DRIVER, Role.FLEET_MANAGER, Role.ADMIN)
+  async endPause(
+    @CurrentUser('tenantId') tenantId: string,
+    @CurrentUser('id') driverId: string,
+  ) {
+    return this.usagesService.endPause(tenantId, driverId);
   }
 }
