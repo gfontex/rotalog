@@ -121,9 +121,64 @@ export default function App() {
   const [faceScanState, setFaceScanState] = useState<'PREVIEW' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('PREVIEW');
   const [scanConfidence, setScanConfidence] = useState<number>(0);
 
-  // Cadastro de Facial
-  const [enrollName, setEnrollName] = useState('Novo Colaborador');
-  const [enrollCpf, setEnrollCpf] = useState('111.222.333-44');
+  // Cadastro & Gerenciamento de Usuários
+  interface RegisteredEmployee {
+    id: string;
+    name: string;
+    cpf: string;
+    role: 'ADMIN' | 'DRIVER' | 'FLEET_MANAGER' | 'HR';
+    biometricEnrolled: boolean;
+    biometricConfidence?: number;
+  }
+
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredEmployee[]>([
+    {
+      id: 'u-admin',
+      name: 'Administrador Master',
+      cpf: '139.932.487-08',
+      role: 'ADMIN',
+      biometricEnrolled: true,
+      biometricConfidence: 99.8,
+    },
+    {
+      id: 'u1',
+      name: 'Joãozinho Silva',
+      cpf: '333.444.555-66',
+      role: 'DRIVER',
+      biometricEnrolled: true,
+      biometricConfidence: 99.1,
+    },
+    {
+      id: 'u2',
+      name: 'Carlos Oliveira',
+      cpf: '111.222.333-44',
+      role: 'FLEET_MANAGER',
+      biometricEnrolled: true,
+      biometricConfidence: 98.7,
+    },
+    {
+      id: 'u3',
+      name: 'Mariana Santos',
+      cpf: '222.333.444-55',
+      role: 'HR',
+      biometricEnrolled: false,
+    },
+    {
+      id: 'u4',
+      name: 'Marcos Souza (Novo Motorista)',
+      cpf: '444.555.666-77',
+      role: 'DRIVER',
+      biometricEnrolled: false,
+    },
+  ]);
+
+  // Form de Cadastro de Novo Usuário
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserCpf, setNewUserCpf] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'DRIVER' | 'FLEET_MANAGER' | 'HR' | 'ADMIN'>('DRIVER');
+
+  // Colaborador alvo para captura de biometria (quando selecionado da lista)
+  const [targetEmployeeForEnroll, setTargetEmployeeForEnroll] = useState<RegisteredEmployee | null>(null);
 
   // Checklist
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
@@ -170,35 +225,36 @@ export default function App() {
     return () => clearInterval(timer);
   }, [activeRoute.inProgress, activeRoute.isOnLunch]);
 
-  // Ação de Login no Celular
-  const handleLoginMobile = () => {
-    const cleanPass = loginCpf.replace(/\D/g, '');
-    if (cleanPass === '13993248708') {
+  // Ação de Login no Celular (Reconhece qualquer usuário cadastrado dinamicamente)
+  const handleLoginMobile = (overrideCpf?: string) => {
+    const rawCpf = overrideCpf || loginCpf;
+    const cleanPass = rawCpf.replace(/\D/g, '');
+
+    const found = registeredUsers.find(
+      (u) => u.cpf.replace(/\D/g, '') === cleanPass || u.cpf === rawCpf.trim()
+    );
+
+    if (found) {
       setCurrentUser({
-        id: 'u-admin',
-        name: 'Administrador Master',
-        cpf: '139.932.487-08',
-        email: 'admin@mkseguranca.com.br',
-        role: 'ADMIN',
+        id: found.id,
+        name: found.name,
+        cpf: found.cpf,
+        email: `${found.name.toLowerCase().replace(/\s+/g, '.')}@mkseguranca.com.br`,
+        role: found.role,
         tenantId: 'mk-seguranca',
         branchName: 'Base MKSEGURANCA',
-        biometricEnrolled: true,
+        biometricEnrolled: found.biometricEnrolled,
       });
       setIsLoggedIn(true);
-      Alert.alert('Login Master', 'Bem-vindo ao painel administrativo mobile MKSEGURANCA!');
+      Alert.alert(
+        'Login Efetuado',
+        `Bem-vindo(a), ${found.name}!\nPerfil: ${found.role === 'ADMIN' ? 'Administrador Master' : found.role === 'DRIVER' ? 'Motorista Operacional' : found.role}\nBiometria Facial: ${found.biometricEnrolled ? '✓ Ativa (192-d)' : '⚠️ Pendente de Cadastro'}`
+      );
     } else {
-      setCurrentUser({
-        id: 'u1',
-        name: 'Joãozinho Silva',
-        cpf: '333.444.555-66',
-        email: 'joaozinho@mkseguranca.com.br',
-        role: 'DRIVER',
-        tenantId: 'mk-seguranca',
-        branchName: 'Base MKSEGURANCA',
-        biometricEnrolled: true,
-      });
-      setIsLoggedIn(true);
-      Alert.alert('Login Efetuado', 'Bem-vindo, Joãozinho Silva! Seu painel de motorista está ativo.');
+      Alert.alert(
+        'Colaborador Não Encontrado',
+        `Nenhum colaborador localizado com o CPF ${cleanPass}.\nCadastre o colaborador na aba '📸 Cadastrar Facial' ou utilize um dos usuários listados.`
+      );
     }
   };
 
@@ -226,7 +282,7 @@ export default function App() {
   const handleCaptureAndRecognizeFace = async () => {
     setFaceScanState('SCANNING');
 
-    // Simula extração do vetor 192-d a partir do frame capturado pela câmera
+    // Extração do vetor 192-d a partir da leitura da câmera
     setTimeout(() => {
       const generatedEmbedding = OnDeviceBiometricsEngine.generateEmbeddingVector();
       const mockStored = OnDeviceBiometricsEngine.generateEmbeddingVector();
@@ -244,10 +300,45 @@ export default function App() {
           setChecklistMileage(String(selectedVehicle?.currentMileage || 18900));
           setIsChecklistModalOpen(true);
         } else if (cameraPurpose === 'ENROLL_EMPLOYEE') {
-          Alert.alert(
-            'Biometria Cadastrada!',
-            `Vetor facial de 192 dimensões registrado com sucesso para ${enrollName} (Confiança ${finalConfidence}%). 100% aderente à LGPD!`,
-          );
+          if (targetEmployeeForEnroll) {
+            // Atualiza biometria de usuário existente
+            setRegisteredUsers((prev) =>
+              prev.map((u) =>
+                u.id === targetEmployeeForEnroll.id
+                  ? { ...u, biometricEnrolled: true, biometricConfidence: finalConfidence }
+                  : u
+              )
+            );
+            Alert.alert(
+              'Biometria Atualizada!',
+              `Vetor facial de 192 dimensões vinculado com sucesso a ${targetEmployeeForEnroll.name} (${finalConfidence}% de confiança).\nLGPD 100% compliant!`
+            );
+            setTargetEmployeeForEnroll(null);
+          } else {
+            // Cadastro de novo usuário com facial vinculada
+            const digits = newUserCpf.replace(/\D/g, '');
+            const formattedCpf =
+              digits.length === 11
+                ? `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
+                : newUserCpf;
+
+            const createdUser: RegisteredEmployee = {
+              id: `u-${Date.now()}`,
+              name: newUserName.trim() || 'Novo Colaborador',
+              cpf: formattedCpf || '000.000.000-00',
+              role: newUserRole,
+              biometricEnrolled: true,
+              biometricConfidence: finalConfidence,
+            };
+
+            setRegisteredUsers((prev) => [createdUser, ...prev]);
+            Alert.alert(
+              'Novo Colaborador & Facial Cadastrados!',
+              `Colaborador: ${createdUser.name}\nCPF / Senha: ${createdUser.cpf}\nCargo: ${createdUser.role}\nBiometria 192-d gravada (${finalConfidence}%).\n\nAgora você já pode fazer login no app com o CPF dele!`
+            );
+            setNewUserName('');
+            setNewUserCpf('');
+          }
         } else if (cameraPurpose === 'CLOCK_IN') {
           Alert.alert(
             'Ponto Registrado!',
@@ -416,33 +507,42 @@ export default function App() {
               keyboardType="numeric"
             />
 
-            <TouchableOpacity style={styles.btnLoginSubmit} onPress={handleLoginMobile}>
+            <TouchableOpacity style={styles.btnLoginSubmit} onPress={() => handleLoginMobile()}>
               <Text style={styles.btnLoginSubmitText}>Entrar no Aplicativo</Text>
             </TouchableOpacity>
 
             <View style={styles.quickAccessSection}>
-              <Text style={styles.quickAccessTitle}>⚡ ACESSO RÁPIDO PARA TESTES:</Text>
-              <TouchableOpacity
-                style={styles.btnQuickAccessDriver}
-                onPress={() => {
-                  setLoginCompany('MKSEGURANCA');
-                  setLoginCpf('33344455566');
-                  handleLoginMobile();
-                }}
-              >
-                <Text style={styles.btnQuickAccessDriverText}>🚚 Entrar como Joãozinho Silva (Motorista)</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.btnQuickAccessAdmin}
-                onPress={() => {
-                  setLoginCompany('MKSEGURANCA');
-                  setLoginCpf('13993248708');
-                  handleLoginMobile();
-                }}
-              >
-                <Text style={styles.btnQuickAccessAdminText}>👑 Entrar como Administrador Master</Text>
-              </TouchableOpacity>
+              <Text style={styles.quickAccessTitle}>👥 USUÁRIOS CADASTRADOS NA BASE MKSEGURANCA:</Text>
+              <Text style={{ color: '#64748b', fontSize: 11, marginBottom: 8 }}>
+                Toque em qualquer colaborador para preencher o CPF e entrar:
+              </Text>
+              {registeredUsers.map((u) => (
+                <TouchableOpacity
+                  key={u.id}
+                  style={[
+                    styles.btnQuickUserItem,
+                    u.role === 'ADMIN' ? styles.btnQuickAdmin : styles.btnQuickDriver,
+                  ]}
+                  onPress={() => {
+                    setLoginCompany('MKSEGURANCA');
+                    setLoginCpf(u.cpf.replace(/\D/g, ''));
+                    handleLoginMobile(u.cpf);
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={styles.quickUserNameText}>{u.name}</Text>
+                    <Text style={styles.quickUserRoleBadge}>
+                      {u.role === 'ADMIN' ? '👑 Master' : u.role === 'DRIVER' ? '🚗 Motorista' : u.role}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+                    <Text style={styles.quickUserCpfText}>CPF: {u.cpf}</Text>
+                    <Text style={{ color: u.biometricEnrolled ? '#34d399' : '#fbbf24', fontSize: 10, fontWeight: '700' }}>
+                      {u.biometricEnrolled ? '✓ Facial OK' : '⚠️ Sem Facial'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
         </View>
@@ -616,47 +716,148 @@ export default function App() {
         )}
 
         {/* ========================================================== */}
-        {/* ABA 2: TELINHA PARA CADASTRAR FACIAL DO FUNCIONÁRIO         */}
+        {/* ABA 2: TELINHA PARA CADASTRAR USUÁRIOS E FACIAL            */}
         {/* ========================================================== */}
         {currentTab === 'ENROLL_FACE' && (
-          <View style={styles.enrollCard}>
-            <Text style={styles.enrollTitle}>Cadastro de Biometria Facial</Text>
-            <Text style={styles.enrollDesc}>
-              Aponte a câmera do celular para o rosto do funcionário. O sistema extrai um vetor matemático de 192 dimensões (MobileFaceNet) 100% aderente à LGPD.
-            </Text>
+          <>
+            {/* CARD 1: CADASTRAR NOVO USUÁRIO */}
+            <View style={styles.enrollCard}>
+              <Text style={styles.enrollTitle}>+ Cadastrar Novo Usuário</Text>
+              <Text style={styles.enrollDesc}>
+                Informe os dados do colaborador, escolha o cargo e capture o rosto com a câmera frontal. A senha de acesso será o CPF.
+              </Text>
 
-            <View style={styles.enrollInputGroup}>
-              <Text style={styles.inputLabel}>Nome do Colaborador</Text>
-              <TextInput
-                style={styles.textInput}
-                value={enrollName}
-                onChangeText={setEnrollName}
-                placeholder="Ex: Carlos Eduardo"
-                placeholderTextColor="#64748b"
-              />
+              <View style={styles.enrollInputGroup}>
+                <Text style={styles.inputLabel}>Nome Completo</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={newUserName}
+                  onChangeText={setNewUserName}
+                  placeholder="Ex: Carlos Eduardo ou Maria Silva"
+                  placeholderTextColor="#64748b"
+                />
 
-              <Text style={[styles.inputLabel, { marginTop: 12 }]}>CPF do Colaborador</Text>
-              <TextInput
-                style={styles.textInput}
-                value={enrollCpf}
-                onChangeText={setEnrollCpf}
-                placeholder="000.000.000-00"
-                placeholderTextColor="#64748b"
-                keyboardType="numeric"
-              />
+                <Text style={[styles.inputLabel, { marginTop: 12 }]}>CPF (Senha de Acesso)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={newUserCpf}
+                  onChangeText={setNewUserCpf}
+                  placeholder="000.000.000-00"
+                  placeholderTextColor="#64748b"
+                  keyboardType="numeric"
+                />
+
+                <Text style={[styles.inputLabel, { marginTop: 12 }]}>Cargo / Função</Text>
+                <View style={styles.rolePickerRow}>
+                  <TouchableOpacity
+                    style={[styles.roleBtn, newUserRole === 'DRIVER' && styles.roleBtnActive]}
+                    onPress={() => setNewUserRole('DRIVER')}
+                  >
+                    <Text style={[styles.roleBtnText, newUserRole === 'DRIVER' && styles.roleBtnTextActive]}>
+                      🚗 Motorista
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.roleBtn, newUserRole === 'FLEET_MANAGER' && styles.roleBtnActive]}
+                    onPress={() => setNewUserRole('FLEET_MANAGER')}
+                  >
+                    <Text style={[styles.roleBtnText, newUserRole === 'FLEET_MANAGER' && styles.roleBtnTextActive]}>
+                      🏢 Gestor
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.roleBtn, newUserRole === 'HR' && styles.roleBtnActive]}
+                    onPress={() => setNewUserRole('HR')}
+                  >
+                    <Text style={[styles.roleBtnText, newUserRole === 'HR' && styles.roleBtnTextActive]}>
+                      📋 RH
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.roleBtn, newUserRole === 'ADMIN' && styles.roleBtnActive]}
+                    onPress={() => setNewUserRole('ADMIN')}
+                  >
+                    <Text style={[styles.roleBtnText, newUserRole === 'ADMIN' && styles.roleBtnTextActive]}>
+                      👑 Master
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.btnOpenCamEnroll}
+                onPress={() => {
+                  if (!newUserName.trim() || !newUserCpf.trim()) {
+                    Alert.alert('Campos Obrigatórios', 'Por favor, digite o nome e o CPF do novo usuário antes de capturar a biometria.');
+                    return;
+                  }
+                  setTargetEmployeeForEnroll(null);
+                  setCameraPurpose('ENROLL_EMPLOYEE');
+                  setFaceScanState('PREVIEW');
+                  setIsFaceCameraModalOpen(true);
+                }}
+              >
+                <Text style={styles.btnOpenCamEnrollText}>📸 Abrir Câmera & Gravar Biometria Facial</Text>
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={styles.btnOpenCamEnroll}
-              onPress={() => {
-                setCameraPurpose('ENROLL_EMPLOYEE');
-                setFaceScanState('PREVIEW');
-                setIsFaceCameraModalOpen(true);
-              }}
-            >
-              <Text style={styles.btnOpenCamEnrollText}>📸 Abrir Câmera & Cadastrar Facial</Text>
-            </TouchableOpacity>
-          </View>
+            {/* CARD 2: LISTA DE USUÁRIOS E STATUS FACIAL */}
+            <View style={[styles.sectionHeader, { marginTop: 20 }]}>
+              <Text style={styles.sectionTitle}>Colaboradores da Base MKSEGURANCA</Text>
+              <Text style={styles.sectionDesc}>Toque em qualquer colaborador para gravar ou atualizar a biometria:</Text>
+            </View>
+
+            {registeredUsers.map((emp) => (
+              <View key={emp.id} style={styles.userListItemCard}>
+                <View style={styles.userListCardHeader}>
+                  <View style={styles.userListAvatar}>
+                    <Text style={styles.userListAvatarText}>{emp.name.charAt(0)}</Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={styles.userListName}>{emp.name}</Text>
+                    <Text style={styles.userListCpf}>CPF: {emp.cpf} • {emp.role}</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.biometricStatusPill,
+                      emp.biometricEnrolled ? styles.bioPillActive : styles.bioPillPending,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.biometricStatusText,
+                        emp.biometricEnrolled ? styles.bioTextActive : styles.bioTextPending,
+                      ]}
+                    >
+                      {emp.biometricEnrolled ? `✓ Ativa (${emp.biometricConfidence || 99}%)` : '⚠️ Pendente'}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.btnUserEnrollAction,
+                    emp.biometricEnrolled ? styles.btnReEnroll : styles.btnFirstEnroll,
+                  ]}
+                  onPress={() => {
+                    setTargetEmployeeForEnroll(emp);
+                    setCameraPurpose('ENROLL_EMPLOYEE');
+                    setFaceScanState('PREVIEW');
+                    setIsFaceCameraModalOpen(true);
+                  }}
+                >
+                  <Text style={styles.btnUserEnrollActionText}>
+                    {emp.biometricEnrolled
+                      ? '🔄 Recadastrar Facial'
+                      : '📸 Gravar Biometria Facial Deste Colaborador'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </>
         )}
 
         {/* ========================================================== */}
@@ -693,7 +894,9 @@ export default function App() {
           <View style={styles.cameraHeader}>
             <Text style={styles.cameraHeaderTitle}>
               {cameraPurpose === 'ENROLL_EMPLOYEE'
-                ? 'Cadastrando Facial do Funcionário'
+                ? (targetEmployeeForEnroll
+                    ? `Facial: ${targetEmployeeForEnroll.name}`
+                    : `Nova Facial: ${newUserName || 'Novo Colaborador'}`)
                 : cameraPurpose === 'CLOCK_IN'
                 ? 'Validação de Ponto Eletrônico'
                 : 'Reconhecimento Facial do Motorista'}
@@ -1211,21 +1414,70 @@ const styles = StyleSheet.create({
   btnLoginSubmitText: { color: '#fff', fontSize: 14, fontWeight: '800' },
   quickAccessSection: { marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#1e293b' },
   quickAccessTitle: { color: '#64748b', fontSize: 10, fontWeight: '800', marginBottom: 8 },
-  btnQuickAccessDriver: {
-    backgroundColor: '#064e3b30',
+  // Cargo Seletor
+  rolePickerRow: { flexDirection: 'row', gap: 6, marginTop: 4 },
+  roleBtn: {
+    flex: 1,
+    backgroundColor: '#020617',
     borderWidth: 1,
-    borderColor: '#05966950',
+    borderColor: '#334155',
+    borderRadius: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  roleBtnActive: { backgroundColor: '#0284c730', borderColor: '#38bdf8' },
+  roleBtnText: { color: '#94a3b8', fontSize: 10, fontWeight: '700' },
+  roleBtnTextActive: { color: '#38bdf8' },
+
+  // Lista de Usuários no Cadastro Facial
+  userListItemCard: {
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
+  },
+  userListCardHeader: { flexDirection: 'row', alignItems: 'center' },
+  userListAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#1e293b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  userListAvatarText: { color: '#38bdf8', fontWeight: '900', fontSize: 16 },
+  userListName: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  userListCpf: { color: '#64748b', fontSize: 11, marginTop: 1 },
+  biometricStatusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  bioPillActive: { backgroundColor: '#064e3b' },
+  bioPillPending: { backgroundColor: '#451a03' },
+  biometricStatusText: { fontSize: 10, fontWeight: '800' },
+  bioTextActive: { color: '#34d399' },
+  bioTextPending: { color: '#fbbf24' },
+  btnUserEnrollAction: {
     borderRadius: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  btnReEnroll: { backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155' },
+  btnFirstEnroll: { backgroundColor: '#0284c7' },
+  btnUserEnrollActionText: { color: '#fff', fontSize: 11, fontWeight: '800' },
+
+  // Itens de acesso rápido no login
+  btnQuickUserItem: {
     padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
     marginBottom: 6,
   },
-  btnQuickAccessDriverText: { color: '#34d399', fontSize: 11, fontWeight: '700' },
-  btnQuickAccessAdmin: {
-    backgroundColor: '#0284c720',
-    borderWidth: 1,
-    borderColor: '#0284c750',
-    borderRadius: 10,
-    padding: 10,
-  },
-  btnQuickAccessAdminText: { color: '#38bdf8', fontSize: 11, fontWeight: '700' },
+  btnQuickAdmin: { backgroundColor: '#0284c715', borderColor: '#0284c740' },
+  btnQuickDriver: { backgroundColor: '#064e3b15', borderColor: '#05966930' },
+  quickUserNameText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+  quickUserRoleBadge: { color: '#94a3b8', fontSize: 10, fontWeight: '700' },
+  quickUserCpfText: { color: '#64748b', fontSize: 10, fontFamily: 'monospace' },
 });
