@@ -587,14 +587,17 @@ export default function App() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.tabButton, currentTab === 'ENROLL_FACE' && styles.tabButtonActive]}
-          onPress={() => setCurrentTab('ENROLL_FACE')}
-        >
-          <Text style={[styles.tabButtonText, currentTab === 'ENROLL_FACE' && styles.tabButtonTextActive]}>
-            📸 Cadastrar Facial
-          </Text>
-        </TouchableOpacity>
+        {/* APENAS O ADMINISTRADOR TEM PERMISSÃO PARA CADASTRAR FACIAL E NOVOS USUÁRIOS */}
+        {currentUser.role === 'ADMIN' && (
+          <TouchableOpacity
+            style={[styles.tabButton, currentTab === 'ENROLL_FACE' && styles.tabButtonActive]}
+            onPress={() => setCurrentTab('ENROLL_FACE')}
+          >
+            <Text style={[styles.tabButtonText, currentTab === 'ENROLL_FACE' && styles.tabButtonTextActive]}>
+              👑 Cadastrar Facial (ADM)
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.tabButton, currentTab === 'TIMECLOCK' && styles.tabButtonActive]}

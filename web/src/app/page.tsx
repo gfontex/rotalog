@@ -958,17 +958,19 @@ export default function DashboardPage() {
                   <FileSpreadsheet className="w-4 h-4" />
                   <span>Relatório Geral da Frota</span>
                 </button>
-                <button
-                  onClick={() => setActiveTab('employees')}
-                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                    activeTab === 'employees'
-                      ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30 shadow-sm'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
-                  }`}
-                >
-                  <Users className="w-4 h-4" />
-                  <span>Colaboradores & Biometria</span>
-                </button>
+                {currentUser.role === 'ADMIN' && (
+                  <button
+                    onClick={() => setActiveTab('employees')}
+                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                      activeTab === 'employees'
+                        ? 'bg-sky-500/15 text-sky-400 border border-sky-500/30 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
+                    }`}
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>Colaboradores & Biometria (ADM)</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setActiveTab('timeclock')}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
@@ -984,8 +986,8 @@ export default function DashboardPage() {
             )}
           </nav>
 
-          {/* BOTÕES ADMINISTRATIVOS APENAS PARA MASTER */}
-          {isMasterUser && (
+          {/* BOTÕES ADMINISTRATIVOS APENAS PARA ADMINISTRADOR MASTER */}
+          {currentUser.role === 'ADMIN' && (
             <div className="flex items-center gap-2 ml-4">
               <button
                 onClick={() => setIsVehicleModalOpen(true)}
@@ -1380,13 +1382,13 @@ export default function DashboardPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* ABA EXCLUSIVA DE GESTORES: TODOS OS COLABORADORES DA EMPRESA              */}
+        {/* ABA EXCLUSIVA DO ADMINISTRADOR MASTER: COLABORADORES & BIOMETRIA          */}
         {/* ========================================================================= */}
-        {activeTab === 'employees' && isMasterUser && (
+        {activeTab === 'employees' && currentUser.role === 'ADMIN' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between bg-slate-900/60 p-4 border border-slate-800 rounded-2xl">
               <div>
-                <h2 className="text-base font-bold text-white">Gestão de Colaboradores & Biometria</h2>
+                <h2 className="text-base font-bold text-white">Gestão de Colaboradores & Biometria (Exclusivo ADM)</h2>
                 <p className="text-xs text-slate-400">Usuários cadastrados na Base MKSEGURANCA</p>
               </div>
               <button
