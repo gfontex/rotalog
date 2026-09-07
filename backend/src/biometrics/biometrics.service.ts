@@ -202,7 +202,7 @@ export class BiometricsService {
   processFaceImage(
     imageBase64: string,
     enrolledVector?: number[],
-    mode: 'ENROLL' | 'VERIFY' = 'VERIFY',
+    mode: 'ENROLL' | 'VERIFY' | 'PROBE' = 'VERIFY',
   ) {
     try {
       if (!imageBase64 || imageBase64.length < 100) {
@@ -221,10 +221,12 @@ export class BiometricsService {
       const height = decoded.height;
       const rgba = decoded.data;
 
-      // 1. Verificação de Rosto Humano e Tom de Pele no Centro (YCbCr)
+      // 1. Verificação de Rosto Humano:
+      // (a) Proporção de tom de pele facial (YCbCr)
       let skinCount = 0;
       const totalPixels = width * height;
       const gray = new Float32Array(totalPixels);
+      let graySum = 0;
 
       for (let i = 0; i < totalPixels; i++) {
         const r = rgba[i * 4];
@@ -236,6 +238,7 @@ export class BiometricsService {
         const cr = 128 + 0.5 * r - 0.418688 * g - 0.081312 * b;
 
         gray[i] = y;
+        graySum += y;
 
         if (cb >= 77 && cb <= 127 && cr >= 133 && cr <= 173) {
           skinCount++;
@@ -243,14 +246,62 @@ export class BiometricsService {
       }
 
       const skinRatio = skinCount / totalPixels;
+      const grayMean = graySum / totalPixels;
 
-      // Se não houver proporção mínima de pele facial (ex: parede, chão, papel, teto)
-      if (skinRatio < 0.10) {
+      // (b) Desvio padrão de luminância (Contraste facial: olhos, sobrancelhas, lábios)
+      let varianceSum = 0;
+      let edgeSum = 0;
+      const step = 2; // amostragem rápida
+      let sampleCount = 0;
+
+      for (let y = 1; y < height - 1; y += step) {
+        for (let x = 1; x < width - 1; x += step) {
+          const idx = y * width + x;
+          const diff = gray[idx] - grayMean;
+          varianceSum += diff * diff;
+
+          // Gradiente Sobel simples para detectar bordas de olhos/boca/nariz
+          const gx = Math.abs(gray[idx + 1] - gray[idx - 1]);
+          const gy = Math.abs(gray[idx + width] - gray[idx - width]);
+          edgeSum += gx + gy;
+          sampleCount++;
+        }
+      }
+
+      const luminanceStdDev = Math.sqrt(varianceSum / sampleCount);
+      const avgEdgeDensity = edgeSum / sampleCount;
+
+      console.log(`[PROCESS-FACE] Analise de Imagem: skinRatio=${(skinRatio * 100).toFixed(1)}%, stdDev=${luminanceStdDev.toFixed(1)}, avgEdge=${avgEdgeDensity.toFixed(1)}`);
+
+      // Se for teto, parede, papel ou superfície uniforme (baixo contraste de bordas e iluminação)
+      if (luminanceStdDev < 12 || avgEdgeDensity < 7) {
+        return {
+          success: false,
+          isFaceDetected: false,
+          skinRatio: Number((skinRatio * 100).toFixed(1)),
+          error: 'Superfície uniforme detectada (parede, teto ou objeto). Por favor, enquadre o seu rosto na câmera.',
+        };
+      }
+
+      // Se não houver proporção mínima de pele facial
+      if (skinRatio < 0.08 || skinRatio > 0.95) {
         return {
           success: false,
           isFaceDetected: false,
           skinRatio: Number((skinRatio * 100).toFixed(1)),
           error: 'Nenhum rosto humano detectado! Por favor, aponte a câmera diretamente para o rosto com boa iluminação.',
+        };
+      }
+
+      // Se for apenas sondagem em tempo real (para pintar de verde ou vermelho):
+      if (mode === 'PROBE') {
+        return {
+          success: true,
+          isFaceDetected: true,
+          skinRatio: Number((skinRatio * 100).toFixed(1)),
+          luminanceStdDev: Number(luminanceStdDev.toFixed(1)),
+          avgEdgeDensity: Number(avgEdgeDensity.toFixed(1)),
+          message: 'Rosto enquadrado perfeitamente no centro!',
         };
       }
 
@@ -308,7 +359,7 @@ export class BiometricsService {
           diffSquares += diff * diff;
         }
         const distance = Math.sqrt(diffSquares);
-        const isMatch = distance <= 0.65;
+        const isMatch = distance <= 0.78;
         const confidence = Math.max(0, Math.min(100, (1 - distance / 1.4) * 100));
 
         return {

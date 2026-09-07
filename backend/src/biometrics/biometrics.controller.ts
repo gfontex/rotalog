@@ -54,13 +54,21 @@ export class BiometricsController {
     body: {
       imageBase64: string;
       enrolledVector?: number[];
-      mode?: 'ENROLL' | 'VERIFY';
+      mode?: 'ENROLL' | 'VERIFY' | 'PROBE';
     },
   ) {
-    return this.biometricsService.processFaceImage(
+    console.log(`[BIOMETRICS] Recebido frame para processamento. Mode: ${body.mode}, Tamanho base64: ${body.imageBase64?.length || 0}`);
+    const result = this.biometricsService.processFaceImage(
       body.imageBase64,
       body.enrolledVector,
       body.mode ?? 'VERIFY',
     );
+    console.log(`[BIOMETRICS] Resultado:`, {
+      isFaceDetected: result.isFaceDetected,
+      isMatch: (result as any).isMatch,
+      confidence: (result as any).confidence,
+      error: (result as any).error,
+    });
+    return result;
   }
 }

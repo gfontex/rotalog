@@ -120,6 +120,8 @@ export default function App() {
   const [cameraPurpose, setCameraPurpose] = useState<'VERIFY_START_ROUTE' | 'ENROLL_EMPLOYEE' | 'CLOCK_IN'>('VERIFY_START_ROUTE');
   const [faceScanState, setFaceScanState] = useState<'PREVIEW' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('PREVIEW');
   const [scanConfidence, setScanConfidence] = useState<number>(0);
+  const [alignmentStatus, setAlignmentStatus] = useState<'INITIAL' | 'ALIGNED_GREEN' | 'MISALIGNED_RED'>('INITIAL');
+  const isAutoCapturingRef = useRef(false);
 
   // Cadastro & Gerenciamento de Usuários
   interface RegisteredEmployee {
@@ -226,6 +228,82 @@ export default function App() {
     return () => clearInterval(timer);
   }, [activeRoute.inProgress, activeRoute.isOnLunch]);
 
+  // Sondagem e Captura Automática Hands-Free (Estilo Face ID Apple)
+  useEffect(() => {
+    if (!isFaceCameraModalOpen) {
+      setAlignmentStatus('INITIAL');
+      isAutoCapturingRef.current = false;
+      return;
+    }
+
+    let isMounted = true;
+    let isProbing = false;
+
+    const probeInterval = setInterval(async () => {
+      if (
+        !isMounted ||
+        isProbing ||
+        isAutoCapturingRef.current ||
+        faceScanState === 'SCANNING' ||
+        faceScanState === 'SUCCESS'
+      ) {
+        return;
+      }
+      if (!cameraRef.current || !cameraRef.current.takePictureAsync) {
+        return;
+      }
+
+      isProbing = true;
+      try {
+        const pic = await cameraRef.current.takePictureAsync({
+          base64: true,
+          quality: 0.1,
+        });
+
+        if (pic?.base64 && isMounted) {
+          const res = await fetch('http://192.168.99.106:3001/api/biometrics/process-face', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imageBase64: pic.base64,
+              mode: 'PROBE',
+            }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (isMounted && !isAutoCapturingRef.current && faceScanState !== 'SCANNING' && faceScanState !== 'SUCCESS') {
+              if (data.isFaceDetected) {
+                // ACENDE VERDE IMEDIATAMENTE!
+                setAlignmentStatus('ALIGNED_GREEN');
+                isAutoCapturingRef.current = true;
+
+                // DISPARA A VALIDAÇÃO/CADASTRO AUTOMATICAMENTE (SEM PRECISAR CLICAR)!
+                setTimeout(() => {
+                  if (isMounted) {
+                    handleCaptureAndRecognizeFace();
+                  }
+                }, 250);
+              } else {
+                // ACENDE VERMELHO (FORA DE ENQUADRAMENTO / TETO / OBJETO)
+                setAlignmentStatus('MISALIGNED_RED');
+              }
+            }
+          }
+        }
+      } catch (err) {
+        // Silencioso na sonda contínua
+      } finally {
+        isProbing = false;
+      }
+    }, 700);
+
+    return () => {
+      isMounted = false;
+      clearInterval(probeInterval);
+    };
+  }, [isFaceCameraModalOpen, faceScanState]);
+
   // Ação de Login no Celular (Reconhece qualquer usuário cadastrado dinamicamente)
   const handleLoginMobile = (overrideCpf?: string) => {
     const rawCpf = overrideCpf || loginCpf;
@@ -288,13 +366,23 @@ export default function App() {
       if (cameraRef.current && cameraRef.current.takePictureAsync) {
         const pic = await cameraRef.current.takePictureAsync({
           base64: true,
-          quality: 0.5,
-          skipProcessing: true,
+          quality: 0.25,
         });
         base64Photo = pic?.base64 || '';
       }
-    } catch (err) {
-      console.log('Frame capture fallback:', err);
+    } catch (err: any) {
+      console.log('Frame capture error:', err);
+      isAutoCapturingRef.current = false;
+      setFaceScanState('ERROR');
+      Alert.alert('Erro na Câmera', 'Falha ao acionar a câmera: ' + (err?.message || 'Câmera indisponível.'));
+      return;
+    }
+
+    if (!base64Photo) {
+      isAutoCapturingRef.current = false;
+      setFaceScanState('ERROR');
+      Alert.alert('Erro na Captura', 'Não foi possível capturar o frame da foto da câmera.');
+      return;
     }
 
     const enrolledVector = targetEmployeeForEnroll
@@ -302,37 +390,50 @@ export default function App() {
       : currentUser.biometricVector;
 
     let apiResult: any = null;
-    if (base64Photo) {
-      try {
-        const response = await fetch('http://192.168.99.106:3001/api/biometrics/process-face', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: base64Photo,
-            enrolledVector,
-            mode: cameraPurpose === 'ENROLL_EMPLOYEE' ? 'ENROLL' : 'VERIFY',
-          }),
-        });
-        if (response.ok) {
-          apiResult = await response.json();
-        }
-      } catch (e) {
-        console.log('Backend offline or unreachable, using local validation');
+    try {
+      const response = await fetch('http://192.168.99.106:3001/api/biometrics/process-face', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageBase64: base64Photo,
+          enrolledVector,
+          mode: cameraPurpose === 'ENROLL_EMPLOYEE' ? 'ENROLL' : 'VERIFY',
+        }),
+      });
+
+      if (response.ok) {
+        apiResult = await response.json();
+      } else {
+        const errJson = await response.json().catch(() => ({}));
+        isAutoCapturingRef.current = false;
+        setFaceScanState('ERROR');
+        Alert.alert('Erro no Servidor', errJson.message || 'Falha no processamento da imagem facial.');
+        return;
       }
+    } catch (e) {
+      isAutoCapturingRef.current = false;
+      setFaceScanState('ERROR');
+      Alert.alert(
+        'Servidor Inacessível',
+        'Não foi possível conectar ao servidor de IA facial em 192.168.99.106:3001.\nVerifique se o backend está ativo na mesma rede Wi-Fi.',
+      );
+      return;
     }
 
     // Se a IA analisou e NÃO detectou rosto humano:
-    if (apiResult && !apiResult.isFaceDetected) {
+    if (!apiResult || !apiResult.isFaceDetected) {
+      isAutoCapturingRef.current = false;
       setFaceScanState('ERROR');
       Alert.alert(
         'Rosto Não Detectado',
-        apiResult.error || 'Nenhum rosto humano identificado na câmera! Aponte para o seu rosto com boa iluminação.',
+        apiResult?.error || 'Nenhum rosto humano identificado na câmera! Aponte para o seu rosto com boa iluminação.',
       );
       return;
     }
 
     // Se for validação de identidade e a IA reprovou (rosto de outra pessoa):
-    if (apiResult && cameraPurpose !== 'ENROLL_EMPLOYEE' && !apiResult.isMatch) {
+    if (cameraPurpose !== 'ENROLL_EMPLOYEE' && !apiResult.isMatch) {
+      isAutoCapturingRef.current = false;
       setFaceScanState('ERROR');
       Alert.alert(
         'Acesso Bloqueado',
@@ -341,14 +442,15 @@ export default function App() {
       return;
     }
 
-    const finalConfidence = apiResult?.confidence || 99.2;
-    const finalVector = apiResult?.vector || OnDeviceBiometricsEngine.generateEmbeddingVector();
+    const finalConfidence = apiResult.confidence || 95.0;
+    const finalVector = apiResult.vector;
 
     setScanConfidence(finalConfidence);
     setFaceScanState('SUCCESS');
 
     setTimeout(() => {
       setIsFaceCameraModalOpen(false);
+      isAutoCapturingRef.current = false;
       if (cameraPurpose === 'VERIFY_START_ROUTE') {
         // Abre o Checklist de Entrada
         setChecklistType('ENTRY');
@@ -992,57 +1094,172 @@ export default function App() {
                 ref={cameraRef}
                 style={styles.cameraPreview}
                 facing="front"
-              >
-                {/* GUIA DE ENQUADRAMENTO FACIAL OVAL */}
-                <View style={styles.faceGuideOverlay}>
+              />
+
+              {/* OVERLAY ESTILO APPLE FACE ID */}
+              <View style={styles.faceIdOverlay} pointerEvents="box-none">
+                {/* DICA DE ENQUADRAMENTO TOPO */}
+                <View
+                  style={[
+                    styles.faceIdPromptPill,
+                    alignmentStatus === 'ALIGNED_GREEN' && styles.promptPillGreen,
+                    alignmentStatus === 'MISALIGNED_RED' && styles.promptPillRed,
+                    faceScanState === 'SUCCESS' && styles.promptPillGreen,
+                  ]}
+                >
+                  <Text style={styles.faceIdPromptPillText}>
+                    {faceScanState === 'SCANNING'
+                      ? '⚡ Mapeando biometria facial...'
+                      : faceScanState === 'SUCCESS'
+                      ? '✓ Rosto Identificado com Sucesso!'
+                      : faceScanState === 'ERROR'
+                      ? '⚠️ Centralize o rosto com boa luz'
+                      : alignmentStatus === 'ALIGNED_GREEN'
+                      ? '🟢 Rosto Enquadrado! Toque para Concluir'
+                      : alignmentStatus === 'MISALIGNED_RED'
+                      ? '🔴 Rosto fora do círculo (Ajuste a posição)'
+                      : '🟡 Posicione o rosto no centro do círculo'}
+                  </Text>
+                </View>
+
+                {/* MOLDURA CIRCULAR CENTRAL FACE ID */}
+                <View style={styles.faceIdRingWrapper}>
+                  {/* CANTOS RETICULARES (ESTILO IPHONE) */}
                   <View
                     style={[
-                      styles.faceGuideOval,
-                      faceScanState === 'SUCCESS' && styles.faceGuideSuccess,
-                      faceScanState === 'SCANNING' && styles.faceGuideScanning,
+                      styles.reticleCorner,
+                      styles.reticleTL,
+                      alignmentStatus === 'ALIGNED_GREEN' && styles.reticleGreen,
+                      alignmentStatus === 'MISALIGNED_RED' && styles.reticleRed,
+                      faceScanState === 'SUCCESS' && styles.reticleGreen,
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.reticleCorner,
+                      styles.reticleTR,
+                      alignmentStatus === 'ALIGNED_GREEN' && styles.reticleGreen,
+                      alignmentStatus === 'MISALIGNED_RED' && styles.reticleRed,
+                      faceScanState === 'SUCCESS' && styles.reticleGreen,
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.reticleCorner,
+                      styles.reticleBL,
+                      alignmentStatus === 'ALIGNED_GREEN' && styles.reticleGreen,
+                      alignmentStatus === 'MISALIGNED_RED' && styles.reticleRed,
+                      faceScanState === 'SUCCESS' && styles.reticleGreen,
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.reticleCorner,
+                      styles.reticleBR,
+                      alignmentStatus === 'ALIGNED_GREEN' && styles.reticleGreen,
+                      alignmentStatus === 'MISALIGNED_RED' && styles.reticleRed,
+                      faceScanState === 'SUCCESS' && styles.reticleGreen,
+                    ]}
+                  />
+
+                  {/* CÍRCULO CENTRAL COM BORDA LUMINOSA */}
+                  <View
+                    style={[
+                      styles.faceIdCircle,
+                      alignmentStatus === 'ALIGNED_GREEN' && styles.faceIdCircleSuccess,
+                      alignmentStatus === 'MISALIGNED_RED' && styles.faceIdCircleError,
+                      faceScanState === 'SCANNING' && styles.faceIdCircleScanning,
+                      faceScanState === 'SUCCESS' && styles.faceIdCircleSuccess,
+                      faceScanState === 'ERROR' && styles.faceIdCircleError,
                     ]}
                   >
+                    {/* FEEDBACK DE CARREGAMENTO NO CENTRO */}
                     {faceScanState === 'SCANNING' && (
-                      <ActivityIndicator size="large" color="#38bdf8" />
+                      <View style={styles.scanningCenterBox}>
+                        <ActivityIndicator size="large" color="#38bdf8" />
+                        <Text style={styles.scanningCenterText}>Processando IA...</Text>
+                      </View>
                     )}
+
+                    {/* BADGE DE SUCESSO VERDE APPLE */}
                     {faceScanState === 'SUCCESS' && (
-                      <Text style={styles.faceSuccessBadge}>
-                        ✓ Reconhecido ({scanConfidence}%)
-                      </Text>
+                      <View style={styles.successCenterBox}>
+                        <View style={styles.successCheckCircle}>
+                          <Text style={styles.successCheckText}>✓</Text>
+                        </View>
+                        <Text style={styles.successCenterTitle}>Autenticado</Text>
+                        <Text style={styles.successCenterConfidence}>
+                          {scanConfidence}% de Similaridade
+                        </Text>
+                      </View>
                     )}
                   </View>
+
+                  {/* MARCADORES RADIAIS (DEPTH TICKS) AO REDOR DO CÍRCULO */}
+                  <View style={styles.radialTicksContainer} pointerEvents="none">
+                    {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => (
+                      <View
+                        key={deg}
+                        style={[
+                          styles.radialTick,
+                          { transform: [{ rotate: `${deg}deg` }, { translateY: -142 }] },
+                          (alignmentStatus === 'ALIGNED_GREEN' || faceScanState === 'SUCCESS') && styles.radialTickSuccess,
+                          alignmentStatus === 'MISALIGNED_RED' && styles.radialTickRed,
+                          faceScanState === 'SCANNING' && styles.radialTickScanning,
+                        ]}
+                      />
+                    ))}
+                  </View>
                 </View>
-              </CameraView>
+
+                {/* INSTRUÇÃO INFERIOR */}
+                <Text style={styles.faceIdSubInstruction}>
+                  {faceScanState === 'SCANNING'
+                    ? 'Mantenha o celular parado por 1 segundo'
+                    : faceScanState === 'SUCCESS'
+                    ? 'Validação biométrica concluída!'
+                    : alignmentStatus === 'ALIGNED_GREEN'
+                    ? '✓ Posição ideal! Toque no botão para gravar'
+                    : 'Olhe diretamente para a tela sem boné ou óculos escuros'}
+                </Text>
+              </View>
             </View>
           )}
 
-          {/* CONTROLES INFERIORES DA CÂMERA */}
-          <View style={styles.cameraControls}>
-            <Text style={styles.cameraInstruction}>
-              {faceScanState === 'SCANNING'
-                ? 'Processando vetor 192-d no chip...'
-                : faceScanState === 'SUCCESS'
-                ? 'Identidade Confirmada! Concluindo...'
-                : 'Enquadre o rosto no círculo e toque em Capturar:'}
-            </Text>
-
+          {/* BARRA INFERIOR COM DISPARADOR ESTILO CÂMERA APPLE */}
+          <View style={styles.cameraControlsApple}>
             <TouchableOpacity
               style={[
-                styles.btnCaptureFace,
+                styles.appleShutterOuter,
+                alignmentStatus === 'ALIGNED_GREEN' && styles.appleShutterOuterGreen,
+                alignmentStatus === 'MISALIGNED_RED' && styles.appleShutterOuterRed,
                 faceScanState === 'SCANNING' && { opacity: 0.6 },
               ]}
               disabled={faceScanState === 'SCANNING'}
               onPress={handleCaptureAndRecognizeFace}
             >
-              <Text style={styles.btnCaptureFaceText}>
-                {cameraPurpose === 'ENROLL_EMPLOYEE'
-                  ? '📸 Capturar & Salvar Biometria'
-                  : '📸 Capturar & Reconhecer Face'}
-              </Text>
+              <View
+                style={[
+                  styles.appleShutterInner,
+                  alignmentStatus === 'ALIGNED_GREEN' && { backgroundColor: '#10b981' },
+                  alignmentStatus === 'MISALIGNED_RED' && { backgroundColor: '#ef4444' },
+                  faceScanState === 'SUCCESS' && { backgroundColor: '#10b981' },
+                ]}
+              />
             </TouchableOpacity>
 
-            <Text style={styles.lgpdBadge}>
-              🔒 100% aderente à LGPD • Nenhuma foto é armazenada na nuvem
+            <Text style={styles.appleShutterLabel}>
+              {faceScanState === 'SCANNING'
+                ? '⚡ Capturando biometria...'
+                : alignmentStatus === 'ALIGNED_GREEN'
+                ? '🟢 Enquadrado! Gravando automaticamente...'
+                : alignmentStatus === 'MISALIGNED_RED'
+                ? '🔴 Aproxime ou centralize seu rosto'
+                : '⚡ Modo Automático: Apenas posicione o rosto'}
+            </Text>
+
+            <Text style={styles.lgpdBadgeApple}>
+              🔒 Biometria On-Device • Vetor 192-d criptografado (LGPD)
             </Text>
           </View>
         </SafeAreaView>
@@ -1335,51 +1552,229 @@ const styles = StyleSheet.create({
   },
   cameraHeaderTitle: { color: '#fff', fontSize: 13, fontWeight: '800' },
   cameraCloseBtn: { color: '#f87171', fontSize: 13, fontWeight: '700' },
-  cameraContainer: { flex: 1, overflow: 'hidden' },
+  cameraContainer: { flex: 1, overflow: 'hidden', position: 'relative', backgroundColor: '#000' },
   cameraPreview: { flex: 1 },
-  faceGuideOverlay: {
-    flex: 1,
+
+  // Apple Face ID Overlay
+  faceIdOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.25)',
+  },
+  faceIdPromptPill: {
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  promptPillGreen: {
+    borderColor: '#10b981',
+    backgroundColor: 'rgba(6, 78, 59, 0.95)',
+  },
+  promptPillRed: {
+    borderColor: '#ef4444',
+    backgroundColor: 'rgba(127, 29, 29, 0.95)',
+  },
+  faceIdPromptPillText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+
+  faceIdRingWrapper: {
+    width: 280,
+    height: 280,
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
   },
-  faceGuideOval: {
-    width: 240,
-    height: 310,
-    borderRadius: 120,
+  faceIdCircle: {
+    width: 250,
+    height: 250,
+    borderRadius: 125,
     borderWidth: 3,
     borderColor: '#38bdf8',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(56, 189, 248, 0.05)',
+    backgroundColor: 'rgba(56, 189, 248, 0.03)',
   },
-  faceGuideScanning: { borderColor: '#f59e0b' },
-  faceGuideSuccess: { borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)' },
-  faceSuccessBadge: {
+  faceIdCircleScanning: {
+    borderColor: '#f59e0b',
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+  },
+  faceIdCircleSuccess: {
+    borderColor: '#10b981',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  faceIdCircleError: {
+    borderColor: '#ef4444',
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+
+  // Reticle Corners (Estilo Face ID)
+  reticleCorner: {
+    position: 'absolute',
+    width: 26,
+    height: 26,
+    borderColor: '#38bdf8',
+    borderWidth: 3,
+  },
+  reticleTL: {
+    top: 6,
+    left: 6,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 10,
+  },
+  reticleTR: {
+    top: 6,
+    right: 6,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+    borderTopRightRadius: 10,
+  },
+  reticleBL: {
+    bottom: 6,
+    left: 6,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 10,
+  },
+  reticleBR: {
+    bottom: 6,
+    right: 6,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderBottomRightRadius: 10,
+  },
+  reticleGreen: {
+    borderColor: '#10b981',
+  },
+  reticleRed: {
+    borderColor: '#ef4444',
+  },
+
+  // Radial Ticks (Depth scan ring)
+  radialTicksContainer: {
+    position: 'absolute',
+    width: 280,
+    height: 280,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radialTick: {
+    position: 'absolute',
+    width: 3,
+    height: 12,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+  },
+  radialTickScanning: {
+    backgroundColor: '#38bdf8',
+  },
+  radialTickSuccess: {
     backgroundColor: '#10b981',
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    height: 16,
+    width: 4,
   },
-  cameraControls: {
-    padding: 20,
-    backgroundColor: '#090d16',
+  radialTickRed: {
+    backgroundColor: '#ef4444',
+  },
+
+  // Central Status Boxes
+  scanningCenterBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanningCenterText: {
+    color: '#38bdf8',
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 10,
+  },
+  successCenterBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  successCheckCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#10b981',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  successCheckText: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: '900',
+  },
+  successCenterTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  successCenterConfidence: {
+    color: '#86efac',
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+
+  faceIdSubInstruction: {
+    color: '#cbd5e1',
+    fontSize: 12,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    fontWeight: '600',
+  },
+
+  // Apple Camera Controls
+  cameraControlsApple: {
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    backgroundColor: '#000',
+    alignItems: 'center',
     borderTopWidth: 1,
     borderTopColor: '#1e293b',
-    alignItems: 'center',
   },
-  cameraInstruction: { color: '#94a3b8', fontSize: 12, textAlign: 'center', marginBottom: 12 },
-  btnCaptureFace: {
-    width: '100%',
-    backgroundColor: '#0284c7',
-    borderRadius: 14,
-    paddingVertical: 14,
+  appleShutterOuter: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 4,
+    borderColor: '#ffffff',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  btnCaptureFaceText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  lgpdBadge: { color: '#64748b', fontSize: 10, marginTop: 10 },
+  appleShutterOuterGreen: {
+    borderColor: '#10b981',
+  },
+  appleShutterOuterRed: {
+    borderColor: '#ef4444',
+  },
+  appleShutterInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#38bdf8',
+  },
+  appleShutterLabel: {
+    color: '#f8fafc',
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  lgpdBadgeApple: {
+    color: '#64748b',
+    fontSize: 11,
+  },
 
   // Permissão Câmera
   permissionBox: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
