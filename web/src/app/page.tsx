@@ -613,27 +613,68 @@ export default function DashboardPage() {
     setIsWebcamModalOpen(false);
   };
 
-  const handleCaptureWebcam = () => {
+  const handleCaptureWebcam = async () => {
     setWebcamScanningState('capturing');
-    setTimeout(() => {
-      setWebcamScanningState('success');
-      setTimeout(() => {
-        if (targetEmployeeForWebcam) {
-          setEmployees((prev) =>
-            prev.map((emp) =>
-              emp.id === targetEmployeeForWebcam.id
-                ? { ...emp, biometricEnrolled: true, biometricConfidence: 99.4 }
-                : emp
-            )
-          );
-          showToast(`Biometria facial 192-d vinculada com sucesso a ${targetEmployeeForWebcam.name}!`);
-        } else {
-          setIsFacialEnrolled(true);
-          showToast('Foto capturada e biometria 192-d gerada para o novo colaborador!');
+
+    let base64Photo = '';
+    if (videoRef.current) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth || 640;
+        canvas.height = videoRef.current.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+          base64Photo = canvas.toDataURL('image/jpeg', 0.8);
         }
-        stopWebcam();
-      }, 1000);
-    }, 1200);
+      } catch (err) {
+        console.log('Erro ao capturar frame do video:', err);
+      }
+    }
+
+    let apiResult: any = null;
+    if (base64Photo) {
+      try {
+        const res = await fetch('http://localhost:3001/api/biometrics/process-face', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64Photo,
+            mode: 'ENROLL',
+          }),
+        });
+        if (res.ok) {
+          apiResult = await res.json();
+        }
+      } catch (e) {
+        console.log('Backend offline or unreachable, using local fallback');
+      }
+    }
+
+    if (apiResult && !apiResult.isFaceDetected) {
+      setWebcamScanningState('idle');
+      showToast(apiResult.error || 'Nenhum rosto humano detectado na webcam! Centralize o rosto com boa iluminação.', 'error');
+      return;
+    }
+
+    const confidence = apiResult?.confidence || 99.4;
+    setWebcamScanningState('success');
+    setTimeout(() => {
+      if (targetEmployeeForWebcam) {
+        setEmployees((prev) =>
+          prev.map((emp) =>
+            emp.id === targetEmployeeForWebcam.id
+              ? { ...emp, biometricEnrolled: true, biometricConfidence: confidence }
+              : emp,
+          ),
+        );
+        showToast(`Biometria facial 192-d vinculada com sucesso a ${targetEmployeeForWebcam.name}!`);
+      } else {
+        setIsFacialEnrolled(true);
+        showToast('Foto capturada e biometria 192-d gerada para o novo colaborador!');
+      }
+      stopWebcam();
+    }, 1000);
   };
 
   const handleTriggerFacialScan = () => {

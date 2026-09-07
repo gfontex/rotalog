@@ -9,6 +9,7 @@ export interface UserProfile {
   tenantId: string;
   branchName: string;
   biometricEnrolled: boolean;
+  biometricVector?: number[];
 }
 
 export interface AssignedVehicle {

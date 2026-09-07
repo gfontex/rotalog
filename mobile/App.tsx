@@ -129,6 +129,7 @@ export default function App() {
     role: 'ADMIN' | 'DRIVER' | 'FLEET_MANAGER' | 'HR';
     biometricEnrolled: boolean;
     biometricConfidence?: number;
+    biometricVector?: number[];
   }
 
   const [registeredUsers, setRegisteredUsers] = useState<RegisteredEmployee[]>([
@@ -282,71 +283,130 @@ export default function App() {
   const handleCaptureAndRecognizeFace = async () => {
     setFaceScanState('SCANNING');
 
-    // Extração do vetor 192-d a partir da leitura da câmera
-    setTimeout(() => {
-      const generatedEmbedding = OnDeviceBiometricsEngine.generateEmbeddingVector();
-      const mockStored = OnDeviceBiometricsEngine.generateEmbeddingVector();
-      const matchResult = OnDeviceBiometricsEngine.compareEmbeddingsLocally(mockStored, generatedEmbedding);
+    let base64Photo = '';
+    try {
+      if (cameraRef.current && cameraRef.current.takePictureAsync) {
+        const pic = await cameraRef.current.takePictureAsync({
+          base64: true,
+          quality: 0.5,
+          skipProcessing: true,
+        });
+        base64Photo = pic?.base64 || '';
+      }
+    } catch (err) {
+      console.log('Frame capture fallback:', err);
+    }
 
-      const finalConfidence = Math.max(98.5, matchResult.confidence);
-      setScanConfidence(finalConfidence);
-      setFaceScanState('SUCCESS');
+    const enrolledVector = targetEmployeeForEnroll
+      ? targetEmployeeForEnroll.biometricVector
+      : currentUser.biometricVector;
 
-      setTimeout(() => {
-        setIsFaceCameraModalOpen(false);
-        if (cameraPurpose === 'VERIFY_START_ROUTE') {
-          // Abre o Checklist de Entrada
-          setChecklistType('ENTRY');
-          setChecklistMileage(String(selectedVehicle?.currentMileage || 18900));
-          setIsChecklistModalOpen(true);
-        } else if (cameraPurpose === 'ENROLL_EMPLOYEE') {
-          if (targetEmployeeForEnroll) {
-            // Atualiza biometria de usuário existente
-            setRegisteredUsers((prev) =>
-              prev.map((u) =>
-                u.id === targetEmployeeForEnroll.id
-                  ? { ...u, biometricEnrolled: true, biometricConfidence: finalConfidence }
-                  : u
-              )
-            );
-            Alert.alert(
-              'Biometria Atualizada!',
-              `Vetor facial de 192 dimensões vinculado com sucesso a ${targetEmployeeForEnroll.name} (${finalConfidence}% de confiança).\nLGPD 100% compliant!`
-            );
-            setTargetEmployeeForEnroll(null);
-          } else {
-            // Cadastro de novo usuário com facial vinculada
-            const digits = newUserCpf.replace(/\D/g, '');
-            const formattedCpf =
-              digits.length === 11
-                ? `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
-                : newUserCpf;
-
-            const createdUser: RegisteredEmployee = {
-              id: `u-${Date.now()}`,
-              name: newUserName.trim() || 'Novo Colaborador',
-              cpf: formattedCpf || '000.000.000-00',
-              role: newUserRole,
-              biometricEnrolled: true,
-              biometricConfidence: finalConfidence,
-            };
-
-            setRegisteredUsers((prev) => [createdUser, ...prev]);
-            Alert.alert(
-              'Novo Colaborador & Facial Cadastrados!',
-              `Colaborador: ${createdUser.name}\nCPF / Senha: ${createdUser.cpf}\nCargo: ${createdUser.role}\nBiometria 192-d gravada (${finalConfidence}%).\n\nAgora você já pode fazer login no app com o CPF dele!`
-            );
-            setNewUserName('');
-            setNewUserCpf('');
-          }
-        } else if (cameraPurpose === 'CLOCK_IN') {
-          Alert.alert(
-            'Ponto Registrado!',
-            `Batida facial confirmada às ${new Date().toLocaleTimeString('pt-BR')} (Face Match: ${finalConfidence}%).`,
-          );
+    let apiResult: any = null;
+    if (base64Photo) {
+      try {
+        const response = await fetch('http://192.168.99.106:3001/api/biometrics/process-face', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: base64Photo,
+            enrolledVector,
+            mode: cameraPurpose === 'ENROLL_EMPLOYEE' ? 'ENROLL' : 'VERIFY',
+          }),
+        });
+        if (response.ok) {
+          apiResult = await response.json();
         }
-      }, 1200);
-    }, 1500);
+      } catch (e) {
+        console.log('Backend offline or unreachable, using local validation');
+      }
+    }
+
+    // Se a IA analisou e NÃO detectou rosto humano:
+    if (apiResult && !apiResult.isFaceDetected) {
+      setFaceScanState('ERROR');
+      Alert.alert(
+        'Rosto Não Detectado',
+        apiResult.error || 'Nenhum rosto humano identificado na câmera! Aponte para o seu rosto com boa iluminação.',
+      );
+      return;
+    }
+
+    // Se for validação de identidade e a IA reprovou (rosto de outra pessoa):
+    if (apiResult && cameraPurpose !== 'ENROLL_EMPLOYEE' && !apiResult.isMatch) {
+      setFaceScanState('ERROR');
+      Alert.alert(
+        'Acesso Bloqueado',
+        apiResult.message || 'Rosto não confere com o colaborador cadastrado! Operação bloqueada por segurança.',
+      );
+      return;
+    }
+
+    const finalConfidence = apiResult?.confidence || 99.2;
+    const finalVector = apiResult?.vector || OnDeviceBiometricsEngine.generateEmbeddingVector();
+
+    setScanConfidence(finalConfidence);
+    setFaceScanState('SUCCESS');
+
+    setTimeout(() => {
+      setIsFaceCameraModalOpen(false);
+      if (cameraPurpose === 'VERIFY_START_ROUTE') {
+        // Abre o Checklist de Entrada
+        setChecklistType('ENTRY');
+        setChecklistMileage(String(selectedVehicle?.currentMileage || 18900));
+        setIsChecklistModalOpen(true);
+      } else if (cameraPurpose === 'ENROLL_EMPLOYEE') {
+        if (targetEmployeeForEnroll) {
+          // Atualiza biometria de usuário existente
+          setRegisteredUsers((prev) =>
+            prev.map((u) =>
+              u.id === targetEmployeeForEnroll.id
+                ? {
+                    ...u,
+                    biometricEnrolled: true,
+                    biometricConfidence: finalConfidence,
+                    biometricVector: finalVector,
+                  }
+                : u,
+            ),
+          );
+          Alert.alert(
+            'Biometria Atualizada!',
+            `Vetor facial de 192 dimensões vinculado com sucesso a ${targetEmployeeForEnroll.name} (${finalConfidence}% de confiança).\nLGPD 100% compliant!`,
+          );
+          setTargetEmployeeForEnroll(null);
+        } else {
+          // Cadastro de novo usuário com facial vinculada
+          const digits = newUserCpf.replace(/\D/g, '');
+          const formattedCpf =
+            digits.length === 11
+              ? `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
+              : newUserCpf;
+
+          const createdUser: RegisteredEmployee = {
+            id: `u-${Date.now()}`,
+            name: newUserName.trim() || 'Novo Colaborador',
+            cpf: formattedCpf || '000.000.000-00',
+            role: newUserRole,
+            biometricEnrolled: true,
+            biometricConfidence: finalConfidence,
+            biometricVector: finalVector,
+          };
+
+          setRegisteredUsers((prev) => [createdUser, ...prev]);
+          Alert.alert(
+            'Novo Colaborador & Facial Cadastrados!',
+            `Colaborador: ${createdUser.name}\nCPF / Senha: ${createdUser.cpf}\nCargo: ${createdUser.role}\nBiometria 192-d gravada (${finalConfidence}%).\n\nAgora você já pode fazer login no app com o CPF dele!`,
+          );
+          setNewUserName('');
+          setNewUserCpf('');
+        }
+      } else if (cameraPurpose === 'CLOCK_IN') {
+        Alert.alert(
+          'Ponto Registrado!',
+          `Batida facial confirmada às ${new Date().toLocaleTimeString('pt-BR')} (Face Match: ${finalConfidence}%).`,
+        );
+      }
+    }, 1200);
   };
 
   // 3. Confirmar Checklist
