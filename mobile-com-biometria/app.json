@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "ROTALOG - Controle de Frota",
-    "slug": "rotalog-frota",
+    "name": "ROTALOG - Biometria Facial",
+    "slug": "rotalog-biometria",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

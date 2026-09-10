@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,12 +10,9 @@ import {
   Modal,
   TextInput,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { UserProfile, AssignedVehicle } from './src/types';
+import { UserProfile } from './src/types';
 import { offlineQueue } from './src/services/offlineQueue';
-import { OnDeviceBiometricsEngine } from './src/services/biometricsService';
 
 interface FleetVehicle {
   id: string;
@@ -27,11 +24,25 @@ interface FleetVehicle {
   currentDriver?: string | null;
 }
 
-export type AlignmentStatus = 'INITIAL' | 'PERFECT' | 'TOO_FAR' | 'TOO_CLOSE' | 'NO_FACE' | 'TOO_DARK';
+interface RegisteredEmployee {
+  id: string;
+  name: string;
+  cpf: string;
+  role: 'ADMIN' | 'DRIVER' | 'FLEET_MANAGER' | 'HR';
+}
+
+interface TimeClockEntry {
+  id: string;
+  type: 'ENTRADA' | 'ALMOCO_SAIDA' | 'ALMOCO_RETORNO' | 'SAIDA';
+  label: string;
+  time: string;
+  date: string;
+  userName: string;
+}
 
 export default function App() {
   // ==========================================
-  // ESTADO DE AUTENTICAÇÃO (LOGIN / DESLOGAR)
+  // ESTADO DE AUTENTICAÇÃO
   // ==========================================
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loginCompany, setLoginCompany] = useState('MKSEGURANCA');
@@ -44,19 +55,18 @@ export default function App() {
     role: 'DRIVER',
     tenantId: 'mk-seguranca',
     branchName: 'Base MKSEGURANCA',
-    biometricEnrolled: true,
+    biometricEnrolled: false,
   });
 
-  // Conectividade Offline-First
-  const [isNetworkOnline, setIsNetworkOnline] = useState<boolean>(true);
+  // Conectividade e Fila Offline
   const [pendingQueueCount, setPendingQueueCount] = useState<number>(0);
 
   // Aba selecionada no App
-  const [currentTab, setCurrentTab] = useState<'ROUTE' | 'ENROLL_FACE' | 'TIMECLOCK'>('ROUTE');
+  const [currentTab, setCurrentTab] = useState<'ROUTE' | 'TIMECLOCK' | 'EMPLOYEES'>('ROUTE');
 
-  // Permissões da Câmera (expo-camera)
-  const [permission, requestPermission] = useCameraPermissions();
-  const cameraRef = useRef<any>(null);
+  // Relógio Digital em tempo real para o Ponto
+  const [currentTimeStr, setCurrentTimeStr] = useState<string>('');
+  const [currentDateStr, setCurrentDateStr] = useState<string>('');
 
   // Veículos da Base MKSEGURANCA
   const [availableVehicles, setAvailableVehicles] = useState<FleetVehicle[]>([
@@ -116,77 +126,8 @@ export default function App() {
     totalLunchMinutes: 0,
   });
 
-  // Modais
+  // Modais de Operação
   const [isVehicleSelectModalOpen, setIsVehicleSelectModalOpen] = useState(false);
-  const [isFaceCameraModalOpen, setIsFaceCameraModalOpen] = useState(false);
-  const [cameraPurpose, setCameraPurpose] = useState<'VERIFY_START_ROUTE' | 'ENROLL_EMPLOYEE' | 'CLOCK_IN'>('VERIFY_START_ROUTE');
-  const [faceScanState, setFaceScanState] = useState<'PREVIEW' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('PREVIEW');
-  const [scanConfidence, setScanConfidence] = useState<number>(0);
-  const [alignmentStatus, setAlignmentStatus] = useState<AlignmentStatus>('INITIAL');
-  const [guidanceMsg, setGuidanceMsg] = useState<string>('🟡 Posicione o rosto no centro');
-  const isAutoCapturingRef = useRef(false);
-
-  // Cadastro & Gerenciamento de Usuários
-  interface RegisteredEmployee {
-    id: string;
-    name: string;
-    cpf: string;
-    role: 'ADMIN' | 'DRIVER' | 'FLEET_MANAGER' | 'HR';
-    biometricEnrolled: boolean;
-    biometricConfidence?: number;
-    biometricVector?: number[];
-  }
-
-  const [registeredUsers, setRegisteredUsers] = useState<RegisteredEmployee[]>([
-    {
-      id: 'u-admin',
-      name: 'Administrador Master',
-      cpf: '139.932.487-08',
-      role: 'ADMIN',
-      biometricEnrolled: true,
-      biometricConfidence: 99.8,
-    },
-    {
-      id: 'u1',
-      name: 'Joãozinho Silva',
-      cpf: '333.444.555-66',
-      role: 'DRIVER',
-      biometricEnrolled: true,
-      biometricConfidence: 99.1,
-    },
-    {
-      id: 'u2',
-      name: 'Carlos Oliveira',
-      cpf: '111.222.333-44',
-      role: 'FLEET_MANAGER',
-      biometricEnrolled: true,
-      biometricConfidence: 98.7,
-    },
-    {
-      id: 'u3',
-      name: 'Mariana Santos',
-      cpf: '222.333.444-55',
-      role: 'HR',
-      biometricEnrolled: false,
-    },
-    {
-      id: 'u4',
-      name: 'Marcos Souza (Novo Motorista)',
-      cpf: '444.555.666-77',
-      role: 'DRIVER',
-      biometricEnrolled: false,
-    },
-  ]);
-
-  // Form de Cadastro de Novo Usuário
-  const [newUserName, setNewUserName] = useState('');
-  const [newUserCpf, setNewUserCpf] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'DRIVER' | 'FLEET_MANAGER' | 'HR' | 'ADMIN'>('DRIVER');
-
-  // Colaborador alvo para captura de biometria (quando selecionado da lista)
-  const [targetEmployeeForEnroll, setTargetEmployeeForEnroll] = useState<RegisteredEmployee | null>(null);
-
-  // Checklist
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
   const [checklistType, setChecklistType] = useState<'ENTRY' | 'EXIT'>('ENTRY');
   const [checklistItems, setChecklistItems] = useState<{ [key: string]: boolean }>({
@@ -213,6 +154,58 @@ export default function App() {
     }>
   >([]);
 
+  // Cadastro de Colaboradores (Sem Biometria)
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredEmployee[]>([
+    {
+      id: 'u-admin',
+      name: 'Administrador Master',
+      cpf: '139.932.487-08',
+      role: 'ADMIN',
+    },
+    {
+      id: 'u1',
+      name: 'Joãozinho Silva',
+      cpf: '333.444.555-66',
+      role: 'DRIVER',
+    },
+    {
+      id: 'u2',
+      name: 'Carlos Oliveira',
+      cpf: '111.222.333-44',
+      role: 'FLEET_MANAGER',
+    },
+    {
+      id: 'u3',
+      name: 'Mariana Santos',
+      cpf: '222.333.444-55',
+      role: 'HR',
+    },
+    {
+      id: 'u4',
+      name: 'Marcos Souza',
+      cpf: '444.555.666-77',
+      role: 'DRIVER',
+    },
+  ]);
+
+  // Form de Cadastro de Novo Usuário (ADM)
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserCpf, setNewUserCpf] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'DRIVER' | 'FLEET_MANAGER' | 'HR' | 'ADMIN'>('DRIVER');
+
+  // Histórico de Batidas de Ponto CLT
+  const [timeClockRecords, setTimeClockRecords] = useState<TimeClockEntry[]>([
+    {
+      id: 'tc-1',
+      type: 'ENTRADA',
+      label: 'Entrada Turno Manhã',
+      time: '08:00:12',
+      date: new Date().toLocaleDateString('pt-BR'),
+      userName: 'Joãozinho Silva',
+    },
+  ]);
+
+  // Fila Offline
   useEffect(() => {
     const unsubscribe = offlineQueue.subscribe(() => {
       setPendingQueueCount(offlineQueue.getPendingCount());
@@ -220,7 +213,19 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Timer de rota
+  // Relógio Digital
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTimeStr(now.toLocaleTimeString('pt-BR'));
+      setCurrentDateStr(now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Timer de Rota Ativa
   useEffect(() => {
     let timer: any;
     if (activeRoute.inProgress && !activeRoute.isOnLunch) {
@@ -231,86 +236,9 @@ export default function App() {
     return () => clearInterval(timer);
   }, [activeRoute.inProgress, activeRoute.isOnLunch]);
 
-  // Sondagem e Captura Automática Hands-Free (Estilo Face ID Apple)
-  useEffect(() => {
-    if (!isFaceCameraModalOpen) {
-      setAlignmentStatus('INITIAL');
-      setGuidanceMsg('🟡 Posicione o rosto no círculo');
-      isAutoCapturingRef.current = false;
-      return;
-    }
-
-    let isMounted = true;
-    let isProbing = false;
-
-    const probeInterval = setInterval(async () => {
-      if (
-        !isMounted ||
-        isProbing ||
-        isAutoCapturingRef.current ||
-        faceScanState === 'SCANNING' ||
-        faceScanState === 'SUCCESS'
-      ) {
-        return;
-      }
-      if (!cameraRef.current || !cameraRef.current.takePictureAsync) {
-        return;
-      }
-
-      isProbing = true;
-      try {
-        const pic = await cameraRef.current.takePictureAsync({
-          base64: true,
-          quality: 0.1,
-        });
-
-        if (pic?.base64 && isMounted) {
-          const res = await fetch('http://192.168.99.106:3001/api/biometrics/process-face', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              imageBase64: pic.base64,
-              mode: 'PROBE',
-            }),
-          });
-
-          if (res.ok) {
-            const data = await res.json();
-            if (isMounted && !isAutoCapturingRef.current) {
-              const status: AlignmentStatus = data.guidanceStatus || (data.isFaceDetected ? 'PERFECT' : 'NO_FACE');
-              const msg: string = data.guidanceMessage || (status === 'PERFECT' ? '🟢 PERFEITO! MANTENHA PARADO...' : '🔴 CENTRALIZE O ROSTO NO CÍRCULO');
-
-              setAlignmentStatus(status);
-              setGuidanceMsg(msg);
-
-              if (status === 'PERFECT') {
-                // ACENDE VERDE IMEDIATAMENTE!
-                isAutoCapturingRef.current = true;
-
-                // DISPARA A VALIDAÇÃO/CADASTRO AUTOMATICAMENTE (SEM PRECISAR CLICAR)!
-                setTimeout(() => {
-                  if (isMounted) {
-                    handleCaptureAndRecognizeFace();
-                  }
-                }, 350);
-              }
-            }
-          }
-        }
-      } catch (err) {
-        // Silencioso na sonda contínua
-      } finally {
-        isProbing = false;
-      }
-    }, 700);
-
-    return () => {
-      isMounted = false;
-      clearInterval(probeInterval);
-    };
-  }, [isFaceCameraModalOpen, faceScanState]);
-
-  // Ação de Login no Celular (Reconhece qualquer usuário cadastrado dinamicamente)
+  // ==========================================
+  // AUTENTICAÇÃO E LOGIN
+  // ==========================================
   const handleLoginMobile = (overrideCpf?: string) => {
     const rawCpf = overrideCpf || loginCpf;
     const cleanPass = rawCpf.replace(/\D/g, '');
@@ -328,17 +256,25 @@ export default function App() {
         role: found.role,
         tenantId: 'mk-seguranca',
         branchName: 'Base MKSEGURANCA',
-        biometricEnrolled: found.biometricEnrolled,
+        biometricEnrolled: false,
       });
       setIsLoggedIn(true);
       Alert.alert(
-        'Login Efetuado',
-        `Bem-vindo(a), ${found.name}!\nPerfil: ${found.role === 'ADMIN' ? 'Administrador Master' : found.role === 'DRIVER' ? 'Motorista Operacional' : found.role}\nBiometria Facial: ${found.biometricEnrolled ? '✓ Ativa (192-d)' : '⚠️ Pendente de Cadastro'}`
+        'Login Efetuado com Sucesso',
+        `Bem-vindo(a), ${found.name}!\nCargo: ${
+          found.role === 'ADMIN'
+            ? 'Administrador Master'
+            : found.role === 'DRIVER'
+            ? 'Motorista Operacional'
+            : found.role === 'FLEET_MANAGER'
+            ? 'Gestor de Frota'
+            : 'Recursos Humanos'
+        }\nBase: MKSEGURANCA`
       );
     } else {
       Alert.alert(
         'Colaborador Não Encontrado',
-        `Nenhum colaborador localizado com o CPF ${cleanPass}.\nCadastre o colaborador na aba '📸 Cadastrar Facial' ou utilize um dos usuários listados.`
+        `Nenhum colaborador localizado com o CPF informado: ${cleanPass}.\nVerifique o número digitado ou utilize um dos perfis pré-cadastrados.`
       );
     }
   };
@@ -348,7 +284,9 @@ export default function App() {
     setSelectedVehicle(null);
   };
 
-  // 1. Iniciar Processo: Selecionar Veículo
+  // ==========================================
+  // FLUXO DE OPERAÇÃO E ROTA (100% DIRETO)
+  // ==========================================
   const handleSelectVehicleForRoute = (v: FleetVehicle) => {
     if (v.status !== 'AVAILABLE') {
       Alert.alert('Veículo Indisponível', `O veículo ${v.plate} está em uso ou manutenção.`);
@@ -357,171 +295,25 @@ export default function App() {
     setSelectedVehicle(v);
     setIsVehicleSelectModalOpen(false);
 
-    // Abre a câmera frontal real para reconhecimento facial
-    setCameraPurpose('VERIFY_START_ROUTE');
-    setFaceScanState('PREVIEW');
-    setIsFaceCameraModalOpen(true);
+    // FLUXO DIRETO: VAI DIRETO PARA O CHECKLIST DE SAÍDA (SEM CÂMERA NEM BIOMETRIA!)
+    setChecklistType('ENTRY');
+    setChecklistMileage(String(v.currentMileage));
+    setChecklistItems({
+      combustivel: true,
+      pneus: true,
+      documentacao: true,
+      avarias: true,
+      limpeza: true,
+      iluminacao: true,
+    });
+    setChecklistObs('');
+    setIsChecklistModalOpen(true);
   };
 
-  // 2. Executar Captura e Validação Facial na Câmera Real
-  const handleCaptureAndRecognizeFace = async () => {
-    setFaceScanState('SCANNING');
-
-    let base64Photo = '';
-    try {
-      if (cameraRef.current && cameraRef.current.takePictureAsync) {
-        const pic = await cameraRef.current.takePictureAsync({
-          base64: true,
-          quality: 0.25,
-        });
-        base64Photo = pic?.base64 || '';
-      }
-    } catch (err: any) {
-      console.log('Frame capture error:', err);
-      isAutoCapturingRef.current = false;
-      setFaceScanState('ERROR');
-      Alert.alert('Erro na Câmera', 'Falha ao acionar a câmera: ' + (err?.message || 'Câmera indisponível.'));
-      return;
-    }
-
-    if (!base64Photo) {
-      isAutoCapturingRef.current = false;
-      setFaceScanState('ERROR');
-      Alert.alert('Erro na Captura', 'Não foi possível capturar o frame da foto da câmera.');
-      return;
-    }
-
-    const enrolledVector = targetEmployeeForEnroll
-      ? targetEmployeeForEnroll.biometricVector
-      : currentUser.biometricVector;
-
-    let apiResult: any = null;
-    try {
-      const response = await fetch('http://192.168.99.106:3001/api/biometrics/process-face', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: base64Photo,
-          enrolledVector,
-          mode: cameraPurpose === 'ENROLL_EMPLOYEE' ? 'ENROLL' : 'VERIFY',
-        }),
-      });
-
-      if (response.ok) {
-        apiResult = await response.json();
-      } else {
-        const errJson = await response.json().catch(() => ({}));
-        isAutoCapturingRef.current = false;
-        setFaceScanState('ERROR');
-        Alert.alert('Erro no Servidor', errJson.message || 'Falha no processamento da imagem facial.');
-        return;
-      }
-    } catch (e) {
-      isAutoCapturingRef.current = false;
-      setFaceScanState('ERROR');
-      Alert.alert(
-        'Servidor Inacessível',
-        'Não foi possível conectar ao servidor de IA facial em 192.168.99.106:3001.\nVerifique se o backend está ativo na mesma rede Wi-Fi.',
-      );
-      return;
-    }
-
-    // Se a IA analisou e o enquadramento ainda não está perfeito:
-    if (!apiResult || !apiResult.isFaceDetected) {
-      isAutoCapturingRef.current = false;
-      setFaceScanState('PREVIEW');
-      const gStatus: AlignmentStatus = apiResult?.guidanceStatus || 'NO_FACE';
-      const gMsg: string = apiResult?.guidanceMessage || apiResult?.error || '🔴 CENTRALIZE O ROSTO NO CÍRCULO';
-      setAlignmentStatus(gStatus);
-      setGuidanceMsg(gMsg);
-      return;
-    }
-
-    // Se for validação de identidade e a IA reprovou (rosto de outra pessoa):
-    if (cameraPurpose !== 'ENROLL_EMPLOYEE' && !apiResult.isMatch) {
-      isAutoCapturingRef.current = false;
-      setFaceScanState('ERROR');
-      Alert.alert(
-        'Acesso Bloqueado',
-        apiResult.message || 'Rosto não confere com o colaborador cadastrado! Operação bloqueada por segurança.',
-      );
-      return;
-    }
-
-    const finalConfidence = apiResult.confidence || 95.0;
-    const finalVector = apiResult.vector;
-
-    setScanConfidence(finalConfidence);
-    setFaceScanState('SUCCESS');
-
-    setTimeout(() => {
-      setIsFaceCameraModalOpen(false);
-      isAutoCapturingRef.current = false;
-      if (cameraPurpose === 'VERIFY_START_ROUTE') {
-        // Abre o Checklist de Entrada
-        setChecklistType('ENTRY');
-        setChecklistMileage(String(selectedVehicle?.currentMileage || 18900));
-        setIsChecklistModalOpen(true);
-      } else if (cameraPurpose === 'ENROLL_EMPLOYEE') {
-        if (targetEmployeeForEnroll) {
-          // Atualiza biometria de usuário existente
-          setRegisteredUsers((prev) =>
-            prev.map((u) =>
-              u.id === targetEmployeeForEnroll.id
-                ? {
-                    ...u,
-                    biometricEnrolled: true,
-                    biometricConfidence: finalConfidence,
-                    biometricVector: finalVector,
-                  }
-                : u,
-            ),
-          );
-          Alert.alert(
-            'Biometria Atualizada!',
-            `Vetor facial de 192 dimensões vinculado com sucesso a ${targetEmployeeForEnroll.name} (${finalConfidence}% de confiança).\nLGPD 100% compliant!`,
-          );
-          setTargetEmployeeForEnroll(null);
-        } else {
-          // Cadastro de novo usuário com facial vinculada
-          const digits = newUserCpf.replace(/\D/g, '');
-          const formattedCpf =
-            digits.length === 11
-              ? `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
-              : newUserCpf;
-
-          const createdUser: RegisteredEmployee = {
-            id: `u-${Date.now()}`,
-            name: newUserName.trim() || 'Novo Colaborador',
-            cpf: formattedCpf || '000.000.000-00',
-            role: newUserRole,
-            biometricEnrolled: true,
-            biometricConfidence: finalConfidence,
-            biometricVector: finalVector,
-          };
-
-          setRegisteredUsers((prev) => [createdUser, ...prev]);
-          Alert.alert(
-            'Novo Colaborador & Facial Cadastrados!',
-            `Colaborador: ${createdUser.name}\nCPF / Senha: ${createdUser.cpf}\nCargo: ${createdUser.role}\nBiometria 192-d gravada (${finalConfidence}%).\n\nAgora você já pode fazer login no app com o CPF dele!`,
-          );
-          setNewUserName('');
-          setNewUserCpf('');
-        }
-      } else if (cameraPurpose === 'CLOCK_IN') {
-        Alert.alert(
-          'Ponto Registrado!',
-          `Batida facial confirmada às ${new Date().toLocaleTimeString('pt-BR')} (Face Match: ${finalConfidence}%).`,
-        );
-      }
-    }, 1200);
-  };
-
-  // 3. Confirmar Checklist
   const handleConfirmChecklist = () => {
     const mileageNum = parseInt(checklistMileage, 10);
     if (isNaN(mileageNum) || mileageNum <= 0) {
-      Alert.alert('Odômetro Obrigatório', 'Por favor, informe a quilometragem atual do painel.');
+      Alert.alert('Odômetro Obrigatório', 'Por favor, informe a quilometragem atual do painel do veículo.');
       return;
     }
 
@@ -549,14 +341,14 @@ export default function App() {
         availableVehicles.map((v) =>
           v.id === selectedVehicle!.id
             ? { ...v, status: 'IN_USE', currentMileage: mileageNum, currentDriver: currentUser.name }
-            : v,
-        ),
+            : v
+        )
       );
 
-      // Notificação exata solicitada no áudio: "Iniciando rota com carro X"
+      // Notificação oficial solicitada: "Iniciando rota com carro X"
       Alert.alert(
         'Iniciando rota',
-        `Iniciando rota com carro ${selectedVehicle!.brand} ${selectedVehicle!.model} (Placa ${selectedVehicle!.plate}).`,
+        `Iniciando rota com carro ${selectedVehicle!.brand} ${selectedVehicle!.model} (Placa ${selectedVehicle!.plate}).`
       );
     } else {
       // Checklist de Saída / Fim de Rota
@@ -587,8 +379,8 @@ export default function App() {
                 currentMileage: mileageNum,
                 currentDriver: null,
               }
-            : v,
-        ),
+            : v
+        )
       );
 
       setActiveRoute({
@@ -605,17 +397,17 @@ export default function App() {
       });
       setSelectedVehicle(null);
 
-      // Notificação exata solicitada no áudio: "Rota finalizada, checklist finalizado"
+      // Notificação oficial solicitada: "Rota finalizada, checklist finalizado"
       Alert.alert(
         'Rota Finalizada',
         hasProblem
-          ? 'Rota finalizada, checklist finalizado (Avaria detectada, veículo direcionado à oficina).'
-          : 'Rota finalizada, checklist finalizado.',
+          ? 'Rota finalizada, checklist finalizado (Avaria reportada, veículo direcionado à manutenção preventiva).'
+          : 'Rota finalizada, checklist finalizado com sucesso.'
       );
     }
   };
 
-  // 4. Pausa para Almoço / Retomada (Opção A)
+  // Pausa para Almoço / Retomada
   const handleToggleLunch = () => {
     const now = new Date();
     const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -626,7 +418,6 @@ export default function App() {
         isOnLunch: true,
         lunchStartTime: timeStr,
       });
-      // Notificação exata solicitada: "Iniciando intervalo para almoço"
       Alert.alert('Intervalo de Almoço', 'Iniciando intervalo para almoço.');
     } else {
       const pauseDuration = 45;
@@ -635,9 +426,80 @@ export default function App() {
         isOnLunch: false,
         totalLunchMinutes: activeRoute.totalLunchMinutes + pauseDuration,
       });
-      // Notificação exata solicitada: "Intervalo para almoço finalizado"
       Alert.alert('Intervalo de Almoço', 'Intervalo para almoço finalizado.');
     }
+  };
+
+  // ==========================================
+  // PONTO ELETRÔNICO CLT (1 TOQUE DIRETO)
+  // ==========================================
+  const handleRegisterTimeClock = (type: 'ENTRADA' | 'ALMOCO_SAIDA' | 'ALMOCO_RETORNO' | 'SAIDA') => {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('pt-BR');
+    const dateStr = now.toLocaleDateString('pt-BR');
+
+    const labels: Record<string, string> = {
+      ENTRADA: 'Entrada no Turno',
+      ALMOCO_SAIDA: 'Saída para Intervalo / Almoço',
+      ALMOCO_RETORNO: 'Retorno do Almoço',
+      SAIDA: 'Saída / Fim de Expediente',
+    };
+
+    const newRecord: TimeClockEntry = {
+      id: `tc-${Date.now()}`,
+      type,
+      label: labels[type] || type,
+      time: timeStr,
+      date: dateStr,
+      userName: currentUser.name,
+    };
+
+    setTimeClockRecords([newRecord, ...timeClockRecords]);
+
+    Alert.alert(
+      'Ponto Registrado!',
+      `✓ Registro confirmado com sucesso!\n\nColaborador: ${currentUser.name}\nTipo: ${labels[type]}\nHorário: ${timeStr}\nData: ${dateStr}\nLocal: Base MKSEGURANCA`
+    );
+  };
+
+  // ==========================================
+  // CADASTRO DIRETO DE USUÁRIOS (ADM)
+  // ==========================================
+  const handleCreateEmployeeDirect = () => {
+    if (!newUserName.trim() || !newUserCpf.trim()) {
+      Alert.alert('Campos Obrigatórios', 'Por favor, informe o Nome Completo e o CPF do novo colaborador.');
+      return;
+    }
+
+    const digits = newUserCpf.replace(/\D/g, '');
+    const formattedCpf =
+      digits.length === 11
+        ? `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
+        : newUserCpf;
+
+    const created: RegisteredEmployee = {
+      id: `u-${Date.now()}`,
+      name: newUserName.trim(),
+      cpf: formattedCpf,
+      role: newUserRole,
+    };
+
+    setRegisteredUsers([created, ...registeredUsers]);
+    setNewUserName('');
+    setNewUserCpf('');
+
+    Alert.alert(
+      'Colaborador Cadastrado!',
+      `Nome: ${created.name}\nCPF / Senha de Acesso: ${created.cpf}\nCargo: ${
+        created.role === 'ADMIN'
+          ? 'Administrador Master'
+          : created.role === 'DRIVER'
+          ? 'Motorista Operacional'
+          : created.role === 'FLEET_MANAGER'
+          ? 'Gestor de Frota'
+          : 'RH'
+      }\n\nO colaborador já está cadastrado e pode fazer login imediatamente no aplicativo!`
+    );
   };
 
   // ==========================================
@@ -652,7 +514,10 @@ export default function App() {
             <Text style={styles.loginLogoText}>R</Text>
           </View>
           <Text style={styles.loginTitle}>ROTALOG</Text>
-          <Text style={styles.loginSubtitle}>App de Frota, Biometria & Ponto CLT</Text>
+          <Text style={styles.loginSubtitle}>App de Frota, Checklist & Ponto CLT</Text>
+          <View style={styles.directModeBadge}>
+            <Text style={styles.directModeBadgeText}>⚡ MODO OPERACIONAL DIRETO (SEM BIOMETRIA)</Text>
+          </View>
 
           <View style={styles.loginForm}>
             <Text style={styles.inputLabel}>Base / Empresa</Text>
@@ -680,37 +545,37 @@ export default function App() {
             </TouchableOpacity>
 
             <View style={styles.quickAccessSection}>
-              <Text style={styles.quickAccessTitle}>👥 USUÁRIOS CADASTRADOS NA BASE MKSEGURANCA:</Text>
-              <Text style={{ color: '#64748b', fontSize: 11, marginBottom: 8 }}>
-                Toque em qualquer colaborador para preencher o CPF e entrar:
-              </Text>
-              {registeredUsers.map((u) => (
-                <TouchableOpacity
-                  key={u.id}
-                  style={[
-                    styles.btnQuickUserItem,
-                    u.role === 'ADMIN' ? styles.btnQuickAdmin : styles.btnQuickDriver,
-                  ]}
-                  onPress={() => {
-                    setLoginCompany('MKSEGURANCA');
-                    setLoginCpf(u.cpf.replace(/\D/g, ''));
-                    handleLoginMobile(u.cpf);
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={styles.quickUserNameText}>{u.name}</Text>
-                    <Text style={styles.quickUserRoleBadge}>
-                      {u.role === 'ADMIN' ? '👑 Master' : u.role === 'DRIVER' ? '🚗 Motorista' : u.role}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+              <Text style={styles.quickAccessTitle}>👥 ACESSO RÁPIDO — TOQUE PARA ENTRAR:</Text>
+              <ScrollView style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
+                {registeredUsers.map((u) => (
+                  <TouchableOpacity
+                    key={u.id}
+                    style={[
+                      styles.btnQuickUserItem,
+                      u.role === 'ADMIN' ? styles.btnQuickAdmin : styles.btnQuickDriver,
+                    ]}
+                    onPress={() => {
+                      setLoginCompany('MKSEGURANCA');
+                      setLoginCpf(u.cpf.replace(/\D/g, ''));
+                      handleLoginMobile(u.cpf);
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={styles.quickUserNameText}>{u.name}</Text>
+                      <Text style={styles.quickUserRoleBadge}>
+                        {u.role === 'ADMIN'
+                          ? '👑 Master'
+                          : u.role === 'DRIVER'
+                          ? '🚗 Motorista'
+                          : u.role === 'FLEET_MANAGER'
+                          ? '🏢 Gestor'
+                          : '📋 RH'}
+                      </Text>
+                    </View>
                     <Text style={styles.quickUserCpfText}>CPF: {u.cpf}</Text>
-                    <Text style={{ color: u.biometricEnrolled ? '#34d399' : '#fbbf24', fontSize: 10, fontWeight: '700' }}>
-                      {u.biometricEnrolled ? '✓ Facial OK' : '⚠️ Sem Facial'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           </View>
         </View>
@@ -719,22 +584,27 @@ export default function App() {
   }
 
   // ==========================================
-  // TELA PRINCIPAL DO APLICATIVO LOGADO
+  // TELA PRINCIPAL (LOGADO)
   // ==========================================
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#090d16" />
 
-      {/* CABEÇALHO DO MOTORISTA & BOTÃO DESLOGAR */}
+      {/* CABEÇALHO DO APLICATIVO */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.logoBadge}>
             <Text style={styles.logoText}>R</Text>
           </View>
           <View>
-            <Text style={styles.brandTitle}>ROTALOG</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.brandTitle}>ROTALOG</Text>
+              <View style={styles.headerDirectTag}>
+                <Text style={styles.headerDirectTagText}>Direto</Text>
+              </View>
+            </View>
             <Text style={styles.brandSubtitle}>
-              {currentUser.name} • Base: {currentUser.tenantId.toUpperCase()}
+              {currentUser.name} • {currentUser.role === 'ADMIN' ? '👑 Master' : '🚗 Motorista'}
             </Text>
           </View>
         </View>
@@ -744,7 +614,7 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      {/* ABAS DO APP MOBILE */}
+      {/* ABAS SUPERIORES */}
       <View style={styles.mobileTabs}>
         <TouchableOpacity
           style={[styles.tabButton, currentTab === 'ROUTE' && styles.tabButtonActive]}
@@ -755,18 +625,6 @@ export default function App() {
           </Text>
         </TouchableOpacity>
 
-        {/* APENAS O ADMINISTRADOR TEM PERMISSÃO PARA CADASTRAR FACIAL E NOVOS USUÁRIOS */}
-        {currentUser.role === 'ADMIN' && (
-          <TouchableOpacity
-            style={[styles.tabButton, currentTab === 'ENROLL_FACE' && styles.tabButtonActive]}
-            onPress={() => setCurrentTab('ENROLL_FACE')}
-          >
-            <Text style={[styles.tabButtonText, currentTab === 'ENROLL_FACE' && styles.tabButtonTextActive]}>
-              👑 Cadastrar Facial (ADM)
-            </Text>
-          </TouchableOpacity>
-        )}
-
         <TouchableOpacity
           style={[styles.tabButton, currentTab === 'TIMECLOCK' && styles.tabButtonActive]}
           onPress={() => setCurrentTab('TIMECLOCK')}
@@ -775,28 +633,50 @@ export default function App() {
             ⏱️ Bater Ponto
           </Text>
         </TouchableOpacity>
+
+        {currentUser.role === 'ADMIN' && (
+          <TouchableOpacity
+            style={[styles.tabButton, currentTab === 'EMPLOYEES' && styles.tabButtonActive]}
+            onPress={() => setCurrentTab('EMPLOYEES')}
+          >
+            <Text style={[styles.tabButtonText, currentTab === 'EMPLOYEES' && styles.tabButtonTextActive]}>
+              👥 Usuários (ADM)
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 50 }}>
         {/* ========================================================== */}
         {/* ABA 1: OPERAÇÃO / ROTA DO MOTORISTA                        */}
         {/* ========================================================== */}
         {currentTab === 'ROUTE' && (
           <>
-            {/* PAINEL DE ROTA ATIVA (SE ESTIVER EM CURSO) */}
+            {/* PAINEL DE ROTA ATIVA */}
             {activeRoute.inProgress ? (
               <View style={styles.activeRouteCard}>
                 <View style={styles.activeRouteHeader}>
                   <View>
-                    <Text style={styles.activeRouteBadge}>
-                      {activeRoute.isOnLunch ? '☕ EM PAUSA DE ALMOÇO' : '🚗 EM ROTA ATIVA'}
-                    </Text>
+                    <View
+                      style={[
+                        styles.activeRouteBadgeContainer,
+                        activeRoute.isOnLunch ? styles.badgeAmberBg : styles.badgeGreenBg,
+                      ]}
+                    >
+                      <Text style={styles.activeRouteBadge}>
+                        {activeRoute.isOnLunch ? '☕ EM PAUSA DE ALMOÇO' : '🚗 EM ROTA ATIVA'}
+                      </Text>
+                    </View>
                     <Text style={styles.activeRouteVehicle}>{activeRoute.vehicleModel}</Text>
                     <Text style={styles.activeRoutePlate}>{activeRoute.vehiclePlate}</Text>
+                    <Text style={styles.activeRouteKmStart}>
+                      Odômetro de saída: {activeRoute.startMileage.toLocaleString('pt-BR')} km
+                    </Text>
                   </View>
                   <View style={styles.activeRouteTimerBox}>
                     <Text style={styles.activeRouteTimerText}>{activeRoute.elapsedMinutes}m</Text>
                     <Text style={styles.activeRouteTimerLabel}>em trânsito</Text>
+                    <Text style={styles.activeRouteStartTime}>Saída: {activeRoute.startTime}</Text>
                   </View>
                 </View>
 
@@ -815,6 +695,14 @@ export default function App() {
                     onPress={() => {
                       setChecklistType('EXIT');
                       setChecklistMileage(String(activeRoute.startMileage + 25));
+                      setChecklistItems({
+                        combustivel: true,
+                        pneus: true,
+                        documentacao: true,
+                        avarias: true,
+                        limpeza: true,
+                        iluminacao: true,
+                      });
                       setIsChecklistModalOpen(true);
                     }}
                   >
@@ -823,11 +711,16 @@ export default function App() {
                 </View>
               </View>
             ) : (
-              /* CARD PARA INICIAR NOVA VIAGEM */
+              /* CARD DE INÍCIO DIRETO */
               <View style={styles.startCard}>
-                <Text style={styles.startTitle}>Iniciar Nova Rota</Text>
+                <View style={styles.startCardHeader}>
+                  <Text style={styles.startTitle}>Iniciar Nova Viagem</Text>
+                  <View style={styles.fastTrackBadge}>
+                    <Text style={styles.fastTrackBadgeText}>⚡ Acesso Ágil</Text>
+                  </View>
+                </View>
                 <Text style={styles.startDesc}>
-                  Selecione o carro da base MKSEGURANCA, realize a validação facial pela câmera frontal e confirme o odômetro.
+                  Selecione o veículo da frota, confira o checklist inicial de odômetro e inicie sua rota diretamente, sem necessidade de câmera ou biometria.
                 </Text>
                 <TouchableOpacity
                   style={styles.btnStartBig}
@@ -838,17 +731,17 @@ export default function App() {
               </View>
             )}
 
-            {/* QUADRO DE VEÍCULOS EM USO E POR QUEM */}
+            {/* QUADRO DE VEÍCULOS DA BASE MKSEGURANCA */}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Quadro da Frota — Base MKSEGURANCA</Text>
-              <Text style={styles.sectionDesc}>Veja quem está utilizando cada veículo da base:</Text>
+              <Text style={styles.sectionDesc}>Disponibilidade e motoristas em rota em tempo real:</Text>
             </View>
 
             {availableVehicles.map((v) => (
               <View key={v.id} style={styles.vehicleCard}>
                 <View style={styles.vehicleCardTop}>
                   <Text style={styles.vehiclePlate}>{v.plate}</Text>
-                  <Text
+                  <View
                     style={[
                       styles.vehicleStatusBadge,
                       v.status === 'IN_USE'
@@ -858,19 +751,30 @@ export default function App() {
                         : styles.statusMaint,
                     ]}
                   >
-                    {v.status === 'IN_USE' ? 'EM USO' : v.status === 'AVAILABLE' ? 'DISPONÍVEL' : 'OFICINA'}
-                  </Text>
+                    <Text
+                      style={[
+                        styles.vehicleStatusText,
+                        v.status === 'IN_USE'
+                          ? styles.statusTextInUse
+                          : v.status === 'AVAILABLE'
+                          ? styles.statusTextAvailable
+                          : styles.statusTextMaint,
+                      ]}
+                    >
+                      {v.status === 'IN_USE' ? '● EM USO' : v.status === 'AVAILABLE' ? '✓ DISPONÍVEL' : '⚠️ OFICINA'}
+                    </Text>
+                  </View>
                 </View>
                 <Text style={styles.vehicleName}>
                   {v.brand} {v.model}
                 </Text>
                 <Text style={styles.vehicleInfo}>
-                  Hodômetro: {v.currentMileage.toLocaleString('pt-BR')} km
+                  Hodômetro Atual: {v.currentMileage.toLocaleString('pt-BR')} km
                 </Text>
 
                 {v.status === 'IN_USE' ? (
                   <View style={styles.driverInfoBox}>
-                    <Text style={styles.driverInfoLabel}>🚗 Utilizado no momento por:</Text>
+                    <Text style={styles.driverInfoLabel}>🚗 Em trânsito com:</Text>
                     <Text style={styles.driverInfoName}>{v.currentDriver || 'Joãozinho Silva'}</Text>
                   </View>
                 ) : v.status === 'AVAILABLE' && !activeRoute.inProgress ? (
@@ -883,19 +787,134 @@ export default function App() {
                 ) : null}
               </View>
             ))}
+
+            {/* HISTÓRICO RECENTE DE ROTAS DO DIA */}
+            {recentTrips.length > 0 && (
+              <View style={{ marginTop: 20 }}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Histórico de Viagens Hoje</Text>
+                </View>
+                {recentTrips.map((trip, idx) => (
+                  <View key={idx} style={styles.tripCard}>
+                    <View style={styles.tripCardTop}>
+                      <Text style={styles.tripPlate}>{trip.plate} • {trip.model}</Text>
+                      <Text style={styles.tripKm}>+{trip.kmDriven} km</Text>
+                    </View>
+                    <Text style={styles.tripTime}>
+                      Horário: {trip.startTime} às {trip.endTime} ({trip.duration})
+                    </Text>
+                    <Text style={styles.tripLunch}>Intervalo de Almoço: {trip.lunchDuration}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </>
         )}
 
         {/* ========================================================== */}
-        {/* ABA 2: TELINHA PARA CADASTRAR USUÁRIOS E FACIAL            */}
+        {/* ABA 2: BATER PONTO CLT (DIRETO E SEGURO)                    */}
         {/* ========================================================== */}
-        {currentTab === 'ENROLL_FACE' && (
-          <>
-            {/* CARD 1: CADASTRAR NOVO USUÁRIO */}
+        {currentTab === 'TIMECLOCK' && (
+          <View style={styles.timeClockContainer}>
+            {/* CARD DIGITAL DO RELÓGIO */}
+            <View style={styles.digitalClockCard}>
+              <Text style={styles.clockDateText}>{currentDateStr}</Text>
+              <Text style={styles.clockDigitalTime}>{currentTimeStr}</Text>
+              <Text style={styles.clockCollabName}>Colaborador: {currentUser.name}</Text>
+              <View style={styles.clockBranchBadge}>
+                <Text style={styles.clockBranchText}>📍 Base MKSEGURANCA • Ponto Conectado</Text>
+              </View>
+            </View>
+
+            {/* BOTÕES DE BATIDA DE PONTO */}
+            <View style={styles.clockActionsCard}>
+              <Text style={styles.clockActionsTitle}>Registrar Batida de Ponto</Text>
+              <Text style={styles.clockActionsSubtitle}>
+                Toque no botão correspondente ao seu momento de expediente:
+              </Text>
+
+              <View style={styles.clockGrid}>
+                <TouchableOpacity
+                  style={[styles.btnClockAction, styles.btnClockEntry]}
+                  onPress={() => handleRegisterTimeClock('ENTRADA')}
+                >
+                  <Text style={styles.btnClockIcon}>🟢</Text>
+                  <Text style={styles.btnClockText}>1. Entrada</Text>
+                  <Text style={styles.btnClockSub}>Início de Turno</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.btnClockAction, styles.btnClockLunchOut]}
+                  onPress={() => handleRegisterTimeClock('ALMOCO_SAIDA')}
+                >
+                  <Text style={styles.btnClockIcon}>☕</Text>
+                  <Text style={styles.btnClockText}>2. Almoço</Text>
+                  <Text style={styles.btnClockSub}>Saída Intervalo</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.btnClockAction, styles.btnClockLunchIn]}
+                  onPress={() => handleRegisterTimeClock('ALMOCO_RETORNO')}
+                >
+                  <Text style={styles.btnClockIcon}>🥪</Text>
+                  <Text style={styles.btnClockText}>3. Retorno</Text>
+                  <Text style={styles.btnClockSub}>Volta do Almoço</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.btnClockAction, styles.btnClockExit]}
+                  onPress={() => handleRegisterTimeClock('SAIDA')}
+                >
+                  <Text style={styles.btnClockIcon}>🔴</Text>
+                  <Text style={styles.btnClockText}>4. Saída</Text>
+                  <Text style={styles.btnClockSub}>Fim de Turno</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* HISTÓRICO DE BATIDAS DO DIA */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Batidas Registradas Hoje</Text>
+            </View>
+
+            {timeClockRecords.map((rec) => (
+              <View key={rec.id} style={styles.punchRecordItem}>
+                <View style={styles.punchRecordLeft}>
+                  <Text style={styles.punchRecordType}>
+                    {rec.type === 'ENTRADA'
+                      ? '🟢 ENTRADA'
+                      : rec.type === 'ALMOCO_SAIDA'
+                      ? '☕ SAÍDA ALMOÇO'
+                      : rec.type === 'ALMOCO_RETORNO'
+                      ? '🥪 VOLTA ALMOÇO'
+                      : '🔴 SAÍDA'}
+                  </Text>
+                  <Text style={styles.punchRecordCollab}>{rec.userName} • Base MKSEGURANCA</Text>
+                </View>
+                <View style={styles.punchRecordRight}>
+                  <Text style={styles.punchRecordTime}>{rec.time}</Text>
+                  <Text style={styles.punchRecordDate}>{rec.date}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* ========================================================== */}
+        {/* ABA 3: GESTÃO DE COLABORADORES (ADM)                       */}
+        {/* ========================================================== */}
+        {currentTab === 'EMPLOYEES' && currentUser.role === 'ADMIN' && (
+          <View style={styles.employeesContainer}>
+            {/* CARD: CADASTRAR NOVO COLABORADOR (DIRETO) */}
             <View style={styles.enrollCard}>
-              <Text style={styles.enrollTitle}>+ Cadastrar Novo Usuário</Text>
+              <View style={styles.enrollCardTop}>
+                <Text style={styles.enrollTitle}>+ Cadastrar Novo Colaborador</Text>
+                <View style={styles.directEnrollBadge}>
+                  <Text style={styles.directEnrollBadgeText}>Cadastro Direto</Text>
+                </View>
+              </View>
               <Text style={styles.enrollDesc}>
-                Informe os dados do colaborador, escolha o cargo e capture o rosto com a câmera frontal. A senha de acesso será o CPF.
+                Cadastre o novo funcionário com Nome, CPF e Cargo. Ele já poderá acessar o sistema no mesmo instante usando o CPF como senha.
               </Text>
 
               <View style={styles.enrollInputGroup}>
@@ -904,7 +923,7 @@ export default function App() {
                   style={styles.textInput}
                   value={newUserName}
                   onChangeText={setNewUserName}
-                  placeholder="Ex: Carlos Eduardo ou Maria Silva"
+                  placeholder="Ex: Carlos Eduardo ou Maria Santos"
                   placeholderTextColor="#64748b"
                 />
 
@@ -958,27 +977,15 @@ export default function App() {
                 </View>
               </View>
 
-              <TouchableOpacity
-                style={styles.btnOpenCamEnroll}
-                onPress={() => {
-                  if (!newUserName.trim() || !newUserCpf.trim()) {
-                    Alert.alert('Campos Obrigatórios', 'Por favor, digite o nome e o CPF do novo usuário antes de capturar a biometria.');
-                    return;
-                  }
-                  setTargetEmployeeForEnroll(null);
-                  setCameraPurpose('ENROLL_EMPLOYEE');
-                  setFaceScanState('PREVIEW');
-                  setIsFaceCameraModalOpen(true);
-                }}
-              >
-                <Text style={styles.btnOpenCamEnrollText}>📸 Abrir Câmera & Gravar Biometria Facial</Text>
+              <TouchableOpacity style={styles.btnSaveEmployeeDirect} onPress={handleCreateEmployeeDirect}>
+                <Text style={styles.btnSaveEmployeeDirectText}>💾 Salvar e Cadastrar Colaborador</Text>
               </TouchableOpacity>
             </View>
 
-            {/* CARD 2: LISTA DE USUÁRIOS E STATUS FACIAL */}
-            <View style={[styles.sectionHeader, { marginTop: 20 }]}>
-              <Text style={styles.sectionTitle}>Colaboradores da Base MKSEGURANCA</Text>
-              <Text style={styles.sectionDesc}>Toque em qualquer colaborador para gravar ou atualizar a biometria:</Text>
+            {/* LISTA DE COLABORADORES CADASTRADOS */}
+            <View style={[styles.sectionHeader, { marginTop: 24 }]}>
+              <Text style={styles.sectionTitle}>Quadro de Colaboradores — Base MKSEGURANCA</Text>
+              <Text style={styles.sectionDesc}>Total de {registeredUsers.length} usuários ativos no sistema:</Text>
             </View>
 
             {registeredUsers.map((emp) => (
@@ -987,300 +994,27 @@ export default function App() {
                   <View style={styles.userListAvatar}>
                     <Text style={styles.userListAvatarText}>{emp.name.charAt(0)}</Text>
                   </View>
-                  <View style={{ flex: 1, marginLeft: 10 }}>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={styles.userListName}>{emp.name}</Text>
-                    <Text style={styles.userListCpf}>CPF: {emp.cpf} • {emp.role}</Text>
+                    <Text style={styles.userListCpf}>CPF: {emp.cpf}</Text>
                   </View>
-                  <View
-                    style={[
-                      styles.biometricStatusPill,
-                      emp.biometricEnrolled ? styles.bioPillActive : styles.bioPillPending,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.biometricStatusText,
-                        emp.biometricEnrolled ? styles.bioTextActive : styles.bioTextPending,
-                      ]}
-                    >
-                      {emp.biometricEnrolled ? `✓ Ativa (${emp.biometricConfidence || 99}%)` : '⚠️ Pendente'}
+                  <View style={styles.userRoleTag}>
+                    <Text style={styles.userRoleTagText}>
+                      {emp.role === 'ADMIN'
+                        ? '👑 Master'
+                        : emp.role === 'DRIVER'
+                        ? '🚗 Motorista'
+                        : emp.role === 'FLEET_MANAGER'
+                        ? '🏢 Gestor'
+                        : '📋 RH'}
                     </Text>
                   </View>
                 </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.btnUserEnrollAction,
-                    emp.biometricEnrolled ? styles.btnReEnroll : styles.btnFirstEnroll,
-                  ]}
-                  onPress={() => {
-                    setTargetEmployeeForEnroll(emp);
-                    setCameraPurpose('ENROLL_EMPLOYEE');
-                    setFaceScanState('PREVIEW');
-                    setIsFaceCameraModalOpen(true);
-                  }}
-                >
-                  <Text style={styles.btnUserEnrollActionText}>
-                    {emp.biometricEnrolled
-                      ? '🔄 Recadastrar Facial'
-                      : '📸 Gravar Biometria Facial Deste Colaborador'}
-                  </Text>
-                </TouchableOpacity>
               </View>
             ))}
-          </>
-        )}
-
-        {/* ========================================================== */}
-        {/* ABA 3: BATER PONTO CLT COM FACIAL                           */}
-        {/* ========================================================== */}
-        {currentTab === 'TIMECLOCK' && (
-          <View style={styles.enrollCard}>
-            <Text style={styles.enrollTitle}>Registro de Ponto Facial (CLT)</Text>
-            <Text style={styles.enrollDesc}>
-              Validação de entrada, almoço e saída com conferência facial on-device.
-            </Text>
-
-            <TouchableOpacity
-              style={[styles.btnOpenCamEnroll, { backgroundColor: '#10b981' }]}
-              onPress={() => {
-                setCameraPurpose('CLOCK_IN');
-                setFaceScanState('PREVIEW');
-                setIsFaceCameraModalOpen(true);
-              }}
-            >
-              <Text style={styles.btnOpenCamEnrollText}>📸 Olhar para a Câmera & Bater Ponto</Text>
-            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
-
-      {/* ========================================================== */}
-      {/* MODAL: CÂMERA REAL DO CELULAR (EXPO-CAMERA FRONTAL)        */}
-      {/* ========================================================== */}
-      <Modal visible={isFaceCameraModalOpen} animationType="slide" transparent={false}>
-        <SafeAreaView style={styles.cameraScreen}>
-          <StatusBar barStyle="light-content" backgroundColor="#000" />
-          
-          <View style={styles.cameraHeader}>
-            <Text style={styles.cameraHeaderTitle}>
-              {cameraPurpose === 'ENROLL_EMPLOYEE'
-                ? (targetEmployeeForEnroll
-                    ? `Facial: ${targetEmployeeForEnroll.name}`
-                    : `Nova Facial: ${newUserName || 'Novo Colaborador'}`)
-                : cameraPurpose === 'CLOCK_IN'
-                ? 'Validação de Ponto Eletrônico'
-                : 'Reconhecimento Facial do Motorista'}
-            </Text>
-            <TouchableOpacity onPress={() => setIsFaceCameraModalOpen(false)}>
-              <Text style={styles.cameraCloseBtn}>Fechar ✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* CÂMERA REAL DO DISPOSITIVO OU PEDIDO DE PERMISSÃO */}
-          {!permission?.granted ? (
-            <View style={styles.permissionBox}>
-              <Text style={styles.permissionTitle}>Permissão da Câmera Necessária</Text>
-              <Text style={styles.permissionDesc}>
-                Para validar o reconhecimento facial seguro no celular, conceda acesso à câmera frontal.
-              </Text>
-              <TouchableOpacity style={styles.btnGrantPermission} onPress={requestPermission}>
-                <Text style={styles.btnGrantPermissionText}>Conceder Permissão da Câmera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.btnSimulateScan}
-                onPress={handleCaptureAndRecognizeFace}
-              >
-                <Text style={styles.btnSimulateScanText}>Simular Captura Facial</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.cameraContainer}>
-              <CameraView
-                ref={cameraRef}
-                style={styles.cameraPreview}
-                facing="front"
-              />
-
-              {/* OVERLAY ESTILO APPLE FACE ID */}
-              <View style={styles.faceIdOverlay} pointerEvents="box-none">
-                {/* DICA DE ENQUADRAMENTO TOPO */}
-                <View
-                  style={[
-                    styles.faceIdPromptPill,
-                    alignmentStatus === 'PERFECT' && styles.promptPillGreen,
-                    (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.promptPillAmber,
-                    alignmentStatus === 'NO_FACE' && styles.promptPillRed,
-                    faceScanState === 'SUCCESS' && styles.promptPillGreen,
-                  ]}
-                >
-                  <Text style={styles.faceIdPromptPillText}>
-                    {faceScanState === 'SCANNING'
-                      ? '⚡ Mapeando biometria facial...'
-                      : faceScanState === 'SUCCESS'
-                      ? '✓ Rosto Identificado com Sucesso!'
-                      : faceScanState === 'ERROR'
-                      ? '⚠️ Centralize o rosto com boa luz'
-                      : guidanceMsg}
-                  </Text>
-                </View>
-
-                {/* MOLDURA CIRCULAR CENTRAL FACE ID */}
-                <View style={styles.faceIdRingWrapper}>
-                  {/* CANTOS RETICULARES (ESTILO IPHONE) */}
-                  <View
-                    style={[
-                      styles.reticleCorner,
-                      styles.reticleTL,
-                      (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.reticleGreen,
-                      (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.reticleAmber,
-                      alignmentStatus === 'NO_FACE' && styles.reticleRed,
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.reticleCorner,
-                      styles.reticleTR,
-                      (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.reticleGreen,
-                      (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.reticleAmber,
-                      alignmentStatus === 'NO_FACE' && styles.reticleRed,
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.reticleCorner,
-                      styles.reticleBL,
-                      (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.reticleGreen,
-                      (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.reticleAmber,
-                      alignmentStatus === 'NO_FACE' && styles.reticleRed,
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.reticleCorner,
-                      styles.reticleBR,
-                      (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.reticleGreen,
-                      (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.reticleAmber,
-                      alignmentStatus === 'NO_FACE' && styles.reticleRed,
-                    ]}
-                  />
-
-                  {/* CÍRCULO CENTRAL COM BORDA LUMINOSA */}
-                  <View
-                    style={[
-                      styles.faceIdCircle,
-                      (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.faceIdCircleSuccess,
-                      (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.faceIdCircleAmber,
-                      alignmentStatus === 'NO_FACE' && styles.faceIdCircleError,
-                      faceScanState === 'SCANNING' && styles.faceIdCircleScanning,
-                      faceScanState === 'ERROR' && styles.faceIdCircleError,
-                    ]}
-                  >
-                    {/* FEEDBACK DE CARREGAMENTO NO CENTRO */}
-                    {faceScanState === 'SCANNING' && (
-                      <View style={styles.scanningCenterBox}>
-                        <ActivityIndicator size="large" color="#38bdf8" />
-                        <Text style={styles.scanningCenterText}>Processando IA...</Text>
-                      </View>
-                    )}
-
-                    {/* BADGE DE SUCESSO VERDE APPLE */}
-                    {faceScanState === 'SUCCESS' && (
-                      <View style={styles.successCenterBox}>
-                        <View style={styles.successCheckCircle}>
-                          <Text style={styles.successCheckText}>✓</Text>
-                        </View>
-                        <Text style={styles.successCenterTitle}>Autenticado</Text>
-                        <Text style={styles.successCenterConfidence}>
-                          {scanConfidence}% de Similaridade
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  {/* MARCADORES RADIAIS (DEPTH TICKS) AO REDOR DO CÍRCULO */}
-                  <View style={styles.radialTicksContainer} pointerEvents="none">
-                    {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map((deg) => (
-                      <View
-                        key={deg}
-                        style={[
-                          styles.radialTick,
-                          { transform: [{ rotate: `${deg}deg` }, { translateY: -142 }] },
-                          (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.radialTickSuccess,
-                          (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.radialTickAmber,
-                          alignmentStatus === 'NO_FACE' && styles.radialTickRed,
-                          faceScanState === 'SCANNING' && styles.radialTickScanning,
-                        ]}
-                      />
-                    ))}
-                  </View>
-                </View>
-
-                {/* INSTRUÇÃO INFERIOR */}
-                <Text style={styles.faceIdSubInstruction}>
-                  {faceScanState === 'SCANNING'
-                    ? 'Mantenha o celular parado por 1 segundo'
-                    : faceScanState === 'SUCCESS'
-                    ? 'Validação biométrica concluída!'
-                    : alignmentStatus === 'PERFECT'
-                    ? '🟢 Perfeito! Gravando automaticamente...'
-                    : alignmentStatus === 'TOO_FAR'
-                    ? '🔍 Rosto pequeno: aproxime mais a câmera'
-                    : alignmentStatus === 'TOO_CLOSE'
-                    ? '↔️ Rosto muito perto: afaste um pouco a câmera'
-                    : alignmentStatus === 'TOO_DARK'
-                    ? '💡 Pouca luz: ilumine seu rosto'
-                    : '🔴 Centralize o rosto dentro do círculo'}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* BARRA INFERIOR COM DISPARADOR ESTILO CÂMERA APPLE */}
-          <View style={styles.cameraControlsApple}>
-            <TouchableOpacity
-              style={[
-                styles.appleShutterOuter,
-                (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.appleShutterOuterGreen,
-                (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.appleShutterOuterAmber,
-                alignmentStatus === 'NO_FACE' && styles.appleShutterOuterRed,
-                faceScanState === 'SCANNING' && { opacity: 0.6 },
-              ]}
-              disabled={faceScanState === 'SCANNING'}
-              onPress={handleCaptureAndRecognizeFace}
-            >
-              <View
-                style={[
-                  styles.appleShutterInner,
-                  (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && { backgroundColor: '#10b981' },
-                  (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && { backgroundColor: '#f59e0b' },
-                  alignmentStatus === 'NO_FACE' && { backgroundColor: '#ef4444' },
-                ]}
-              />
-            </TouchableOpacity>
-
-            <Text style={styles.appleShutterLabel}>
-              {faceScanState === 'SCANNING'
-                ? '⚡ Capturando biometria...'
-                : alignmentStatus === 'PERFECT'
-                ? '🟢 PERFEITO! Gravando biometria...'
-                : alignmentStatus === 'TOO_FAR'
-                ? '🔍 APROXIME O CELULAR'
-                : alignmentStatus === 'TOO_CLOSE'
-                ? '↔️ AFASTE O CELULAR'
-                : alignmentStatus === 'TOO_DARK'
-                ? '💡 ILUMINE O ROSTO'
-                : alignmentStatus === 'NO_FACE'
-                ? '🔴 CENTRALIZE O ROSTO'
-                : '⚡ Modo Automático: Posicione o rosto'}
-            </Text>
-
-            <Text style={styles.lgpdBadgeApple}>
-              🔒 Biometria On-Device • Vetor 192-d criptografado (LGPD)
-            </Text>
-          </View>
-        </SafeAreaView>
-      </Modal>
 
       {/* ========================================================== */}
       {/* MODAL: SELEÇÃO DE VEÍCULO DA BASE MKSEGURANCA             */}
@@ -1289,7 +1023,8 @@ export default function App() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Escolha o Veículo da Frota</Text>
-            <ScrollView style={{ maxHeight: 300 }}>
+            <Text style={styles.modalSubtitle}>Selecione o carro para iniciar o checklist:</Text>
+            <ScrollView style={{ maxHeight: 320 }}>
               {availableVehicles
                 .filter((v) => v.status === 'AVAILABLE')
                 .map((v) => (
@@ -1298,7 +1033,10 @@ export default function App() {
                     style={styles.modalVehicleItem}
                     onPress={() => handleSelectVehicleForRoute(v)}
                   >
-                    <Text style={styles.modalVehiclePlate}>{v.plate}</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={styles.modalVehiclePlate}>{v.plate}</Text>
+                      <Text style={styles.modalVehicleStatus}>✓ Disponível</Text>
+                    </View>
                     <Text style={styles.modalVehicleModel}>
                       {v.brand} {v.model}
                     </Text>
@@ -1325,13 +1063,14 @@ export default function App() {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>
-              {checklistType === 'ENTRY' ? 'Checklist de Saída' : 'Checklist de Retorno'}
+              {checklistType === 'ENTRY' ? 'Checklist de Saída (Início de Rota)' : 'Checklist de Retorno (Devolução)'}
             </Text>
             <Text style={styles.modalSubtitle}>
-              Veículo: {selectedVehicle?.plate || activeRoute.vehiclePlate}
+              Veículo: {selectedVehicle?.plate || activeRoute.vehiclePlate} (
+              {selectedVehicle ? `${selectedVehicle.brand} ${selectedVehicle.model}` : activeRoute.vehicleModel})
             </Text>
 
-            <Text style={[styles.inputLabel, { marginTop: 10 }]}>Odômetro do Painel (Km) *</Text>
+            <Text style={[styles.inputLabel, { marginTop: 14 }]}>Odômetro do Painel (Km) *</Text>
             <TextInput
               style={styles.textInput}
               value={checklistMileage}
@@ -1341,7 +1080,8 @@ export default function App() {
               placeholderTextColor="#64748b"
             />
 
-            <View style={{ marginTop: 12 }}>
+            <View style={{ marginTop: 14 }}>
+              <Text style={[styles.inputLabel, { marginBottom: 6 }]}>Itens de Inspeção Visual:</Text>
               {['combustivel', 'pneus', 'avarias', 'iluminacao'].map((item) => (
                 <TouchableOpacity
                   key={item}
@@ -1354,10 +1094,10 @@ export default function App() {
                     {item === 'combustivel'
                       ? 'Nível de Combustível'
                       : item === 'pneus'
-                      ? 'Estado dos Pneus'
+                      ? 'Estado dos Pneus e Calibragem'
                       : item === 'avarias'
                       ? 'Sem Avarias ou Amassados'
-                      : 'Lanternas e Faróis'}
+                      : 'Faróis e Lanternas Funcionando'}
                   </Text>
                   <Text style={checklistItems[item] ? styles.chkOk : styles.chkBad}>
                     {checklistItems[item] ? '✓ OK' : '⚠ Problema'}
@@ -1367,7 +1107,16 @@ export default function App() {
             </View>
 
             <TouchableOpacity style={styles.btnConfirmChecklist} onPress={handleConfirmChecklist}>
-              <Text style={styles.btnConfirmChecklistText}>Confirmar Checklist & Liberar</Text>
+              <Text style={styles.btnConfirmChecklistText}>
+                {checklistType === 'ENTRY' ? 'Confirmar Checklist & Iniciar Rota' : 'Confirmar Devolução do Veículo'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.modalBtnCancel, { marginTop: 10 }]}
+              onPress={() => setIsChecklistModalOpen(false)}
+            >
+              <Text style={styles.modalBtnCancelText}>Cancelar</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1377,7 +1126,7 @@ export default function App() {
 }
 
 // ==========================================
-// ESTILOS VISUAIS EXECUTIVOS (DARK THEME)
+// ESTILOS VISUAIS EXECUTIVOS
 // ==========================================
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#090d16' },
@@ -1393,25 +1142,34 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   logoBadge: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: 10,
     backgroundColor: '#0284c7',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoText: { color: '#fff', fontWeight: '900', fontSize: 18 },
-  brandTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  brandSubtitle: { color: '#94a3b8', fontSize: 11 },
+  logoText: { color: '#fff', fontSize: 20, fontWeight: '900' },
+  brandTitle: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
+  headerDirectTag: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#10b981',
+  },
+  headerDirectTagText: { color: '#34d399', fontSize: 10, fontWeight: '700' },
+  brandSubtitle: { color: '#94a3b8', fontSize: 12, marginTop: 1 },
   btnLogout: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
     backgroundColor: '#1e293b',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#334155',
   },
-  btnLogoutText: { color: '#f87171', fontSize: 12, fontWeight: '700' },
+  btnLogoutText: { color: '#ef4444', fontSize: 13, fontWeight: '700' },
 
   // Abas
   mobileTabs: {
@@ -1419,557 +1177,451 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a',
     borderBottomWidth: 1,
     borderBottomColor: '#1e293b',
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    gap: 6,
+    paddingHorizontal: 10,
+    paddingTop: 8,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
   },
   tabButtonActive: {
-    backgroundColor: '#0284c7',
+    borderBottomColor: '#0284c7',
   },
-  tabButtonText: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
-  tabButtonTextActive: { color: '#fff' },
+  tabButtonText: { color: '#64748b', fontSize: 13, fontWeight: '600' },
+  tabButtonTextActive: { color: '#38bdf8', fontWeight: '800' },
 
   content: { flex: 1, padding: 16 },
 
-  // Rota Ativa Card
-  activeRouteCard: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#0284c7',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-  },
-  activeRouteHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  activeRouteBadge: { color: '#38bdf8', fontSize: 11, fontWeight: '800', marginBottom: 4 },
-  activeRouteVehicle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  activeRoutePlate: { color: '#94a3b8', fontSize: 13, fontFamily: 'monospace', fontWeight: '700' },
-  activeRouteTimerBox: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  activeRouteTimerText: { color: '#38bdf8', fontSize: 18, fontWeight: '900' },
-  activeRouteTimerLabel: { color: '#64748b', fontSize: 10 },
-  activeRouteActions: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  btnLunchPause: {
+  // Tela de Login
+  loginContainer: {
     flex: 1,
-    backgroundColor: '#d97706',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  btnLunchActive: { backgroundColor: '#10b981' },
-  btnLunchText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  btnFinishRoute: {
-    flex: 1,
-    backgroundColor: '#9333ea',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  btnFinishRouteText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-
-  // Iniciar Card
-  startCard: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 16,
-  },
-  startTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  startDesc: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginVertical: 8 },
-  btnStartBig: {
-    backgroundColor: '#0284c7',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  btnStartBigText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-
-  // Lista de Veículos
-  sectionHeader: { marginBottom: 12 },
-  sectionTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  sectionDesc: { color: '#94a3b8', fontSize: 11, marginTop: 2 },
-  vehicleCard: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
-  },
-  vehicleCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  vehiclePlate: { color: '#fff', fontSize: 14, fontWeight: '800', fontFamily: 'monospace' },
-  vehicleStatusBadge: { fontSize: 10, fontWeight: '800', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  statusAvailable: { backgroundColor: '#064e3b', color: '#34d399' },
-  statusInUse: { backgroundColor: '#0c4a6e', color: '#38bdf8' },
-  statusMaint: { backgroundColor: '#4c0519', color: '#fb7185' },
-  vehicleName: { color: '#e2e8f0', fontSize: 13, fontWeight: '600' },
-  vehicleInfo: { color: '#64748b', fontSize: 11, marginTop: 2 },
-  driverInfoBox: {
-    backgroundColor: '#0284c715',
-    borderWidth: 1,
-    borderColor: '#0284c740',
-    borderRadius: 10,
-    padding: 8,
-    marginTop: 8,
-  },
-  driverInfoLabel: { color: '#38bdf8', fontSize: 10, fontWeight: '800' },
-  driverInfoName: { color: '#fff', fontSize: 12, fontWeight: '800', marginTop: 1 },
-  btnPickVehicle: {
-    backgroundColor: '#10b981',
-    borderRadius: 10,
-    paddingVertical: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  btnPickVehicleText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-
-  // Telinha de Cadastro Facial
-  enrollCard: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    borderRadius: 20,
-    padding: 18,
-  },
-  enrollTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
-  enrollDesc: { color: '#94a3b8', fontSize: 12, lineHeight: 18, marginTop: 4, marginBottom: 14 },
-  enrollInputGroup: { marginBottom: 16 },
-  btnOpenCamEnroll: {
-    backgroundColor: '#0284c7',
-    borderRadius: 14,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  btnOpenCamEnrollText: { color: '#fff', fontSize: 13, fontWeight: '800' },
-
-  // Câmera Modal
-  cameraScreen: { flex: 1, backgroundColor: '#000' },
-  cameraHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    backgroundColor: '#06090e',
+    justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#222',
   },
-  cameraHeaderTitle: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  cameraCloseBtn: { color: '#f87171', fontSize: 13, fontWeight: '700' },
-  cameraContainer: { flex: 1, overflow: 'hidden', position: 'relative', backgroundColor: '#000' },
-  cameraPreview: { flex: 1 },
-
-  // Apple Face ID Overlay
-  faceIdOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 18,
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-  },
-  faceIdPromptPill: {
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  promptPillGreen: {
-    borderColor: '#10b981',
-    backgroundColor: 'rgba(6, 78, 59, 0.95)',
-  },
-  promptPillRed: {
-    borderColor: '#ef4444',
-    backgroundColor: 'rgba(127, 29, 29, 0.95)',
-  },
-  promptPillAmber: {
-    borderColor: '#f59e0b',
-    backgroundColor: 'rgba(120, 53, 15, 0.95)',
-  },
-  faceIdPromptPillText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-
-  faceIdRingWrapper: {
-    width: 280,
-    height: 280,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  faceIdCircle: {
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    borderWidth: 3,
-    borderColor: '#38bdf8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(56, 189, 248, 0.03)',
-  },
-  faceIdCircleScanning: {
-    borderColor: '#f59e0b',
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
-  },
-  faceIdCircleSuccess: {
-    borderColor: '#10b981',
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-  },
-  faceIdCircleError: {
-    borderColor: '#ef4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-  },
-  faceIdCircleAmber: {
-    borderColor: '#f59e0b',
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-  },
-
-  // Reticle Corners (Estilo Face ID)
-  reticleCorner: {
-    position: 'absolute',
-    width: 26,
-    height: 26,
-    borderColor: '#38bdf8',
-    borderWidth: 3,
-  },
-  reticleTL: {
-    top: 6,
-    left: 6,
-    borderRightWidth: 0,
-    borderBottomWidth: 0,
-    borderTopLeftRadius: 10,
-  },
-  reticleTR: {
-    top: 6,
-    right: 6,
-    borderLeftWidth: 0,
-    borderBottomWidth: 0,
-    borderTopRightRadius: 10,
-  },
-  reticleBL: {
-    bottom: 6,
-    left: 6,
-    borderRightWidth: 0,
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 10,
-  },
-  reticleBR: {
-    bottom: 6,
-    right: 6,
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-    borderBottomRightRadius: 10,
-  },
-  reticleGreen: {
-    borderColor: '#10b981',
-  },
-  reticleRed: {
-    borderColor: '#ef4444',
-  },
-  reticleAmber: {
-    borderColor: '#f59e0b',
-  },
-
-  // Radial Ticks (Depth scan ring)
-  radialTicksContainer: {
-    position: 'absolute',
-    width: 280,
-    height: 280,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radialTick: {
-    position: 'absolute',
-    width: 3,
-    height: 12,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  radialTickScanning: {
-    backgroundColor: '#38bdf8',
-  },
-  radialTickSuccess: {
-    backgroundColor: '#10b981',
-    height: 16,
-    width: 4,
-  },
-  radialTickRed: {
-    backgroundColor: '#ef4444',
-  },
-  radialTickAmber: {
-    backgroundColor: '#f59e0b',
-  },
-
-  // Central Status Boxes
-  scanningCenterBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanningCenterText: {
-    color: '#38bdf8',
-    fontSize: 13,
-    fontWeight: '700',
-    marginTop: 10,
-  },
-  successCenterBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  successCheckCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: '#10b981',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  successCheckText: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  successCenterTitle: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  successCenterConfidence: {
-    color: '#86efac',
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-
-  faceIdSubInstruction: {
-    color: '#cbd5e1',
-    fontSize: 12,
-    textAlign: 'center',
-    paddingHorizontal: 24,
-    fontWeight: '600',
-  },
-
-  // Apple Camera Controls
-  cameraControlsApple: {
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    backgroundColor: '#000',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#1e293b',
-  },
-  appleShutterOuter: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 4,
-    borderColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  appleShutterOuterGreen: {
-    borderColor: '#10b981',
-  },
-  appleShutterOuterRed: {
-    borderColor: '#ef4444',
-  },
-  appleShutterOuterAmber: {
-    borderColor: '#f59e0b',
-  },
-  appleShutterInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#38bdf8',
-  },
-  appleShutterLabel: {
-    color: '#f8fafc',
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  lgpdBadgeApple: {
-    color: '#64748b',
-    fontSize: 11,
-  },
-
-  // Permissão Câmera
-  permissionBox: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30 },
-  permissionTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
-  permissionDesc: { color: '#94a3b8', fontSize: 12, textAlign: 'center', lineHeight: 18, marginBottom: 20 },
-  btnGrantPermission: {
-    backgroundColor: '#0284c7',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 10,
-  },
-  btnGrantPermissionText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-  btnSimulateScan: { padding: 10 },
-  btnSimulateScanText: { color: '#64748b', fontSize: 12, textDecorationLine: 'underline' },
-
-  // Modal Genérico
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: '#0f172a', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#1e293b' },
-  modalTitle: { color: '#fff', fontSize: 16, fontWeight: '800', marginBottom: 4 },
-  modalSubtitle: { color: '#94a3b8', fontSize: 12, marginBottom: 14 },
-  modalVehicleItem: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-  },
-  modalVehiclePlate: { color: '#38bdf8', fontSize: 14, fontWeight: '800', fontFamily: 'monospace' },
-  modalVehicleModel: { color: '#fff', fontSize: 12, fontWeight: '600', marginTop: 2 },
-  modalVehicleKm: { color: '#94a3b8', fontSize: 11, marginTop: 1 },
-  modalBtnCancel: { marginTop: 10, padding: 10, alignItems: 'center' },
-  modalBtnCancelText: { color: '#94a3b8', fontSize: 12 },
-
-  // Checklist
-  inputLabel: { color: '#cbd5e1', fontSize: 11, fontWeight: '700', marginBottom: 4 },
-  textInput: {
-    backgroundColor: '#020617',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#fff',
-    fontSize: 13,
-  },
-  chkItemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
-  },
-  chkItemLabel: { color: '#e2e8f0', fontSize: 12 },
-  chkOk: { color: '#34d399', fontWeight: '800', fontSize: 12 },
-  chkBad: { color: '#f87171', fontWeight: '800', fontSize: 12 },
-  btnConfirmChecklist: {
-    backgroundColor: '#0284c7',
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  btnConfirmChecklistText: { color: '#fff', fontWeight: '800', fontSize: 13 },
-
-  // Login Screen
-  loginContainer: { flex: 1, backgroundColor: '#06090e', justifyContent: 'center', padding: 20 },
   loginCard: {
+    width: '100%',
+    maxWidth: 400,
     backgroundColor: '#0c1220',
-    borderRadius: 24,
+    borderRadius: 16,
     padding: 24,
     borderWidth: 1,
     borderColor: '#1e293b',
+    alignItems: 'center',
   },
   loginLogoBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 60,
+    height: 60,
+    borderRadius: 16,
     backgroundColor: '#0284c7',
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'center',
     marginBottom: 12,
   },
-  loginLogoText: { color: '#fff', fontWeight: '900', fontSize: 24 },
-  loginTitle: { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center' },
-  loginSubtitle: { color: '#64748b', fontSize: 12, textAlign: 'center', marginTop: 4, marginBottom: 20 },
+  loginLogoText: { color: '#fff', fontSize: 32, fontWeight: '900' },
+  loginTitle: { color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: 1 },
+  loginSubtitle: { color: '#94a3b8', fontSize: 13, marginTop: 4, marginBottom: 8 },
+  directModeBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: '#10b981',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 16,
+  },
+  directModeBadgeText: { color: '#34d399', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
   loginForm: { width: '100%' },
+  inputLabel: { color: '#94a3b8', fontSize: 12, fontWeight: '700', marginBottom: 6 },
+  textInput: {
+    backgroundColor: '#080d1a',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: '#fff',
+    fontSize: 14,
+  },
   btnLoginSubmit: {
     backgroundColor: '#0284c7',
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  btnLoginSubmitText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  quickAccessSection: { marginTop: 20, width: '100%' },
+  quickAccessTitle: { color: '#64748b', fontSize: 11, fontWeight: '800', marginBottom: 8 },
+  btnQuickUserItem: {
+    backgroundColor: '#080d1a',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 6,
+  },
+  btnQuickAdmin: { borderColor: '#f59e0b' },
+  btnQuickDriver: { borderColor: '#1e293b' },
+  quickUserNameText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  quickUserRoleBadge: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
+  quickUserCpfText: { color: '#64748b', fontSize: 11, marginTop: 2 },
+
+  // Painel de Rota Ativa
+  activeRouteCard: {
+    backgroundColor: '#0c1220',
+    borderWidth: 1,
+    borderColor: '#0284c7',
     borderRadius: 14,
+    padding: 16,
+    marginBottom: 18,
+  },
+  activeRouteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  activeRouteBadgeContainer: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  badgeGreenBg: { backgroundColor: 'rgba(16, 185, 129, 0.2)' },
+  badgeAmberBg: { backgroundColor: 'rgba(245, 158, 11, 0.2)' },
+  activeRouteBadge: { color: '#38bdf8', fontSize: 11, fontWeight: '800' },
+  activeRouteVehicle: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  activeRoutePlate: { color: '#38bdf8', fontSize: 14, fontWeight: '800', marginTop: 2 },
+  activeRouteKmStart: { color: '#64748b', fontSize: 11, marginTop: 4 },
+  activeRouteTimerBox: {
+    backgroundColor: '#080d1a',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  activeRouteTimerText: { color: '#38bdf8', fontSize: 22, fontWeight: '900' },
+  activeRouteTimerLabel: { color: '#64748b', fontSize: 10, fontWeight: '700' },
+  activeRouteStartTime: { color: '#94a3b8', fontSize: 9, marginTop: 2 },
+  activeRouteActions: { flexDirection: 'row', gap: 10 },
+  btnLunchPause: {
+    flex: 1,
+    backgroundColor: '#1e293b',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  btnLunchActive: {
+    backgroundColor: '#f59e0b',
+    borderColor: '#d97706',
+  },
+  btnLunchText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  btnFinishRoute: {
+    flex: 1,
+    backgroundColor: '#dc2626',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  btnFinishRouteText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+
+  // Card Iniciar Rota
+  startCard: {
+    backgroundColor: '#0c1220',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    marginBottom: 18,
+  },
+  startCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  startTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  fastTrackBadge: {
+    backgroundColor: 'rgba(2, 132, 199, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  fastTrackBadgeText: { color: '#38bdf8', fontSize: 11, fontWeight: '800' },
+  startDesc: { color: '#94a3b8', fontSize: 13, marginVertical: 8, lineHeight: 18 },
+  btnStartBig: {
+    backgroundColor: '#0284c7',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  btnStartBigText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+
+  // Seções & Veículos
+  sectionHeader: { marginBottom: 12 },
+  sectionTitle: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  sectionDesc: { color: '#64748b', fontSize: 12, marginTop: 2 },
+  vehicleCard: {
+    backgroundColor: '#0c1220',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    marginBottom: 10,
+  },
+  vehicleCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  vehiclePlate: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
+  vehicleStatusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  statusInUse: { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderWidth: 1, borderColor: '#ef4444' },
+  statusAvailable: { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderWidth: 1, borderColor: '#10b981' },
+  statusMaint: { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderWidth: 1, borderColor: '#f59e0b' },
+  vehicleStatusText: { fontSize: 11, fontWeight: '800' },
+  statusTextInUse: { color: '#f87171' },
+  statusTextAvailable: { color: '#34d399' },
+  statusTextMaint: { color: '#fbbf24' },
+  vehicleName: { color: '#cbd5e1', fontSize: 13, marginTop: 4, fontWeight: '600' },
+  vehicleInfo: { color: '#64748b', fontSize: 11, marginTop: 2 },
+  driverInfoBox: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#080d1a',
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  driverInfoLabel: { color: '#94a3b8', fontSize: 11 },
+  driverInfoName: { color: '#38bdf8', fontSize: 12, fontWeight: '700' },
+  btnPickVehicle: {
+    marginTop: 10,
+    backgroundColor: '#0369a1',
+    paddingVertical: 9,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  btnPickVehicleText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+
+  // Histórico de Viagens
+  tripCard: {
+    backgroundColor: '#0c1220',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    marginBottom: 8,
+  },
+  tripCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  tripPlate: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  tripKm: { color: '#10b981', fontSize: 13, fontWeight: '800' },
+  tripTime: { color: '#94a3b8', fontSize: 11, marginTop: 3 },
+  tripLunch: { color: '#64748b', fontSize: 10, marginTop: 1 },
+
+  // Ponto Eletrônico CLT
+  timeClockContainer: { width: '100%' },
+  digitalClockCard: {
+    backgroundColor: '#0c1220',
+    borderRadius: 14,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#0284c7',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  clockDateText: { color: '#94a3b8', fontSize: 12, textTransform: 'capitalize' },
+  clockDigitalTime: { color: '#38bdf8', fontSize: 38, fontWeight: '900', marginVertical: 6, letterSpacing: 2 },
+  clockCollabName: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  clockBranchBadge: {
+    marginTop: 8,
+    backgroundColor: 'rgba(2, 132, 199, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  clockBranchText: { color: '#38bdf8', fontSize: 11, fontWeight: '700' },
+
+  clockActionsCard: {
+    backgroundColor: '#0c1220',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    marginBottom: 18,
+  },
+  clockActionsTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  clockActionsSubtitle: { color: '#64748b', fontSize: 12, marginTop: 2, marginBottom: 14 },
+  clockGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  btnClockAction: {
+    width: '48%',
+    backgroundColor: '#080d1a',
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  btnClockEntry: { borderColor: '#10b981' },
+  btnClockLunchOut: { borderColor: '#f59e0b' },
+  btnClockLunchIn: { borderColor: '#0284c7' },
+  btnClockExit: { borderColor: '#ef4444' },
+  btnClockIcon: { fontSize: 20, marginBottom: 4 },
+  btnClockText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  btnClockSub: { color: '#64748b', fontSize: 10, marginTop: 2 },
+
+  punchRecordItem: {
+    backgroundColor: '#0c1220',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  punchRecordLeft: { flex: 1 },
+  punchRecordType: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  punchRecordCollab: { color: '#64748b', fontSize: 11, marginTop: 2 },
+  punchRecordRight: { alignItems: 'flex-end' },
+  punchRecordTime: { color: '#38bdf8', fontSize: 14, fontWeight: '800' },
+  punchRecordDate: { color: '#64748b', fontSize: 10, marginTop: 2 },
+
+  // Aba Funcionários (ADM)
+  employeesContainer: { width: '100%' },
+  enrollCard: {
+    backgroundColor: '#0c1220',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  enrollCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  enrollTitle: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  directEnrollBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#10b981',
+  },
+  directEnrollBadgeText: { color: '#34d399', fontSize: 10, fontWeight: '700' },
+  enrollDesc: { color: '#94a3b8', fontSize: 12, marginVertical: 8, lineHeight: 16 },
+  enrollInputGroup: { marginTop: 6 },
+  rolePickerRow: { flexDirection: 'row', gap: 6, marginTop: 6 },
+  roleBtn: {
+    flex: 1,
+    backgroundColor: '#080d1a',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 6,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  roleBtnActive: {
+    borderColor: '#0284c7',
+    backgroundColor: 'rgba(2, 132, 199, 0.2)',
+  },
+  roleBtnText: { color: '#64748b', fontSize: 11, fontWeight: '700' },
+  roleBtnTextActive: { color: '#38bdf8', fontWeight: '800' },
+  btnSaveEmployeeDirect: {
+    backgroundColor: '#10b981',
+    borderRadius: 8,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  btnSaveEmployeeDirectText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+
+  userListItemCard: {
+    backgroundColor: '#0c1220',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    marginBottom: 8,
+  },
+  userListCardHeader: { flexDirection: 'row', alignItems: 'center' },
+  userListAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0284c7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userListAvatarText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  userListName: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  userListCpf: { color: '#64748b', fontSize: 11, marginTop: 1 },
+  userRoleTag: {
+    backgroundColor: '#080d1a',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  userRoleTagText: { color: '#94a3b8', fontSize: 11, fontWeight: '700' },
+
+  // Modais
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 420,
+    backgroundColor: '#0c1220',
+    borderRadius: 14,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#1e293b',
+  },
+  modalTitle: { color: '#fff', fontSize: 17, fontWeight: '800' },
+  modalSubtitle: { color: '#94a3b8', fontSize: 12, marginTop: 2, marginBottom: 12 },
+  modalVehicleItem: {
+    backgroundColor: '#080d1a',
+    borderWidth: 1,
+    borderColor: '#1e293b',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  modalVehiclePlate: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  modalVehicleStatus: { color: '#10b981', fontSize: 11, fontWeight: '700' },
+  modalVehicleModel: { color: '#cbd5e1', fontSize: 12, marginTop: 2 },
+  modalVehicleKm: { color: '#64748b', fontSize: 11, marginTop: 2 },
+  modalBtnCancel: {
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  modalBtnCancelText: { color: '#94a3b8', fontSize: 13, fontWeight: '700' },
+
+  chkItemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1e293b',
+  },
+  chkItemLabel: { color: '#cbd5e1', fontSize: 12 },
+  chkOk: { color: '#10b981', fontSize: 12, fontWeight: '700' },
+  chkBad: { color: '#ef4444', fontSize: 12, fontWeight: '700' },
+  btnConfirmChecklist: {
+    backgroundColor: '#10b981',
+    borderRadius: 8,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 18,
   },
-  btnLoginSubmitText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  quickAccessSection: { marginTop: 24, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#1e293b' },
-  quickAccessTitle: { color: '#64748b', fontSize: 10, fontWeight: '800', marginBottom: 8 },
-  // Cargo Seletor
-  rolePickerRow: { flexDirection: 'row', gap: 6, marginTop: 4 },
-  roleBtn: {
-    flex: 1,
-    backgroundColor: '#020617',
-    borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  roleBtnActive: { backgroundColor: '#0284c730', borderColor: '#38bdf8' },
-  roleBtnText: { color: '#94a3b8', fontSize: 10, fontWeight: '700' },
-  roleBtnTextActive: { color: '#38bdf8' },
-
-  // Lista de Usuários no Cadastro Facial
-  userListItemCard: {
-    backgroundColor: '#0f172a',
-    borderWidth: 1,
-    borderColor: '#1e293b',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
-  },
-  userListCardHeader: { flexDirection: 'row', alignItems: 'center' },
-  userListAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#1e293b',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  userListAvatarText: { color: '#38bdf8', fontWeight: '900', fontSize: 16 },
-  userListName: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  userListCpf: { color: '#64748b', fontSize: 11, marginTop: 1 },
-  biometricStatusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  bioPillActive: { backgroundColor: '#064e3b' },
-  bioPillPending: { backgroundColor: '#451a03' },
-  biometricStatusText: { fontSize: 10, fontWeight: '800' },
-  bioTextActive: { color: '#34d399' },
-  bioTextPending: { color: '#fbbf24' },
-  btnUserEnrollAction: {
-    borderRadius: 10,
-    paddingVertical: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  btnReEnroll: { backgroundColor: '#1e293b', borderWidth: 1, borderColor: '#334155' },
-  btnFirstEnroll: { backgroundColor: '#0284c7' },
-  btnUserEnrollActionText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-
-  // Itens de acesso rápido no login
-  btnQuickUserItem: {
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 6,
-  },
-  btnQuickAdmin: { backgroundColor: '#0284c715', borderColor: '#0284c740' },
-  btnQuickDriver: { backgroundColor: '#064e3b15', borderColor: '#05966930' },
-  quickUserNameText: { color: '#fff', fontSize: 12, fontWeight: '700' },
-  quickUserRoleBadge: { color: '#94a3b8', fontSize: 10, fontWeight: '700' },
-  quickUserCpfText: { color: '#64748b', fontSize: 10, fontFamily: 'monospace' },
+  btnConfirmChecklistText: { color: '#fff', fontSize: 14, fontWeight: '800' },
 });

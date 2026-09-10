@@ -1,15 +1,14 @@
 @echo off
-title ROTALOG - App Mobile (Operacional Direto)
+title ROTALOG - App Mobile SEM Biometria (Operacional Direto)
 color 0A
 echo ========================================================
-echo       ROTALOG - APP MOBILE (OPERACIONAL DIRETO)
+echo   ROTALOG - APP MOBILE SEM BIOMETRIA (OPERACIONAL)
 echo ========================================================
 echo.
-echo Versao: Acesso Direto, Agil e Sem Biometria Facial.
-echo (Para abrir a versao com Biometria, use: iniciar_mobile_com_biometria.bat)
+echo Versao: Acesso Direto, Agil, Sem Camera e Sem Biometria.
 echo.
 echo 1. Baixe o aplicativo gratuito "Expo Go" na Google Play ou App Store.
-echo 2. Escaneie o QR Code abaixo com o Expo Go no seu celular.
+echo 2. Escaneie o QR Code abaixo com a camera do celular.
 echo.
 set PATH=C:\Program Files\nodejs;%PATH%
 cd /d "%~dp0mobile"
