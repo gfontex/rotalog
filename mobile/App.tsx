@@ -27,6 +27,8 @@ interface FleetVehicle {
   currentDriver?: string | null;
 }
 
+export type AlignmentStatus = 'INITIAL' | 'PERFECT' | 'TOO_FAR' | 'TOO_CLOSE' | 'NO_FACE' | 'TOO_DARK';
+
 export default function App() {
   // ==========================================
   // ESTADO DE AUTENTICAÇÃO (LOGIN / DESLOGAR)
@@ -120,7 +122,8 @@ export default function App() {
   const [cameraPurpose, setCameraPurpose] = useState<'VERIFY_START_ROUTE' | 'ENROLL_EMPLOYEE' | 'CLOCK_IN'>('VERIFY_START_ROUTE');
   const [faceScanState, setFaceScanState] = useState<'PREVIEW' | 'SCANNING' | 'SUCCESS' | 'ERROR'>('PREVIEW');
   const [scanConfidence, setScanConfidence] = useState<number>(0);
-  const [alignmentStatus, setAlignmentStatus] = useState<'INITIAL' | 'ALIGNED_GREEN' | 'MISALIGNED_RED'>('INITIAL');
+  const [alignmentStatus, setAlignmentStatus] = useState<AlignmentStatus>('INITIAL');
+  const [guidanceMsg, setGuidanceMsg] = useState<string>('🟡 Posicione o rosto no centro');
   const isAutoCapturingRef = useRef(false);
 
   // Cadastro & Gerenciamento de Usuários
@@ -232,6 +235,7 @@ export default function App() {
   useEffect(() => {
     if (!isFaceCameraModalOpen) {
       setAlignmentStatus('INITIAL');
+      setGuidanceMsg('🟡 Posicione o rosto no círculo');
       isAutoCapturingRef.current = false;
       return;
     }
@@ -272,10 +276,15 @@ export default function App() {
 
           if (res.ok) {
             const data = await res.json();
-            if (isMounted && !isAutoCapturingRef.current && faceScanState !== 'SCANNING' && faceScanState !== 'SUCCESS') {
-              if (data.isFaceDetected) {
+            if (isMounted && !isAutoCapturingRef.current) {
+              const status: AlignmentStatus = data.guidanceStatus || (data.isFaceDetected ? 'PERFECT' : 'NO_FACE');
+              const msg: string = data.guidanceMessage || (status === 'PERFECT' ? '🟢 PERFEITO! MANTENHA PARADO...' : '🔴 CENTRALIZE O ROSTO NO CÍRCULO');
+
+              setAlignmentStatus(status);
+              setGuidanceMsg(msg);
+
+              if (status === 'PERFECT') {
                 // ACENDE VERDE IMEDIATAMENTE!
-                setAlignmentStatus('ALIGNED_GREEN');
                 isAutoCapturingRef.current = true;
 
                 // DISPARA A VALIDAÇÃO/CADASTRO AUTOMATICAMENTE (SEM PRECISAR CLICAR)!
@@ -283,10 +292,7 @@ export default function App() {
                   if (isMounted) {
                     handleCaptureAndRecognizeFace();
                   }
-                }, 250);
-              } else {
-                // ACENDE VERMELHO (FORA DE ENQUADRAMENTO / TETO / OBJETO)
-                setAlignmentStatus('MISALIGNED_RED');
+                }, 350);
               }
             }
           }
@@ -420,14 +426,14 @@ export default function App() {
       return;
     }
 
-    // Se a IA analisou e NÃO detectou rosto humano:
+    // Se a IA analisou e o enquadramento ainda não está perfeito:
     if (!apiResult || !apiResult.isFaceDetected) {
       isAutoCapturingRef.current = false;
-      setFaceScanState('ERROR');
-      Alert.alert(
-        'Rosto Não Detectado',
-        apiResult?.error || 'Nenhum rosto humano identificado na câmera! Aponte para o seu rosto com boa iluminação.',
-      );
+      setFaceScanState('PREVIEW');
+      const gStatus: AlignmentStatus = apiResult?.guidanceStatus || 'NO_FACE';
+      const gMsg: string = apiResult?.guidanceMessage || apiResult?.error || '🔴 CENTRALIZE O ROSTO NO CÍRCULO';
+      setAlignmentStatus(gStatus);
+      setGuidanceMsg(gMsg);
       return;
     }
 
@@ -1102,8 +1108,9 @@ export default function App() {
                 <View
                   style={[
                     styles.faceIdPromptPill,
-                    alignmentStatus === 'ALIGNED_GREEN' && styles.promptPillGreen,
-                    alignmentStatus === 'MISALIGNED_RED' && styles.promptPillRed,
+                    alignmentStatus === 'PERFECT' && styles.promptPillGreen,
+                    (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.promptPillAmber,
+                    alignmentStatus === 'NO_FACE' && styles.promptPillRed,
                     faceScanState === 'SUCCESS' && styles.promptPillGreen,
                   ]}
                 >
@@ -1114,11 +1121,7 @@ export default function App() {
                       ? '✓ Rosto Identificado com Sucesso!'
                       : faceScanState === 'ERROR'
                       ? '⚠️ Centralize o rosto com boa luz'
-                      : alignmentStatus === 'ALIGNED_GREEN'
-                      ? '🟢 Rosto Enquadrado! Toque para Concluir'
-                      : alignmentStatus === 'MISALIGNED_RED'
-                      ? '🔴 Rosto fora do círculo (Ajuste a posição)'
-                      : '🟡 Posicione o rosto no centro do círculo'}
+                      : guidanceMsg}
                   </Text>
                 </View>
 
@@ -1129,36 +1132,36 @@ export default function App() {
                     style={[
                       styles.reticleCorner,
                       styles.reticleTL,
-                      alignmentStatus === 'ALIGNED_GREEN' && styles.reticleGreen,
-                      alignmentStatus === 'MISALIGNED_RED' && styles.reticleRed,
-                      faceScanState === 'SUCCESS' && styles.reticleGreen,
+                      (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.reticleGreen,
+                      (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.reticleAmber,
+                      alignmentStatus === 'NO_FACE' && styles.reticleRed,
                     ]}
                   />
                   <View
                     style={[
                       styles.reticleCorner,
                       styles.reticleTR,
-                      alignmentStatus === 'ALIGNED_GREEN' && styles.reticleGreen,
-                      alignmentStatus === 'MISALIGNED_RED' && styles.reticleRed,
-                      faceScanState === 'SUCCESS' && styles.reticleGreen,
+                      (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.reticleGreen,
+                      (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.reticleAmber,
+                      alignmentStatus === 'NO_FACE' && styles.reticleRed,
                     ]}
                   />
                   <View
                     style={[
                       styles.reticleCorner,
                       styles.reticleBL,
-                      alignmentStatus === 'ALIGNED_GREEN' && styles.reticleGreen,
-                      alignmentStatus === 'MISALIGNED_RED' && styles.reticleRed,
-                      faceScanState === 'SUCCESS' && styles.reticleGreen,
+                      (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.reticleGreen,
+                      (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.reticleAmber,
+                      alignmentStatus === 'NO_FACE' && styles.reticleRed,
                     ]}
                   />
                   <View
                     style={[
                       styles.reticleCorner,
                       styles.reticleBR,
-                      alignmentStatus === 'ALIGNED_GREEN' && styles.reticleGreen,
-                      alignmentStatus === 'MISALIGNED_RED' && styles.reticleRed,
-                      faceScanState === 'SUCCESS' && styles.reticleGreen,
+                      (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.reticleGreen,
+                      (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.reticleAmber,
+                      alignmentStatus === 'NO_FACE' && styles.reticleRed,
                     ]}
                   />
 
@@ -1166,10 +1169,10 @@ export default function App() {
                   <View
                     style={[
                       styles.faceIdCircle,
-                      alignmentStatus === 'ALIGNED_GREEN' && styles.faceIdCircleSuccess,
-                      alignmentStatus === 'MISALIGNED_RED' && styles.faceIdCircleError,
+                      (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.faceIdCircleSuccess,
+                      (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.faceIdCircleAmber,
+                      alignmentStatus === 'NO_FACE' && styles.faceIdCircleError,
                       faceScanState === 'SCANNING' && styles.faceIdCircleScanning,
-                      faceScanState === 'SUCCESS' && styles.faceIdCircleSuccess,
                       faceScanState === 'ERROR' && styles.faceIdCircleError,
                     ]}
                   >
@@ -1203,8 +1206,9 @@ export default function App() {
                         style={[
                           styles.radialTick,
                           { transform: [{ rotate: `${deg}deg` }, { translateY: -142 }] },
-                          (alignmentStatus === 'ALIGNED_GREEN' || faceScanState === 'SUCCESS') && styles.radialTickSuccess,
-                          alignmentStatus === 'MISALIGNED_RED' && styles.radialTickRed,
+                          (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.radialTickSuccess,
+                          (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.radialTickAmber,
+                          alignmentStatus === 'NO_FACE' && styles.radialTickRed,
                           faceScanState === 'SCANNING' && styles.radialTickScanning,
                         ]}
                       />
@@ -1218,9 +1222,15 @@ export default function App() {
                     ? 'Mantenha o celular parado por 1 segundo'
                     : faceScanState === 'SUCCESS'
                     ? 'Validação biométrica concluída!'
-                    : alignmentStatus === 'ALIGNED_GREEN'
-                    ? '✓ Posição ideal! Toque no botão para gravar'
-                    : 'Olhe diretamente para a tela sem boné ou óculos escuros'}
+                    : alignmentStatus === 'PERFECT'
+                    ? '🟢 Perfeito! Gravando automaticamente...'
+                    : alignmentStatus === 'TOO_FAR'
+                    ? '🔍 Rosto pequeno: aproxime mais a câmera'
+                    : alignmentStatus === 'TOO_CLOSE'
+                    ? '↔️ Rosto muito perto: afaste um pouco a câmera'
+                    : alignmentStatus === 'TOO_DARK'
+                    ? '💡 Pouca luz: ilumine seu rosto'
+                    : '🔴 Centralize o rosto dentro do círculo'}
                 </Text>
               </View>
             </View>
@@ -1231,8 +1241,9 @@ export default function App() {
             <TouchableOpacity
               style={[
                 styles.appleShutterOuter,
-                alignmentStatus === 'ALIGNED_GREEN' && styles.appleShutterOuterGreen,
-                alignmentStatus === 'MISALIGNED_RED' && styles.appleShutterOuterRed,
+                (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && styles.appleShutterOuterGreen,
+                (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && styles.appleShutterOuterAmber,
+                alignmentStatus === 'NO_FACE' && styles.appleShutterOuterRed,
                 faceScanState === 'SCANNING' && { opacity: 0.6 },
               ]}
               disabled={faceScanState === 'SCANNING'}
@@ -1241,9 +1252,9 @@ export default function App() {
               <View
                 style={[
                   styles.appleShutterInner,
-                  alignmentStatus === 'ALIGNED_GREEN' && { backgroundColor: '#10b981' },
-                  alignmentStatus === 'MISALIGNED_RED' && { backgroundColor: '#ef4444' },
-                  faceScanState === 'SUCCESS' && { backgroundColor: '#10b981' },
+                  (alignmentStatus === 'PERFECT' || faceScanState === 'SUCCESS') && { backgroundColor: '#10b981' },
+                  (alignmentStatus === 'TOO_FAR' || alignmentStatus === 'TOO_CLOSE' || alignmentStatus === 'TOO_DARK') && { backgroundColor: '#f59e0b' },
+                  alignmentStatus === 'NO_FACE' && { backgroundColor: '#ef4444' },
                 ]}
               />
             </TouchableOpacity>
@@ -1251,11 +1262,17 @@ export default function App() {
             <Text style={styles.appleShutterLabel}>
               {faceScanState === 'SCANNING'
                 ? '⚡ Capturando biometria...'
-                : alignmentStatus === 'ALIGNED_GREEN'
-                ? '🟢 Enquadrado! Gravando automaticamente...'
-                : alignmentStatus === 'MISALIGNED_RED'
-                ? '🔴 Aproxime ou centralize seu rosto'
-                : '⚡ Modo Automático: Apenas posicione o rosto'}
+                : alignmentStatus === 'PERFECT'
+                ? '🟢 PERFEITO! Gravando biometria...'
+                : alignmentStatus === 'TOO_FAR'
+                ? '🔍 APROXIME O CELULAR'
+                : alignmentStatus === 'TOO_CLOSE'
+                ? '↔️ AFASTE O CELULAR'
+                : alignmentStatus === 'TOO_DARK'
+                ? '💡 ILUMINE O ROSTO'
+                : alignmentStatus === 'NO_FACE'
+                ? '🔴 CENTRALIZE O ROSTO'
+                : '⚡ Modo Automático: Posicione o rosto'}
             </Text>
 
             <Text style={styles.lgpdBadgeApple}>
@@ -1583,6 +1600,10 @@ const styles = StyleSheet.create({
     borderColor: '#ef4444',
     backgroundColor: 'rgba(127, 29, 29, 0.95)',
   },
+  promptPillAmber: {
+    borderColor: '#f59e0b',
+    backgroundColor: 'rgba(120, 53, 15, 0.95)',
+  },
   faceIdPromptPillText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
   faceIdRingWrapper: {
@@ -1613,6 +1634,10 @@ const styles = StyleSheet.create({
   faceIdCircleError: {
     borderColor: '#ef4444',
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  faceIdCircleAmber: {
+    borderColor: '#f59e0b',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
   },
 
   // Reticle Corners (Estilo Face ID)
@@ -1657,6 +1682,9 @@ const styles = StyleSheet.create({
   reticleRed: {
     borderColor: '#ef4444',
   },
+  reticleAmber: {
+    borderColor: '#f59e0b',
+  },
 
   // Radial Ticks (Depth scan ring)
   radialTicksContainer: {
@@ -1683,6 +1711,9 @@ const styles = StyleSheet.create({
   },
   radialTickRed: {
     backgroundColor: '#ef4444',
+  },
+  radialTickAmber: {
+    backgroundColor: '#f59e0b',
   },
 
   // Central Status Boxes
@@ -1758,6 +1789,9 @@ const styles = StyleSheet.create({
   },
   appleShutterOuterRed: {
     borderColor: '#ef4444',
+  },
+  appleShutterOuterAmber: {
+    borderColor: '#f59e0b',
   },
   appleShutterInner: {
     width: 60,

@@ -273,34 +273,49 @@ export class BiometricsService {
 
       console.log(`[PROCESS-FACE] Analise de Imagem: skinRatio=${(skinRatio * 100).toFixed(1)}%, stdDev=${luminanceStdDev.toFixed(1)}, avgEdge=${avgEdgeDensity.toFixed(1)}`);
 
-      // Se for teto, parede, papel ou superfície uniforme (baixo contraste de bordas e iluminação)
-      if (luminanceStdDev < 12 || avgEdgeDensity < 7) {
+      // 1. Diagnóstico Inteligente de Enquadramento: AFASTE, APROXIME, CENTRALIZE, PERFEITO
+      let guidanceStatus: 'PERFECT' | 'TOO_FAR' | 'TOO_CLOSE' | 'NO_FACE' | 'TOO_DARK' = 'PERFECT';
+      let guidanceMessage = '🟢 PERFEITO! MANTENHA PARADO...';
+
+      // Se for superfície lisa/teto/parede (baixo contraste facial)
+      if (luminanceStdDev < 15) {
+        guidanceStatus = 'NO_FACE';
+        guidanceMessage = '🔴 CENTRALIZE O ROSTO NO CÍRCULO';
+      } else if (grayMean < 25) {
+        guidanceStatus = 'TOO_DARK';
+        guidanceMessage = '💡 AMBIENTE ESCURO (ILUMINE O ROSTO)';
+      } else if (skinRatio < 0.18) {
+        guidanceStatus = 'TOO_FAR';
+        guidanceMessage = '🔍 APROXIME O CELULAR';
+      } else if (skinRatio > 0.75) {
+        guidanceStatus = 'TOO_CLOSE';
+        guidanceMessage = '↔️ AFASTE UM POUCO O CELULAR';
+      }
+
+      console.log(`[PROCESS-FACE] Status: ${guidanceStatus}, skinRatio=${(skinRatio * 100).toFixed(1)}%, stdDev=${luminanceStdDev.toFixed(1)}, grayMean=${grayMean.toFixed(1)}`);
+
+      // Se não estiver no enquadramento perfeito:
+      if (guidanceStatus !== 'PERFECT') {
         return {
           success: false,
           isFaceDetected: false,
+          guidanceStatus,
+          guidanceMessage,
           skinRatio: Number((skinRatio * 100).toFixed(1)),
-          error: 'Superfície uniforme detectada (parede, teto ou objeto). Por favor, enquadre o seu rosto na câmera.',
+          luminanceStdDev: Number(luminanceStdDev.toFixed(1)),
+          error: guidanceMessage,
         };
       }
 
-      // Se não houver proporção mínima de pele facial
-      if (skinRatio < 0.08 || skinRatio > 0.95) {
-        return {
-          success: false,
-          isFaceDetected: false,
-          skinRatio: Number((skinRatio * 100).toFixed(1)),
-          error: 'Nenhum rosto humano detectado! Por favor, aponte a câmera diretamente para o rosto com boa iluminação.',
-        };
-      }
-
-      // Se for apenas sondagem em tempo real (para pintar de verde ou vermelho):
+      // Se for apenas sondagem em tempo real (para feedback na tela):
       if (mode === 'PROBE') {
         return {
           success: true,
           isFaceDetected: true,
+          guidanceStatus: 'PERFECT',
+          guidanceMessage: '🟢 PERFEITO! GRAVANDO...',
           skinRatio: Number((skinRatio * 100).toFixed(1)),
           luminanceStdDev: Number(luminanceStdDev.toFixed(1)),
-          avgEdgeDensity: Number(avgEdgeDensity.toFixed(1)),
           message: 'Rosto enquadrado perfeitamente no centro!',
         };
       }
