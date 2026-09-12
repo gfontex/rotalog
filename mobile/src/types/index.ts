@@ -8,8 +8,6 @@ export interface UserProfile {
   role: Role;
   tenantId: string;
   branchName: string;
-  biometricEnrolled: boolean;
-  biometricVector?: number[];
 }
 
 export interface AssignedVehicle {

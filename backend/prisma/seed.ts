@@ -221,19 +221,6 @@ async function main() {
       },
     });
     console.log(`👑 Administrador MK Segurança criado: CPF ${mkAdminCpf} | Senha: CPF`);
-
-    // Cadastro biométrico com vetor de 192 dimensões
-    const dummyEmbedding = Array.from({ length: 192 }, () => Number((Math.random() * 0.2 - 0.1).toFixed(4)));
-    await prisma.facialEmbedding.create({
-      data: {
-        tenantId: mkTenant.id,
-        userId: adminUser.id,
-        embeddingVector: dummyEmbedding,
-        consentGiven: true,
-        consentAt: new Date(),
-      },
-    });
-    console.log(`📸 Biometria facial 192-d cadastrada para o Administrador MK`);
   }
 
   // Veículos da frota MK Segurança

@@ -1,9 +1,39 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Environment Variables
 .env
 .env.local
-dist/
-.next/
-.expo/
-*.log
-mobile-sem-biometria/
+.env.development.local
+.env.test.local
+.env.production.local
 
+# Build Outputs
+dist/
+build/
+.next/
+out/
+.expo/
+*.tsbuildinfo
+
+# Logs & Debugging
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor & AI Skills / Internal Prompts
+.claude/
+.cursor/
+.agents/
+.devin/
+.vscode/
+.idea/
+AGENTS.md
+CLAUDE.md
+
+# Operating System
+.DS_Store
+Thumbs.db

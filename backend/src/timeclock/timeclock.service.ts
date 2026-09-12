@@ -1,6 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { BiometricsService } from '../biometrics/biometrics.service.js';
 import { CreateClockingDto } from './dto/create-clocking.dto.js';
 import { ClockingType } from '@prisma/client';
 
@@ -16,57 +15,32 @@ export interface WorkShiftAnalysis {
 
 @Injectable()
 export class TimeclockService {
-  constructor(
-    private prisma: PrismaService,
-    private biometricsService: BiometricsService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   /**
-   * Registro de Batida de Ponto (Entrada, Saída ou Intervalo de Almoço)
+   * Registro de Batida de Ponto Manual e Direto (Entrada, Saída ou Intervalo de Almoço)
    */
   async punch(tenantId: string, userId: string, dto: CreateClockingDto) {
     const user = await this.prisma.user.findFirst({
       where: { id: userId, tenantId },
-      include: { facialEmbedding: true },
     });
 
     if (!user || !user.isActive) {
       throw new NotFoundException('Colaborador não encontrado ou inativo.');
     }
 
-    let facialVerified = false;
-    let matchConfidence: number | null = null;
-
-    // 1. Verificação biométrica se embedding fornecido
-    if (dto.capturedEmbedding && user.facialEmbedding?.embeddingVector) {
-      const enrolledVector = user.facialEmbedding.embeddingVector as number[];
-      const distance = this.biometricsService.calculateEuclideanDistance(
-        dto.capturedEmbedding,
-        enrolledVector,
-      );
-      matchConfidence = this.biometricsService.distanceToConfidencePercentage(distance);
-      facialVerified = distance <= 0.8;
-    }
-
-    // 2. Se não verificou por biometria e não deu fallback justificado
-    if (!facialVerified && !dto.fallbackReason) {
-      throw new BadRequestException(
-        'Falha no reconhecimento facial. É necessário fornecer uma justificativa de fallback supervisionado.',
-      );
-    }
-
     const punchTimestamp = dto.timestamp ? new Date(dto.timestamp) : new Date();
 
-    // 3. Salvar registro do Ponto
+    // Salvar registro do Ponto Direto
     const clocking = await this.prisma.timeClocking.create({
       data: {
         tenantId,
         userId,
         type: dto.type,
         timestamp: punchTimestamp,
-        facialVerified,
-        matchConfidence,
-        manualFallbackReason: !facialVerified ? dto.fallbackReason : null,
+        facialVerified: false,
+        matchConfidence: null,
+        manualFallbackReason: dto.fallbackReason || 'Registro Manual Operacional',
         latitude: dto.latitude || null,
         longitude: dto.longitude || null,
       },
@@ -78,9 +52,7 @@ export class TimeclockService {
     return {
       clocking,
       shiftAnalysis,
-      message: facialVerified
-        ? `Ponto registrado com sucesso via reconhecimento facial (${matchConfidence}% de similaridade).`
-        : 'Ponto registrado via contingência supervisionada com justificativa.',
+      message: 'Ponto registrado com sucesso.',
     };
   }
 

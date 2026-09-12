@@ -5,7 +5,6 @@ import { ClockingType } from '@prisma/client';
 describe('TimeclockService - Regras Trabalhistas CLT', () => {
   let service: TimeclockService;
   let mockPrisma: any;
-  let mockBiometrics: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -14,12 +13,7 @@ describe('TimeclockService - Regras Trabalhistas CLT', () => {
       workShift: { upsert: vi.fn(), findMany: vi.fn() },
     };
 
-    mockBiometrics = {
-      calculateEuclideanDistance: vi.fn(),
-      distanceToConfidencePercentage: vi.fn(),
-    };
-
-    service = new TimeclockService(mockPrisma, mockBiometrics);
+    service = new TimeclockService(mockPrisma);
   });
 
   it('deve calcular jornada padrão de 8 horas e 1h de almoço sem gerar alertas', async () => {

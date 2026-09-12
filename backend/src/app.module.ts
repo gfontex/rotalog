@@ -8,7 +8,6 @@ import { UsersModule } from './users/users.module.js';
 import { VehiclesModule } from './vehicles/vehicles.module.js';
 import { ChecklistsModule } from './checklists/checklists.module.js';
 import { UsagesModule } from './usages/usages.module.js';
-import { BiometricsModule } from './biometrics/biometrics.module.js';
 import { TimeclockModule } from './timeclock/timeclock.module.js';
 
 @Module({
@@ -20,7 +19,6 @@ import { TimeclockModule } from './timeclock/timeclock.module.js';
     VehiclesModule,
     ChecklistsModule,
     UsagesModule,
-    BiometricsModule,
     TimeclockModule,
   ],
   controllers: [AppController],
