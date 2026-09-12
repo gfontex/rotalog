@@ -635,7 +635,7 @@ export default function DashboardPage() {
     let apiResult: any = null;
     if (base64Photo) {
       try {
-        const res = await fetch('http://localhost:3001/api/biometrics/process-face', {
+        const res = await fetch('https://rotalog-api.onrender.com/api/biometrics/process-face', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

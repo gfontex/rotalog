@@ -1,6 +1,6 @@
 // Cliente de API HTTP para comunicação com o backend NestJS do ROTALOG
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://rotalog-api.onrender.com/api';
 
 export interface User {
   id: string;

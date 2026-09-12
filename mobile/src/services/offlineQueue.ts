@@ -66,7 +66,7 @@ class OfflineQueueService {
   }
 
   // Sincronizar fila pendente com o Backend (quando a conexão retorna)
-  async syncQueue(apiBaseUrl: string = 'http://localhost:3001/api'): Promise<{
+  async syncQueue(apiBaseUrl: string = 'https://rotalog-api.onrender.com/api'): Promise<{
     syncedChecklists: number;
     syncedClockings: number;
     failed: number;
