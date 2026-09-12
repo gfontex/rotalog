@@ -27,8 +27,8 @@ async function bootstrap() {
   );
 
   const port = process.env.PORT ?? 3001;
-  await app.listen(port);
-  console.log(`🚀 ROTALOG API Backend rodando com sucesso em: http://localhost:${port}`);
+  await app.listen(port, '0.0.0.0');
+  console.log(`🚀 ROTALOG API Backend rodando com sucesso na porta: ${port}`);
 }
 await bootstrap();
 
