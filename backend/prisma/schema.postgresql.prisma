@@ -1,0 +1,208 @@
+// ROTALOG - Prisma Schema (PostgreSQL para producao)
+// Gestão de Frotas e Tropas Operacionais com Checklist e Ponto Eletrônico CLT
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  DRIVER
+  FLEET_MANAGER
+  HR
+  ADMIN
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+}
+
+enum ChecklistType {
+  ENTRY
+  EXIT
+}
+
+enum UsageStatus {
+  IN_PROGRESS
+  PAUSED_LUNCH
+  COMPLETED
+}
+
+enum TimeClockType {
+  ENTRADA
+  ALMOCO_SAIDA
+  ALMOCO_RETORNO
+  SAIDA
+}
+
+enum AuditAction {
+  INICIO_ROTA
+  PAUSA_ALMOCO
+  RETOMADA_ALMOCO
+  FIM_ROTA
+  ALERTA_AVARIA
+  BATIDA_PONTO
+}
+
+model Tenant {
+  id                 String               @id @default(uuid())
+  name               String
+  cnpj               String               @unique
+  status             String               @default("ACTIVE")
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  branches           Branch[]
+  users              User[]
+  vehicles           Vehicle[]
+  checklistTemplates ChecklistTemplate[]
+  vehicleChecklists  VehicleChecklist[]
+  vehicleUsages      VehicleUsage[]
+  timeClockings      TimeClocking[]
+  auditLogs          AuditLog[]
+}
+
+model Branch {
+  id        String    @id @default(uuid())
+  tenantId  String
+  name      String
+  city      String
+  state     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  users     User[]
+  vehicles  Vehicle[]
+}
+
+model User {
+  id                 String             @id @default(uuid())
+  tenantId           String
+  branchId           String?
+  name               String
+  cpf                String             @unique
+  email              String             @unique
+  passwordHash       String
+  role               Role               @default(DRIVER)
+  isActive           Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch             Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  checklists         VehicleChecklist[]
+  usages             VehicleUsage[]
+  timeClockings      TimeClocking[]
+  auditLogs          AuditLog[]
+}
+
+model Vehicle {
+  id             String             @id @default(uuid())
+  tenantId       String
+  branchId       String?
+  plate          String             @unique
+  brand          String
+  model          String
+  year           Int
+  status         VehicleStatus      @default(AVAILABLE)
+  currentMileage Int                @default(0)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch         Branch?            @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  checklists     VehicleChecklist[]
+  usages         VehicleUsage[]
+}
+
+model ChecklistTemplate {
+  id        String   @id @default(uuid())
+  tenantId  String
+  name      String
+  items     Json     // Lista de itens padrao de inspecao
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+}
+
+model VehicleChecklist {
+  id           String        @id @default(uuid())
+  tenantId     String
+  vehicleId    String
+  driverId     String
+  type         ChecklistType
+  mileage      Int
+  itemsResult  Json          // Registros com status de cada item (OK, PROBLEMA)
+  observation  String?
+  hasProblem   Boolean       @default(false)
+  photoUrls    Json?
+  createdAt    DateTime      @default(now())
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driver       User          @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  entryUsages  VehicleUsage[] @relation("EntryChecklist")
+  exitUsages   VehicleUsage[] @relation("ExitChecklist")
+}
+
+model VehicleUsage {
+  id                   String        @id @default(uuid())
+  tenantId             String
+  vehicleId            String
+  driverId             String
+  entryChecklistId     String?
+  exitChecklistId      String?
+  startTime            DateTime      @default(now())
+  endTime              DateTime?
+  lunchStartTime       DateTime?
+  lunchEndTime         DateTime?
+  totalLunchMinutes    Int           @default(0)
+  totalDurationMinutes Int           @default(0)
+  totalDistanceKm      Int           @default(0)
+  status               UsageStatus   @default(IN_PROGRESS)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  tenant               Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle              Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  driver               User          @relation(fields: [driverId], references: [id], onDelete: Cascade)
+  entryChecklist       VehicleChecklist? @relation("EntryChecklist", fields: [entryChecklistId], references: [id], onDelete: SetNull)
+  exitChecklist        VehicleChecklist? @relation("ExitChecklist", fields: [exitChecklistId], references: [id], onDelete: SetNull)
+}
+
+model TimeClocking {
+  id        String        @id @default(uuid())
+  tenantId  String
+  userId    String
+  type      TimeClockType
+  timestamp DateTime      @default(now())
+  isOffline Boolean       @default(false)
+  latitude  Float?
+  longitude Float?
+  createdAt DateTime      @default(now())
+
+  tenant    Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  tenantId   String
+  userId     String?
+  action     AuditAction
+  entityType String
+  entityId   String
+  details    Json?
+  timestamp  DateTime    @default(now())
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user       User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
