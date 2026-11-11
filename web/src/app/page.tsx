@@ -9,6 +9,8 @@ import { TripReports } from '../components/TripReports';
 import { TimeClockMirror } from '../components/TimeClockMirror';
 import { NotificationDrawer } from '../components/NotificationDrawer';
 import { NewVehicleModal, NewUserModal } from '../components/ManagementModals';
+import { ChecklistModal } from '../components/ChecklistModal';
+import { ReturnChecklistModal } from '../components/ReturnChecklistModal';
 import { webApi } from '../services/api';
 import {
   Car,
@@ -32,6 +34,11 @@ import {
   Sparkles,
   ChevronRight,
   ExternalLink,
+  Play,
+  Pause,
+  Flag,
+  Navigation,
+  CheckSquare,
 } from 'lucide-react';
 
 interface AuthUser {
@@ -77,11 +84,18 @@ export default function DashboardPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
 
-  // Estados dos Modais
+  // Estados dos Modais Administrativos
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isNewVehicleOpen, setIsNewVehicleOpen] = useState(false);
   const [isNewUserOpen, setIsNewUserOpen] = useState(false);
+
+  // Estados de Operação de Rota e Checklist pelo PC
+  const [selectedVehicleForRoute, setSelectedVehicleForRoute] = useState<any | null>(null);
+  const [isChecklistOpen, setIsChecklistOpen] = useState(false);
+  const [selectedUsageForReturn, setSelectedUsageForReturn] = useState<any | null>(null);
+  const [isReturnChecklistOpen, setIsReturnChecklistOpen] = useState(false);
+  const [activeUsage, setActiveUsage] = useState<any | null>(null);
 
   // Carregar sessão salva no navegador
   useEffect(() => {
@@ -141,6 +155,7 @@ export default function DashboardPage() {
 
   const handleLogout = () => {
     setCurrentUser(null);
+    setActiveUsage(null);
     localStorage.removeItem('@rotalog:user');
   };
 
@@ -150,7 +165,7 @@ export default function DashboardPage() {
     setIsRefreshing(true);
     try {
       const tenantId = currentUser.tenantId;
-      const [statsData, vehiclesData, tripsData, punchesData, notifsData, usersData] =
+      const [statsData, vehiclesData, tripsData, punchesData, notifsData, usersData, activeUsageData] =
         await Promise.allSettled([
           webApi.getStats(tenantId),
           webApi.getVehicles(tenantId),
@@ -158,6 +173,7 @@ export default function DashboardPage() {
           webApi.getTimeClockReport(tenantId),
           webApi.getNotifications(tenantId),
           webApi.getUsers(tenantId),
+          webApi.getActiveUsage(currentUser.id),
         ]);
 
       if (statsData.status === 'fulfilled') setStats(statsData.value);
@@ -166,6 +182,11 @@ export default function DashboardPage() {
       if (punchesData.status === 'fulfilled') setPunches(punchesData.value);
       if (notifsData.status === 'fulfilled') setNotifications(notifsData.value);
       if (usersData.status === 'fulfilled') setUsers(usersData.value);
+      if (activeUsageData.status === 'fulfilled' && activeUsageData.value) {
+        setActiveUsage(activeUsageData.value);
+      } else {
+        setActiveUsage(null);
+      }
     } catch (err) {
       console.warn('Erro ao atualizar dados do dashboard:', err);
     } finally {
@@ -185,13 +206,53 @@ export default function DashboardPage() {
   const isControl = currentUser?.role === 'FLEET_MANAGER';
   const isDriver = currentUser?.role === 'DRIVER';
 
+  // Handlers de Rota e Checklist
+  const handleStartRoute = (vehicle: any) => {
+    setSelectedVehicleForRoute(vehicle);
+    setIsChecklistOpen(true);
+  };
+
+  const handleFinishRoute = (vehicle: any) => {
+    const usage = trips.find(
+      (t) => (t.vehicleId === vehicle.id || t.vehiclePlate === vehicle.plate) && t.status !== 'COMPLETED'
+    ) || {
+      id: vehicle.id,
+      vehicle,
+      vehiclePlate: vehicle.plate,
+      vehicleModel: vehicle.model,
+      startTime: new Date().toISOString(),
+      driver: { name: vehicle.currentDriver?.name || 'Condutor' },
+    };
+    setSelectedUsageForReturn(usage);
+    setIsReturnChecklistOpen(true);
+  };
+
+  const handlePauseLunch = async () => {
+    if (!activeUsage) return;
+    try {
+      await webApi.pauseLunch(activeUsage.id);
+      loadAllData();
+    } catch (err: any) {
+      alert('Erro ao pausar almoço: ' + (err.message || 'Erro inesperado.'));
+    }
+  };
+
+  const handleResumeLunch = async () => {
+    if (!activeUsage) return;
+    try {
+      await webApi.resumeLunch(activeUsage.id);
+      loadAllData();
+    } catch (err: any) {
+      alert('Erro ao retomar almoço: ' + (err.message || 'Erro inesperado.'));
+    }
+  };
+
   // =========================================================================
-  // 1. TELA DE LOGIN UNIFICADA (RESPONSIVA, BONITA NO CELULAR E NO PC)
+  // 1. TELA DE LOGIN UNIFICADA (RESPONSIVA NO CELULAR E NO PC)
   // =========================================================================
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8 selection:bg-indigo-500 selection:text-white">
-        {/* Cabeçalho da Tela de Login */}
         <div className="max-w-md w-full mx-auto flex items-center justify-between py-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/20">
@@ -207,7 +268,6 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        {/* Card Central de Login com Efeito Moderno */}
         <div className="max-w-md w-full mx-auto my-6 bg-[#0F172A] border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500" />
 
@@ -283,7 +343,7 @@ export default function DashboardPage() {
             </button>
           </form>
 
-          {/* Atalhos Rápidos para Demonstração em Sala (Perfeitos para Apresentação) */}
+          {/* Atalhos Rápidos para Demonstração em Sala */}
           <div className="mt-6 pt-5 border-t border-slate-800">
             <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2.5 text-center flex items-center justify-center gap-1.5">
               <Sparkles className="w-3 h-3 text-amber-400" />
@@ -323,7 +383,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Rodapé: Link Exclusivo do Proprietário (Software House) */}
         <div className="max-w-md w-full mx-auto text-center py-2">
           <Link
             href="/master"
@@ -338,11 +397,12 @@ export default function DashboardPage() {
   }
 
   // =========================================================================
-  // 2. PAINEL DO COLABORADOR / MOTORISTA (ACESSO APENAS ÀS SUAS INFORMAÇÕES)
+  // 2. PAINEL DO COLABORADOR / MOTORISTA (INICIAR ROTA + CHECKLIST PELO PC)
   // =========================================================================
   if (isDriver) {
     const driverTrips = trips.filter((t) => t.driverId === currentUser.id);
     const driverPunches = punches.filter((p) => p.userId === currentUser.id);
+    const availableCars = vehicles.filter((v) => v.status === 'AVAILABLE');
 
     const totalKm = driverTrips.reduce((acc, t) => acc + (t.totalDistanceKm || 0), 0);
     const totalLunch = driverTrips.reduce((acc, t) => acc + (t.totalLunchMinutes || 0), 0);
@@ -378,17 +438,128 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            {/* Banner de Operação Mobile */}
             <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl max-w-sm w-full">
               <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold mb-1">
                 <Smartphone className="w-4 h-4" />
                 Operação em Rota (App Mobile)
               </div>
               <p className="text-xs text-emerald-300/90 leading-relaxed">
-                Para iniciar viagens com vistoria de pneus e combustível e bater ponto sem internet, abra o app <strong>ROTALOG</strong> no celular pelo Expo Go.
+                Você pode iniciar a rota por aqui no PC ou usar o <strong>App Mobile ROTALOG</strong> no celular pelo Expo Go para operar offline na rua.
               </p>
             </div>
           </div>
+
+          {/* BANNER DE ROTA ATIVA (SE O MOTORISTA JÁ ESTIVER COM CARRO EM ROTA) */}
+          {activeUsage && (
+            <div className="bg-gradient-to-r from-blue-950/80 via-[#0F172A] to-blue-950/80 border-2 border-blue-500/50 rounded-3xl p-6 shadow-2xl animate-pulse-glow">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-3 rounded-2xl bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                    <Navigation className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                      {activeUsage.status === 'PAUSED_LUNCH' ? '🍽️ Pausa de Almoço' : '🛣️ Rota em Andamento'}
+                    </span>
+                    <h2 className="text-xl font-black text-white mt-1">
+                      Viatura: {activeUsage.vehiclePlate || 'Carro em Rota'}
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Início da viagem: {new Date(activeUsage.startTime).toLocaleTimeString('pt-BR')} • Almoço acumulado: {activeUsage.totalLunchMinutes || 0} min
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {activeUsage.status === 'PAUSED_LUNCH' ? (
+                    <button
+                      onClick={handleResumeLunch}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-1.5"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      <span>Retomar Rota</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handlePauseLunch}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-amber-600/20 flex items-center gap-1.5"
+                    >
+                      <Pause className="w-3.5 h-3.5" />
+                      <span>Pausar para Almoço</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setSelectedUsageForReturn(activeUsage);
+                      setIsReturnChecklistOpen(true);
+                    }}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl transition-all shadow-lg shadow-rose-600/20 flex items-center gap-1.5"
+                  >
+                    <Flag className="w-3.5 h-3.5" />
+                    <span>Encerrar Rota (Devolução)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SEÇÃO: INICIAR NOVA ROTA PELO PC (CHECKLIST DE SAÍDA) */}
+          {!activeUsage && (
+            <div className="bg-[#0F172A] border border-slate-800 rounded-3xl p-6 shadow-2xl">
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <CheckSquare className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-extrabold text-white">Iniciar Rota pelo PC (Preencher Checklist)</h2>
+                    <p className="text-xs text-slate-400">Escolha um veículo disponível no pátio para abrir o checklist de vistoria</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  {availableCars.length} Disponíveis
+                </span>
+              </div>
+
+              {availableCars.length === 0 ? (
+                <div className="p-6 text-center text-slate-500 text-xs">
+                  Nenhum veículo disponível no pátio no momento. Aguarde a devolução ou consulte o gestor.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {availableCars.map((v) => (
+                    <div
+                      key={v.id}
+                      className="p-4 bg-[#070B14] border border-slate-800 hover:border-emerald-500/40 rounded-2xl transition-all flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-mono font-black text-white text-sm px-2 py-0.5 rounded bg-slate-900 border border-slate-700">
+                            {v.plate}
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                            LIVRE
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-slate-200 text-sm">{v.brand} {v.model}</h4>
+                        <p className="text-xs text-slate-500 mt-0.5 font-mono">Odômetro: {v.currentMileage.toLocaleString('pt-BR')} km</p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleStartRoute(v)}
+                        className="mt-3 w-full py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs rounded-xl transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <CheckSquare className="w-3.5 h-3.5" />
+                        <span>Preencher Checklist & Iniciar</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Métricas Pessoais do Colaborador */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
@@ -463,6 +634,23 @@ export default function DashboardPage() {
             )}
           </div>
         </main>
+
+        {/* Modais de Checklist para o Motorista */}
+        <ChecklistModal
+          isOpen={isChecklistOpen}
+          onClose={() => setIsChecklistOpen(false)}
+          onSuccess={loadAllData}
+          vehicle={selectedVehicleForRoute}
+          drivers={[{ id: currentUser.id, name: currentUser.name, cpf: currentUser.cpf, role: currentUser.role }]}
+          currentUserId={currentUser.id}
+        />
+
+        <ReturnChecklistModal
+          isOpen={isReturnChecklistOpen}
+          onClose={() => setIsReturnChecklistOpen(false)}
+          onSuccess={loadAllData}
+          usage={selectedUsageForReturn}
+        />
       </div>
     );
   }
@@ -559,7 +747,6 @@ export default function DashboardPage() {
             <span>Espelho de Ponto CLT ({punches.length})</span>
           </button>
 
-          {/* Ambos Master e Usuário de Controle podem acessar Colaboradores */}
           <button
             onClick={() => setActiveTab('users')}
             className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs sm:text-sm font-extrabold border-b-2 transition-all whitespace-nowrap ${
@@ -575,9 +762,17 @@ export default function DashboardPage() {
 
         {/* Conteúdo Dinâmico das Abas */}
         <div>
-          {activeTab === 'fleet' && <FleetMonitor vehicles={vehicles} />}
+          {activeTab === 'fleet' && (
+            <FleetMonitor
+              vehicles={vehicles}
+              onStartRoute={handleStartRoute}
+              onFinishRoute={handleFinishRoute}
+            />
+          )}
+
           {activeTab === 'trips' && <TripReports trips={trips} />}
           {activeTab === 'timeclock' && <TimeClockMirror punches={punches} />}
+
           {activeTab === 'users' && (
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -661,7 +856,7 @@ export default function DashboardPage() {
         notifications={notifications}
       />
 
-      {/* Modais de Cadastro de Veículo e Colaborador */}
+      {/* Modais Administrativos */}
       <NewVehicleModal
         isOpen={isNewVehicleOpen}
         onClose={() => setIsNewVehicleOpen(false)}
@@ -674,6 +869,23 @@ export default function DashboardPage() {
         onClose={() => setIsNewUserOpen(false)}
         onSuccess={loadAllData}
         tenants={[{ id: currentUser.tenantId, name: currentUser.tenantName }]}
+      />
+
+      {/* Modais de Checklist e Devolução no PC */}
+      <ChecklistModal
+        isOpen={isChecklistOpen}
+        onClose={() => setIsChecklistOpen(false)}
+        onSuccess={loadAllData}
+        vehicle={selectedVehicleForRoute}
+        drivers={users.length > 0 ? users : [{ id: currentUser.id, name: currentUser.name, cpf: currentUser.cpf, role: currentUser.role }]}
+        currentUserId={currentUser.id}
+      />
+
+      <ReturnChecklistModal
+        isOpen={isReturnChecklistOpen}
+        onClose={() => setIsReturnChecklistOpen(false)}
+        onSuccess={loadAllData}
+        usage={selectedUsageForReturn}
       />
     </div>
   );

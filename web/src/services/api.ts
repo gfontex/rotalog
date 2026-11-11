@@ -67,9 +67,41 @@ export const webApi = {
       body: JSON.stringify(data),
     }),
 
-  // Relatórios de Viagens
+  // Relatórios de Viagens & Operação de Rotas
   getUsages: (tenantId?: string) => fetcher(`/usages${tenantId ? `?tenantId=${tenantId}` : ''}`),
   getDriverTrips: (driverId: string) => fetcher(`/usages/driver/${driverId}`),
+  getActiveUsage: (driverId: string) => fetcher(`/usages/active/${driverId}`),
+  startUsage: (data: {
+    vehicleId: string;
+    driverId: string;
+    mileage: number;
+    itemsResult: Record<string, { ok: boolean; observation?: string }>;
+    observation?: string;
+  }) =>
+    fetcher('/usages/start', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  pauseLunch: (usageId: string) =>
+    fetcher(`/usages/${usageId}/pause-lunch`, {
+      method: 'PATCH',
+    }),
+  resumeLunch: (usageId: string) =>
+    fetcher(`/usages/${usageId}/resume-lunch`, {
+      method: 'PATCH',
+    }),
+  finishUsage: (
+    usageId: string,
+    data: {
+      exitMileage: number;
+      itemsResult: Record<string, { ok: boolean; observation?: string }>;
+      observation?: string;
+    }
+  ) =>
+    fetcher(`/usages/${usageId}/finish`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // Ponto CLT
   getTimeClockReport: (tenantId?: string) => fetcher(`/timeclock/report${tenantId ? `?tenantId=${tenantId}` : ''}`),
