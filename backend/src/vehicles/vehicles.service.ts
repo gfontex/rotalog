@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVehicleDto, UpdateVehicleStatusDto } from './dto/create-vehicle.dto';
 
@@ -12,7 +12,7 @@ export class VehiclesService {
       include: {
         branch: true,
         usages: {
-          where: { status: 'IN_PROGRESS' },
+          where: { status: { in: ['IN_PROGRESS', 'PAUSED_LUNCH'] } },
           include: { driver: true },
           take: 1,
         },
@@ -48,7 +48,7 @@ export class VehiclesService {
       where: { id },
       include: {
         usages: {
-          where: { status: 'IN_PROGRESS' },
+          where: { status: { in: ['IN_PROGRESS', 'PAUSED_LUNCH'] } },
           include: { driver: true },
           take: 1,
         },
@@ -76,11 +76,19 @@ export class VehiclesService {
       tenantId = defaultTenant.id;
     }
 
+    const normalizedPlate = dto.plate.toUpperCase().trim();
+    const existing = await this.prisma.vehicle.findUnique({
+      where: { plate: normalizedPlate },
+    });
+    if (existing) {
+      throw new ConflictException(`Já existe uma viatura cadastrada com a placa ${normalizedPlate}.`);
+    }
+
     return this.prisma.vehicle.create({
       data: {
         tenantId,
         branchId: dto.branchId || null,
-        plate: dto.plate.toUpperCase().trim(),
+        plate: normalizedPlate,
         brand: dto.brand,
         model: dto.model,
         year: dto.year,

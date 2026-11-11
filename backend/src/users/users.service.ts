@@ -19,13 +19,24 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto) {
-    // 1. Verificar se ja existe colaborador com o mesmo CPF
-    const existing = await this.prisma.user.findUnique({
-      where: { cpf: dto.cpf },
+    const normalizedEmail = dto.email.toLowerCase().trim();
+    const cleanCpf = dto.cpf.replace(/\D/g, '');
+
+    // 1. Verificar se já existe colaborador com o mesmo CPF ou Email
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { cpf: dto.cpf },
+          { email: normalizedEmail },
+        ],
+      },
     });
 
     if (existing) {
-      throw new ConflictException(`Ja existe um colaborador cadastrado com o CPF ${dto.cpf}.`);
+      if (existing.email.toLowerCase() === normalizedEmail) {
+        throw new ConflictException(`Já existe um colaborador cadastrado com o e-mail ${dto.email}.`);
+      }
+      throw new ConflictException(`Já existe um colaborador cadastrado com o CPF ${dto.cpf}.`);
     }
 
     // 2. Se tenantId nao for enviado, vincula ao primeiro tenant disponivel (ex: MK Seguranca)
