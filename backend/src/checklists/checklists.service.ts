@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateChecklistDto } from './dto/create-checklist.dto';
 
@@ -38,11 +38,17 @@ export class ChecklistsService {
   }
 
   async create(dto: CreateChecklistDto) {
-    let tenantId = dto.tenantId;
-    if (!tenantId) {
-      const v = await this.prisma.vehicle.findUnique({ where: { id: dto.vehicleId } });
-      tenantId = v?.tenantId || (await this.prisma.tenant.findFirst())?.id || '';
+    const vehicle = await this.prisma.vehicle.findUnique({ where: { id: dto.vehicleId } });
+    if (!vehicle) {
+      throw new NotFoundException(`Veículo ${dto.vehicleId} não encontrado.`);
     }
+
+    const driver = await this.prisma.user.findUnique({ where: { id: dto.driverId } });
+    if (!driver) {
+      throw new NotFoundException(`Colaborador/Motorista ${dto.driverId} não encontrado.`);
+    }
+
+    const tenantId = dto.tenantId || vehicle.tenantId;
 
     // Calcula hasProblem se algum item não estiver OK
     let hasProblem = dto.hasProblem || false;
@@ -57,9 +63,6 @@ export class ChecklistsService {
 
     // Se houver problema, grava log de alerta de avaria no banco
     if (hasProblem) {
-      const vehicle = await this.prisma.vehicle.findUnique({ where: { id: dto.vehicleId } });
-      const driver = await this.prisma.user.findUnique({ where: { id: dto.driverId } });
-
       await this.prisma.auditLog.create({
         data: {
           tenantId,
@@ -68,7 +71,7 @@ export class ChecklistsService {
           entityType: 'VEHICLE',
           entityId: dto.vehicleId,
           details: JSON.stringify({
-            message: `Alerta de avaria detectado no checklist de ${dto.type === 'ENTRY' ? 'Saída' : 'Devolução'}. Veículo: ${vehicle?.brand} ${vehicle?.model} (${vehicle?.plate}).`,
+            message: `Alerta de avaria detectado no checklist de ${dto.type === 'ENTRY' ? 'Saída' : 'Devolução'}. Veículo: ${vehicle.brand} ${vehicle.model} (${vehicle.plate}).`,
             itemsResult: dto.itemsResult,
             observation: dto.observation,
           }),

@@ -28,6 +28,8 @@ export class UsagesService {
 
     return list.map((u) => ({
       ...u,
+      vehiclePlate: u.vehicle?.plate || '',
+      vehicleModel: `${u.vehicle?.brand || ''} ${u.vehicle?.model || ''}`.trim(),
       entryChecklist: u.entryChecklist
         ? {
             ...u.entryChecklist,
@@ -55,6 +57,7 @@ export class UsagesService {
       where: { driverId },
       include: {
         vehicle: true,
+        driver: { select: { id: true, name: true, cpf: true, role: true } },
         entryChecklist: true,
         exitChecklist: true,
       },
@@ -63,6 +66,8 @@ export class UsagesService {
 
     return list.map((u) => ({
       ...u,
+      vehiclePlate: u.vehicle?.plate || '',
+      vehicleModel: `${u.vehicle?.brand || ''} ${u.vehicle?.model || ''}`.trim(),
       entryChecklist: u.entryChecklist
         ? {
             ...u.entryChecklist,
@@ -116,7 +121,26 @@ export class UsagesService {
 
   // FLUXO B: INICIAR ROTA COM CHECKLIST DE ENTRADA
   async startUsage(dto: StartUsageDto) {
-    // 1. Validar que o veiculo esta realmente AVAILABLE
+    // 1. Validar motorista e rota ativa anterior
+    const driver = await this.prisma.user.findUnique({ where: { id: dto.driverId } });
+    if (!driver) {
+      throw new NotFoundException('Motorista/Colaborador não encontrado.');
+    }
+
+    const activeUsage = await this.prisma.vehicleUsage.findFirst({
+      where: {
+        driverId: dto.driverId,
+        status: { in: ['IN_PROGRESS', 'PAUSED_LUNCH'] },
+      },
+      include: { vehicle: true },
+    });
+    if (activeUsage) {
+      throw new BadRequestException(
+        `O condutor ${driver.name} já possui uma rota em andamento com o veículo ${activeUsage.vehicle?.plate || 'em trânsito'}. Finalize-a antes de iniciar uma nova rota.`
+      );
+    }
+
+    // 2. Validar que o veiculo esta realmente AVAILABLE
     const vehicle = await this.prisma.vehicle.findUnique({ where: { id: dto.vehicleId } });
     if (!vehicle) {
       throw new NotFoundException('Veículo não encontrado.');
@@ -127,10 +151,9 @@ export class UsagesService {
       );
     }
 
-    const driver = await this.prisma.user.findUnique({ where: { id: dto.driverId } });
     const tenantId = dto.tenantId || vehicle.tenantId;
 
-    // 2. Criar Checklist de Saida
+    // 3. Criar Checklist de Saida
     const entryChecklist = await this.checklistsService.create({
       tenantId,
       vehicleId: dto.vehicleId,
@@ -291,6 +314,10 @@ export class UsagesService {
       throw new NotFoundException('Sessão de rota não encontrada.');
     }
 
+    if (usage.status === 'COMPLETED') {
+      throw new BadRequestException('Esta rota já foi finalizada anteriormente.');
+    }
+
     const entryMileage = usage.entryChecklist?.mileage || 0;
     if (dto.exitMileage < entryMileage) {
       throw new BadRequestException(
@@ -309,11 +336,20 @@ export class UsagesService {
       observation: dto.observation,
     });
 
-    // 2. Calculos Liquidos de Viagem e Distancia
+    // 2. Calculos Liquidos de Viagem e Distancia (ajusta almoco caso finalizado direto da pausa)
     const endTime = new Date();
     const startTime = new Date(usage.startTime);
+    let totalLunch = usage.totalLunchMinutes || 0;
+    let lunchEndTime = usage.lunchEndTime;
+
+    if (usage.status === 'PAUSED_LUNCH' && usage.lunchStartTime) {
+      const extraLunchMs = endTime.getTime() - new Date(usage.lunchStartTime).getTime();
+      totalLunch += Math.max(0, Math.round(extraLunchMs / 60000));
+      lunchEndTime = endTime;
+    }
+
     const grossMinutes = Math.max(1, Math.round((endTime.getTime() - startTime.getTime()) / 60000));
-    const netMinutes = Math.max(0, grossMinutes - (usage.totalLunchMinutes || 0));
+    const netMinutes = Math.max(0, grossMinutes - totalLunch);
     const distanceKm = dto.exitMileage - entryMileage;
 
     // 3. Atualizar Status do Veiculo
@@ -331,6 +367,8 @@ export class UsagesService {
       data: {
         exitChecklistId: exitChecklist.id,
         endTime,
+        lunchEndTime,
+        totalLunchMinutes: totalLunch,
         totalDistanceKm: distanceKm,
         totalDurationMinutes: netMinutes,
         status: 'COMPLETED',

@@ -25,6 +25,13 @@ import {
   AlertCircle,
   LogOut,
   QrCode,
+  Gauge,
+  Calendar,
+  Utensils,
+  MapPin,
+  Sparkles,
+  ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
 
 interface AuthUser {
@@ -47,7 +54,7 @@ export default function DashboardPage() {
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // Aba ativa do Painel
+  // Aba ativa do Painel (para Master e Controle)
   const [activeTab, setActiveTab] = useState<'fleet' | 'trips' | 'timeclock' | 'users'>('fleet');
 
   // Dados do Servidor
@@ -86,7 +93,7 @@ export default function DashboardPage() {
     } catch (_) {}
   }, []);
 
-  // Carregar empresas disponíveis para o select de login
+  // Carregar lista de empresas para autocomplete/seleção
   useEffect(() => {
     webApi.getTenants().then((data) => {
       if (Array.isArray(data) && data.length > 0) {
@@ -96,7 +103,7 @@ export default function DashboardPage() {
     }).catch(() => {});
   }, []);
 
-  // Ação de Login
+  // Ação de Login Unificada (por CPF e Senha)
   const handleLogin = async (e?: React.FormEvent, customCpf?: string, customPass?: string, customComp?: string) => {
     if (e) e.preventDefault();
     const comp = customComp || loginCompany;
@@ -174,136 +181,156 @@ export default function DashboardPage() {
     }
   }, [currentUser, loadAllData]);
 
+  const isMaster = currentUser?.role === 'ADMIN';
+  const isControl = currentUser?.role === 'FLEET_MANAGER';
+  const isDriver = currentUser?.role === 'DRIVER';
+
   // =========================================================================
-  // 1. TELA DE LOGIN DO CLIENTE (SE NÃO ESTIVER AUTENTICADO)
+  // 1. TELA DE LOGIN UNIFICADA (RESPONSIVA, BONITA NO CELULAR E NO PC)
   // =========================================================================
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-[#0B1120] flex flex-col justify-between p-4 sm:p-6">
-        {/* Cabeçalho Minimalista da Tela de Login */}
+      <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8 selection:bg-indigo-500 selection:text-white">
+        {/* Cabeçalho da Tela de Login */}
         <div className="max-w-md w-full mx-auto flex items-center justify-between py-2">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/20">
               <ShieldCheck className="w-5 h-5 text-white" />
             </div>
-            <span className="font-black text-white text-lg tracking-wider">ROTALOG</span>
+            <div>
+              <span className="font-black text-white text-lg tracking-wider block">ROTALOG</span>
+              <span className="text-[10px] text-slate-400 font-medium">Gestão de Frotas & Ponto CLT</span>
+            </div>
           </div>
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-            Acesso Corporativo
+          <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
+            Acesso Único
           </span>
         </div>
 
-        {/* Card Central de Login */}
-        <div className="max-w-md w-full mx-auto bg-[#1E293B] border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl">
+        {/* Card Central de Login com Efeito Moderno */}
+        <div className="max-w-md w-full mx-auto my-6 bg-[#0F172A] border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500" />
+
           <div className="text-center mb-6">
-            <h1 className="text-2xl font-black text-white mb-1">Acesso ao Sistema</h1>
+            <h1 className="text-2xl font-black text-white mb-1.5 tracking-tight">Portal de Acesso</h1>
             <p className="text-xs text-slate-400">
-              Digite a Base da sua empresa, seu CPF e a senha fornecida pelo gestor.
+              O sistema detecta sua hierarquia automaticamente pelo CPF.
             </p>
           </div>
 
           {loginError && (
-            <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-start gap-2">
+            <div className="mb-5 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-xs text-rose-300 flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
-              <span>{loginError}</span>
+              <span className="leading-relaxed">{loginError}</span>
             </div>
           )}
 
           <form onSubmit={(e) => handleLogin(e)} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Empresa / Base Operacional</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Ex: MK Seguranca"
-                  value={loginCompany}
-                  onChange={(e) => setLoginCompany(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">CPF do Colaborador</label>
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+                Empresa / Base Operacional
+              </label>
               <input
                 type="text"
-                placeholder="Ex: 000.111.222-33"
-                value={loginCpf}
-                onChange={(e) => setLoginCpf(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
+                placeholder="Ex: MK Seguranca"
+                value={loginCompany}
+                onChange={(e) => setLoginCompany(e.target.value)}
+                className="w-full px-4 py-2.5 bg-[#070B14] border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Senha de Acesso</label>
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
+                CPF do Usuário (Identificador)
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: 000.111.222-33"
+                value={loginCpf}
+                onChange={(e) => setLoginCpf(e.target.value)}
+                className="w-full px-4 py-2.5 bg-[#070B14] border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 font-mono transition-all"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-purple-400" />
+                Senha de Acesso
+              </label>
               <input
                 type="password"
-                placeholder="Digite sua senha"
+                placeholder="Digite sua senha cadastrada"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#0B1120] border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500"
+                className="w-full px-4 py-2.5 bg-[#070B14] border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 transition-all"
               />
               <p className="text-[11px] text-slate-500 mt-1">
-                A senha padrão inicial é o próprio CPF cadastrado pelo gestor.
+                A senha padrão do funcionário é o próprio CPF cadastrado pelo gestor.
               </p>
             </div>
 
             <button
               type="submit"
               disabled={loginLoading}
-              className="w-full py-3 bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-600/30 text-sm flex items-center justify-center gap-2"
+              className="w-full py-3.5 mt-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-blue-600/25 text-sm flex items-center justify-center gap-2 cursor-pointer"
             >
-              {loginLoading ? 'Validando Acesso...' : 'Entrar no Sistema'}
+              {loginLoading ? 'Identificando Hierarquia...' : 'Acessar Meu Painel'}
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
-          {/* Atalhos Rápidos para Demonstração em Sala de Aula */}
+          {/* Atalhos Rápidos para Demonstração em Sala (Perfeitos para Apresentação) */}
           <div className="mt-6 pt-5 border-t border-slate-800">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2.5 text-center">
-              Acesso Rápido para Apresentação
+            <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2.5 text-center flex items-center justify-center gap-1.5">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              Atalhos de Apresentação (3 Níveis de Acesso)
             </p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => handleLogin(undefined, '000.111.222-33', 'admin123', 'MK Seguranca')}
-                className="p-2 bg-slate-900 hover:bg-slate-800 border border-purple-500/30 rounded-lg text-left transition-all"
+                className="p-2.5 bg-[#070B14] hover:bg-slate-900 border border-purple-500/30 hover:border-purple-500/60 rounded-xl text-left transition-all group"
               >
-                <div className="text-[10px] font-bold text-purple-400">👑 Admin</div>
-                <div className="text-[11px] text-slate-200 truncate">Admin MK</div>
+                <div className="text-[10px] font-extrabold text-purple-400 group-hover:text-purple-300">👑 Master</div>
+                <div className="text-xs font-bold text-white truncate">Admin Geral</div>
+                <div className="text-[10px] text-slate-500">Cadastra tudo</div>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleLogin(undefined, '333.444.555-66', '333.444.555-66', 'MK Seguranca')}
-                className="p-2 bg-slate-900 hover:bg-slate-800 border border-blue-500/30 rounded-lg text-left transition-all"
+                className="p-2.5 bg-[#070B14] hover:bg-slate-900 border border-blue-500/30 hover:border-blue-500/60 rounded-xl text-left transition-all group"
               >
-                <div className="text-[10px] font-bold text-blue-400">👔 Gestor</div>
-                <div className="text-[11px] text-slate-200 truncate">Roberto S.</div>
+                <div className="text-[10px] font-extrabold text-blue-400 group-hover:text-blue-300">👔 Controle</div>
+                <div className="text-xs font-bold text-white truncate">Roberto (Gestor)</div>
+                <div className="text-[10px] text-slate-500">Frota & Equipe</div>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleLogin(undefined, '111.222.333-44', '111.222.333-44', 'MK Seguranca')}
-                className="p-2 bg-slate-900 hover:bg-slate-800 border border-emerald-500/30 rounded-lg text-left transition-all"
+                className="p-2.5 bg-[#070B14] hover:bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 rounded-xl text-left transition-all group"
               >
-                <div className="text-[10px] font-bold text-emerald-400">🚗 Motorista</div>
-                <div className="text-[11px] text-slate-200 truncate">Carlos S.</div>
+                <div className="text-[10px] font-extrabold text-emerald-400 group-hover:text-emerald-300">🚗 Colaborador</div>
+                <div className="text-xs font-bold text-white truncate">Carlos Silva</div>
+                <div className="text-[10px] text-slate-500">Suas viagens</div>
               </button>
             </div>
           </div>
         </div>
 
         {/* Rodapé: Link Exclusivo do Proprietário (Software House) */}
-        <div className="max-w-md w-full mx-auto text-center py-4">
+        <div className="max-w-md w-full mx-auto text-center py-2">
           <Link
             href="/master"
-            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-400 transition-colors py-1 px-3 rounded-full hover:bg-indigo-950/30 border border-transparent hover:border-indigo-900/40"
+            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-400 transition-colors py-1.5 px-3 rounded-full hover:bg-indigo-950/30 border border-transparent hover:border-indigo-900/40"
           >
-            <Lock className="w-3 h-3" />
-            <span>Portal do Mantenedor (Cadastrar Nova Empresa Cliente)</span>
+            <Lock className="w-3.5 h-3.5" />
+            <span>Portal Master MEU (Cadastrar Nova Empresa Cliente)</span>
           </Link>
         </div>
       </div>
@@ -311,14 +338,17 @@ export default function DashboardPage() {
   }
 
   // =========================================================================
-  // 2. PAINEL DO MOTORISTA (SE O USUÁRIO LOGADO FOR "DRIVER")
+  // 2. PAINEL DO COLABORADOR / MOTORISTA (ACESSO APENAS ÀS SUAS INFORMAÇÕES)
   // =========================================================================
-  if (currentUser.role === 'DRIVER') {
+  if (isDriver) {
     const driverTrips = trips.filter((t) => t.driverId === currentUser.id);
     const driverPunches = punches.filter((p) => p.userId === currentUser.id);
 
+    const totalKm = driverTrips.reduce((acc, t) => acc + (t.totalDistanceKm || 0), 0);
+    const totalLunch = driverTrips.reduce((acc, t) => acc + (t.totalLunchMinutes || 0), 0);
+
     return (
-      <div className="min-h-screen flex flex-col bg-[#0B1120]">
+      <div className="min-h-screen flex flex-col bg-[#070B14] text-slate-100">
         <Header
           onOpenNewVehicle={() => {}}
           onOpenNewUser={() => {}}
@@ -331,51 +361,92 @@ export default function DashboardPage() {
           onLogout={handleLogout}
         />
 
-        <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-6">
-          {/* Card de Boas-vindas do Motorista */}
-          <div className="bg-[#1E293B] border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+          {/* Card de Boas-vindas Personalizado */}
+          <div className="bg-[#0F172A] border border-slate-800 rounded-3xl p-6 sm:p-7 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-500" />
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  🚗 Perfil: Motorista Operacional
+              <div className="flex items-center gap-2 mb-2">
+                <span className="px-3 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  🚗 Perfil: Colaborador Operacional
                 </span>
                 <span className="text-xs text-slate-400 font-mono">CPF: {currentUser.cpf}</span>
               </div>
-              <h1 className="text-xl font-bold text-white">Olá, {currentUser.name}!</h1>
+              <h1 className="text-2xl font-black text-white">Olá, {currentUser.name}!</h1>
               <p className="text-xs text-slate-400 mt-1">
-                Empresa Vinculada: <strong className="text-slate-200">{currentUser.tenantName}</strong>
+                Base Operacional: <strong className="text-emerald-400 font-semibold">{currentUser.tenantName}</strong> • Seus dados privativos
               </p>
             </div>
 
-            {/* Aviso do App Mobile */}
-            <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl max-w-md">
+            {/* Banner de Operação Mobile */}
+            <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl max-w-sm w-full">
               <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold mb-1">
                 <Smartphone className="w-4 h-4" />
-                Operação em Trânsito (App Mobile)
+                Operação em Rota (App Mobile)
               </div>
-              <p className="text-xs text-emerald-300 leading-relaxed">
-                Para iniciar viagens, preencher vistoria de saída/devolução e bater ponto mesmo sem sinal de internet, utilize o <strong>App Mobile ROTALOG</strong> no seu celular via Expo Go.
+              <p className="text-xs text-emerald-300/90 leading-relaxed">
+                Para iniciar viagens com vistoria de pneus e combustível e bater ponto sem internet, abra o app <strong>ROTALOG</strong> no celular pelo Expo Go.
               </p>
             </div>
           </div>
 
-          {/* Histórico Privativo do Motorista */}
-          <div className="bg-[#1E293B] border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <h2 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-400" />
-              Suas Viagens e Rotas ({driverTrips.length})
-            </h2>
+          {/* Métricas Pessoais do Colaborador */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-[#0F172A] border border-slate-800 p-4 rounded-2xl">
+              <div className="flex items-center gap-2 text-blue-400 text-xs font-bold mb-1">
+                <Car className="w-4 h-4" />
+                Viagens Feitas
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-white">{driverTrips.length}</div>
+            </div>
+
+            <div className="bg-[#0F172A] border border-slate-800 p-4 rounded-2xl">
+              <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold mb-1">
+                <Gauge className="w-4 h-4" />
+                Km Percorrido
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-white">{totalKm} Km</div>
+            </div>
+
+            <div className="bg-[#0F172A] border border-slate-800 p-4 rounded-2xl">
+              <div className="flex items-center gap-2 text-amber-400 text-xs font-bold mb-1">
+                <Utensils className="w-4 h-4" />
+                Pausas de Almoço
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-white">{totalLunch} min</div>
+            </div>
+
+            <div className="bg-[#0F172A] border border-slate-800 p-4 rounded-2xl">
+              <div className="flex items-center gap-2 text-purple-400 text-xs font-bold mb-1">
+                <Clock className="w-4 h-4" />
+                Pontos CLT Hoje
+              </div>
+              <div className="text-xl sm:text-2xl font-black text-white">{driverPunches.length}</div>
+            </div>
+          </div>
+
+          {/* Histórico Privativo de Viagens */}
+          <div className="bg-[#0F172A] border border-slate-800 rounded-3xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-400" />
+                <h2 className="text-base font-bold text-white">Suas Viagens e Rotas Pessoais ({driverTrips.length})</h2>
+              </div>
+              <span className="text-xs text-slate-400">Acesso Restrito ao Condutor</span>
+            </div>
 
             {driverTrips.length === 0 ? (
-              <p className="text-xs text-slate-400 py-6 text-center">Nenhuma rota registrada no seu histórico ainda.</p>
+              <p className="text-xs text-slate-500 py-8 text-center">Você ainda não realizou nenhuma viagem com as viaturas da base.</p>
             ) : (
               <div className="space-y-3">
                 {driverTrips.map((t) => (
-                  <div key={t.id} className="p-4 bg-[#0B1120] border border-slate-800 rounded-xl flex items-center justify-between">
+                  <div key={t.id} className="p-4 bg-[#070B14] border border-slate-800/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm">{t.vehiclePlate}</span>
-                        <span className="text-xs text-slate-400">{t.vehicleModel}</span>
+                        <span className="font-mono font-bold text-white text-sm px-2 py-0.5 rounded bg-slate-800 border border-slate-700">
+                          {t.vehiclePlate}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-300">{t.vehicleModel}</span>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           t.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
                         }`}>
@@ -383,7 +454,7 @@ export default function DashboardPage() {
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-1">
-                        Início: {new Date(t.startTime).toLocaleTimeString('pt-BR')} • Almoço: {t.totalLunchMinutes} min • Distância: {t.totalDistanceKm} Km
+                        Início: {new Date(t.startTime).toLocaleTimeString('pt-BR')} • Almoço Total: {t.totalLunchMinutes} min • Distância: {t.totalDistanceKm} Km
                       </p>
                     </div>
                   </div>
@@ -397,11 +468,11 @@ export default function DashboardPage() {
   }
 
   // =========================================================================
-  // 3. PAINEL DO GESTOR E ADMINISTRADOR (ADMIN / FLEET_MANAGER)
+  // 3. PAINEL DO USUÁRIO MASTER (ADMIN) E DO USUÁRIO DE CONTROLE (FLEET_MANAGER)
   // =========================================================================
   return (
-    <div className="min-h-screen flex flex-col bg-[#0B1120]">
-      {/* Cabeçalho Executivo */}
+    <div className="min-h-screen flex flex-col bg-[#070B14] text-slate-100">
+      {/* Cabeçalho Executivo com Ações Contextuais */}
       <Header
         onOpenNewVehicle={() => setIsNewVehicleOpen(true)}
         onOpenNewUser={() => setIsNewUserOpen(true)}
@@ -415,32 +486,34 @@ export default function DashboardPage() {
       />
 
       {/* Conteúdo Central */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* Banner Informativo da Empresa */}
-        <div className="bg-gradient-to-r from-slate-900 via-blue-950/40 to-slate-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-              <ShieldCheck className="w-5 h-5" />
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:p-8 py-6 space-y-6">
+        {/* Banner Informativo com a Identificação do Perfil */}
+        <div className="bg-gradient-to-r from-[#0F172A] via-[#111C38] to-[#0F172A] border border-slate-800/80 rounded-3xl p-5 sm:p-6 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
+          <div className="flex items-center gap-3.5">
+            <div className={`p-3 rounded-2xl border ${isMaster ? 'bg-purple-500/10 border-purple-500/20 text-purple-400' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}>
+              <ShieldCheck className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm font-bold text-white">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-base sm:text-lg font-black text-white">
                   Base Operacional: <span className="text-emerald-400">{currentUser.tenantName}</span>
                 </h1>
-                <span className="text-[10px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded font-mono border border-slate-700">
-                  {currentUser.role === 'ADMIN' ? 'Perfil: Administrador Geral' : 'Perfil: Gestor de Frota'}
+                <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${isMaster ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>
+                  {isMaster ? '👑 Perfil: Usuário Master (Acesso Total)' : '👔 Perfil: Usuário de Controle da Frota'}
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
-                Monitoramento da frota, inspeção de viaturas e espelho de ponto eletrônico CLT.
+              <p className="text-xs text-slate-400 mt-0.5">
+                {isMaster
+                  ? 'Você pode cadastrar viaturas, definir senhas e cadastrar quem terá o controle da frota e os motoristas.'
+                  : 'Você tem controle em tempo real dos carros, relatórios de viagens, espelho de ponto CLT e pode cadastrar colaboradores.'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-800">
+            <div className="flex items-center gap-1.5 text-xs text-emerald-400 bg-[#070B14] px-3.5 py-2 rounded-xl border border-slate-800">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              <span>Sincronização em Tempo Real</span>
+              <span className="font-semibold">Sincronização Ativa</span>
             </div>
           </div>
         </div>
@@ -448,23 +521,23 @@ export default function DashboardPage() {
         {/* Métricas Principais da Frota */}
         <MetricCards stats={stats} />
 
-        {/* Navegação Superior por Abas */}
-        <div className="flex border-b border-slate-800 space-x-2 sm:space-x-4">
+        {/* Navegação por Abas Executivas */}
+        <div className="flex border-b border-slate-800 space-x-1 sm:space-x-4 overflow-x-auto pb-1">
           <button
             onClick={() => setActiveTab('fleet')}
-            className={`flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-all ${
+            className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs sm:text-sm font-extrabold border-b-2 transition-all whitespace-nowrap ${
               activeTab === 'fleet'
                 ? 'border-blue-500 text-blue-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <Car className="w-4 h-4" />
-            <span>Monitoramento da Frota ({vehicles.length})</span>
+            <span>Registros dos Carros ({vehicles.length})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('trips')}
-            className={`flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-all ${
+            className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs sm:text-sm font-extrabold border-b-2 transition-all whitespace-nowrap ${
               activeTab === 'trips'
                 ? 'border-blue-500 text-blue-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -476,7 +549,7 @@ export default function DashboardPage() {
 
           <button
             onClick={() => setActiveTab('timeclock')}
-            className={`flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-all ${
+            className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs sm:text-sm font-extrabold border-b-2 transition-all whitespace-nowrap ${
               activeTab === 'timeclock'
                 ? 'border-blue-500 text-blue-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -486,20 +559,18 @@ export default function DashboardPage() {
             <span>Espelho de Ponto CLT ({punches.length})</span>
           </button>
 
-          {/* Aba de Usuários restrita ao ADMIN */}
-          {currentUser.role === 'ADMIN' && (
-            <button
-              onClick={() => setActiveTab('users')}
-              className={`flex items-center gap-2 py-3 px-4 text-xs sm:text-sm font-bold border-b-2 transition-all ${
-                activeTab === 'users'
-                  ? 'border-blue-500 text-blue-400'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              <span>Colaboradores & Senhas ({users.length})</span>
-            </button>
-          )}
+          {/* Ambos Master e Usuário de Controle podem acessar Colaboradores */}
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`flex items-center gap-2 py-3 px-3 sm:px-4 text-xs sm:text-sm font-extrabold border-b-2 transition-all whitespace-nowrap ${
+              activeTab === 'users'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            <span>Colaboradores & Hierarquia ({users.length})</span>
+          </button>
         </div>
 
         {/* Conteúdo Dinâmico das Abas */}
@@ -507,35 +578,37 @@ export default function DashboardPage() {
           {activeTab === 'fleet' && <FleetMonitor vehicles={vehicles} />}
           {activeTab === 'trips' && <TripReports trips={trips} />}
           {activeTab === 'timeclock' && <TimeClockMirror punches={punches} />}
-          {activeTab === 'users' && currentUser.role === 'ADMIN' && (
+          {activeTab === 'users' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-base font-bold text-white">Equipe de Colaboradores da Base</h3>
+                  <h3 className="text-base font-extrabold text-white">Equipe e Colaboradores da Base</h3>
                   <p className="text-xs text-slate-400">
-                    Definição de senhas com criptografia segura (bcrypt) e controle de permissões.
+                    {isMaster
+                      ? 'Você pode cadastrar usuários de controle da frota e motoristas, definindo senhas e cargos.'
+                      : 'Você pode cadastrar os colaboradores operacionais e consultar os acessos da base.'}
                   </p>
                 </div>
                 <button
                   onClick={() => setIsNewUserOpen(true)}
-                  className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2"
+                  className="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
                 >
                   <Users className="w-4 h-4" />
-                  <span>Cadastrar Novo Colaborador</span>
+                  <span>+ Cadastrar Colaborador</span>
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 {users.map((u) => {
                   const isAdmin = u.role === 'ADMIN';
                   const isManager = u.role === 'FLEET_MANAGER';
-                  const isDriver = u.role === 'DRIVER';
+                  const isDriverUser = u.role === 'DRIVER';
 
                   const badgeLabel = isAdmin
-                    ? '👑 Administrador'
+                    ? '👑 Usuário Master'
                     : isManager
-                    ? '👔 Gestor de Frota'
-                    : '🚗 Motorista';
+                    ? '👔 Controle da Frota'
+                    : '🚗 Colaborador';
 
                   const badgeClass = isAdmin
                     ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
@@ -546,30 +619,30 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={u.id}
-                      className="bg-[#1E293B] rounded-xl p-4 border border-slate-800 flex flex-col justify-between"
+                      className="bg-[#0F172A] rounded-2xl p-4 sm:p-5 border border-slate-800 flex flex-col justify-between hover:border-slate-700 transition-all shadow-lg"
                     >
                       <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badgeClass}`}>
+                        <div className="flex items-center justify-between mb-2.5">
+                          <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${badgeClass}`}>
                             {badgeLabel}
                           </span>
                           <span className="text-[10px] text-slate-500 font-mono">
                             Base: {currentUser.tenantName}
                           </span>
                         </div>
-                        <h4 className="font-bold text-white text-sm">{u.name}</h4>
-                        <p className="text-xs text-slate-400 font-mono mt-0.5">CPF: {u.cpf}</p>
+                        <h4 className="font-extrabold text-white text-sm">{u.name}</h4>
+                        <p className="text-xs text-slate-400 font-mono mt-1">CPF: {u.cpf}</p>
                         <p className="text-[11px] text-slate-500">{u.email}</p>
                       </div>
 
-                      <div className="mt-3 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
-                        <span>Permissão:</span>
-                        <span className="font-medium text-slate-300">
-                          {isDriver
-                            ? 'Rotas próprias'
+                      <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
+                        <span>Acesso ao Sistema:</span>
+                        <span className="font-bold text-slate-200">
+                          {isDriverUser
+                            ? 'Somente viagens próprias'
                             : isManager
-                            ? 'Controle total da frota'
-                            : 'Gestão da base'}
+                            ? 'Controle de carros & equipe'
+                            : 'Gestão completa da base'}
                         </span>
                       </div>
                     </div>
@@ -588,7 +661,7 @@ export default function DashboardPage() {
         notifications={notifications}
       />
 
-      {/* Modais de Cadastro */}
+      {/* Modais de Cadastro de Veículo e Colaborador */}
       <NewVehicleModal
         isOpen={isNewVehicleOpen}
         onClose={() => setIsNewVehicleOpen(false)}

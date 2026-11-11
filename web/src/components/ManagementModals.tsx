@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Car, UserPlus, Save, Building2, ShieldCheck, KeyRound } from 'lucide-react';
 import { webApi } from '../services/api';
 
@@ -190,6 +190,12 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
   const [tenantId, setTenantId] = useState(tenants[0]?.id || '');
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (tenants.length > 0 && !tenantId) {
+      setTenantId(tenants[0].id);
+    }
+  }, [tenants, tenantId]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -347,6 +353,12 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [] }: NewUs
   const [password, setPassword] = useState('');
   const [tenantId, setTenantId] = useState(tenants[0]?.id || '');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (tenants.length > 0 && !tenantId) {
+      setTenantId(tenants[0].id);
+    }
+  }, [tenants, tenantId]);
 
   if (!isOpen) return null;
 

@@ -6,19 +6,13 @@ import {
   Building2,
   ShieldCheck,
   KeyRound,
-  UserPlus,
   CheckCircle,
-  ArrowLeft,
-  Lock,
-  Users,
-  Car,
-  ExternalLink,
-  RefreshCw,
-  Sparkles,
   Briefcase,
   Layers,
   ChevronRight,
-  Fingerprint
+  ExternalLink,
+  RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { webApi } from '../../services/api';
 
@@ -137,7 +131,6 @@ export default function MasterSuperAdminPage() {
         {/* Coluna Esquerda: Formulário de Cadastro da Empresa */}
         <div className="lg:col-span-5 flex flex-col">
           <div className="bg-[#0F172A] border border-slate-800/90 rounded-3xl p-6 sm:p-7 shadow-2xl relative overflow-hidden flex-1 flex flex-col justify-between">
-            {/* Gradiente decorativo superior */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500" />
 
             <div>
@@ -356,19 +349,6 @@ export default function MasterSuperAdminPage() {
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Cartão Didático de Arquitetura Multi-Tenant para a Apresentação */}
-          <div className="bg-gradient-to-br from-[#0F172A] to-[#131D38] border border-indigo-900/30 rounded-3xl p-6 shadow-xl">
-            <div className="flex items-center gap-2.5 mb-3 text-indigo-400">
-              <ShieldCheck className="w-5 h-5" />
-              <h4 className="text-sm font-bold text-white">Como Explicar Essa Tela para o Professor:</h4>
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              &quot;Professor, este é o <strong>Portal Master do Software ROTALOG</strong>. O nosso sistema é um <em>SaaS B2B Multi-tenant</em>. 
-              Por regra de negócio, <strong>o cliente final não pode criar sua própria empresa sozinho na tela inicial</strong>, pois isso violaria contratos comerciais e segurança da informação. 
-              A software house é quem cadastra a empresa contratante nesta tela à parte e gera a primeira conta de Administrador. A partir disso, o cliente recebe seu login e passa a operar com seus próprios veículos e motoristas de forma 100% isolada e segura.&quot;
-            </p>
           </div>
         </div>
       </main>

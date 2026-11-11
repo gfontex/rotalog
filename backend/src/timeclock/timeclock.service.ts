@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PunchClockDto, SyncTimeClocksDto } from './dto/timeclock.dto';
 
@@ -8,7 +8,11 @@ export class TimeclockService {
 
   async punch(dto: PunchClockDto) {
     const user = await this.prisma.user.findUnique({ where: { id: dto.userId } });
-    const tenantId = dto.tenantId || user?.tenantId || (await this.prisma.tenant.findFirst())?.id || '';
+    if (!user) {
+      throw new NotFoundException(`Colaborador com ID ${dto.userId} não encontrado.`);
+    }
+
+    const tenantId = dto.tenantId || user.tenantId;
     const timestamp = dto.timestamp ? new Date(dto.timestamp) : new Date();
 
     const record = await this.prisma.timeClocking.create({

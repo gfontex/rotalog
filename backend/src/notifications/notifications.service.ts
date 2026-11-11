@@ -15,17 +15,28 @@ export class NotificationsService {
       take: 60,
     });
 
-    return logs.map((l) => ({
-      id: l.id,
-      tenantId: l.tenantId,
-      userId: l.userId,
-      userName: l.user?.name || null,
-      action: l.action,
-      entityType: l.entityType,
-      entityId: l.entityId,
-      details: typeof l.details === 'string' ? JSON.parse(l.details) : l.details,
-      timestamp: l.timestamp,
-    }));
+    return logs.map((l) => {
+      let parsedDetails: any = l.details;
+      if (typeof l.details === 'string') {
+        try {
+          parsedDetails = JSON.parse(l.details);
+        } catch {
+          parsedDetails = { message: l.details };
+        }
+      }
+
+      return {
+        id: l.id,
+        tenantId: l.tenantId,
+        userId: l.userId,
+        userName: l.user?.name || null,
+        action: l.action,
+        entityType: l.entityType,
+        entityId: l.entityId,
+        details: parsedDetails,
+        timestamp: l.timestamp,
+      };
+    });
   }
 
   async getDashboardStats(tenantId?: string) {
