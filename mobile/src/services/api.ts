@@ -1,18 +1,48 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-const DEFAULT_HOST = Platform.OS === 'android' ? 'http://10.0.2.2:3001' : 'http://localhost:3001';
+function resolveDefaultHost(): string {
+  // 1. Tenta extrair automaticamente o IP da máquina a partir da conexão do Expo Go
+  try {
+    const hostUri = Constants.expoConfig?.hostUri;
+    if (hostUri) {
+      const ip = hostUri.split(':')[0];
+      if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+        return `http://${ip}:3001`;
+      }
+    }
+  } catch (_) {}
 
-export let BASE_URL = DEFAULT_HOST;
+  // 2. IP atual da máquina na rede local
+  const LOCAL_MACHINE_IP = '192.168.99.111';
+
+  // 3. Fallbacks por plataforma
+  if (Platform.OS === 'web') {
+    return 'http://localhost:3001';
+  }
+
+  return `http://${LOCAL_MACHINE_IP}:3001`;
+}
+
+export let BASE_URL = resolveDefaultHost();
 
 export function setCustomApiUrl(url: string) {
-  BASE_URL = url.trim();
+  let cleaned = url.trim();
+  if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+    cleaned = `http://${cleaned}`;
+  }
+  // Remove barra final se houver
+  if (cleaned.endsWith('/')) {
+    cleaned = cleaned.slice(0, -1);
+  }
+  BASE_URL = cleaned;
 }
 
 async function request(endpoint: string, options: RequestInit = {}) {
   const url = `${BASE_URL}${endpoint}`;
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const res = await fetch(url, {
       ...options,
@@ -32,6 +62,9 @@ async function request(endpoint: string, options: RequestInit = {}) {
 
     return await res.json();
   } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error(`Tempo esgotado ao conectar no servidor (${BASE_URL}). Verifique se o backend está rodando e se o IP está correto.`);
+    }
     throw err;
   }
 }
