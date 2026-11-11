@@ -24,6 +24,15 @@ async function fetcher(endpoint: string, options: RequestInit = {}) {
 }
 
 export const webApi = {
+  // Autenticação
+  login: (data: { company: string; cpf: string; password?: string }) =>
+    fetcher('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  getCompanies: () => fetcher('/auth/companies'),
+  getQuickUsers: () => fetcher('/auth/quick-users'),
+
   // Estatísticas
   getStats: (tenantId?: string) => fetcher(`/notifications/stats${tenantId ? `?tenantId=${tenantId}` : ''}`),
 

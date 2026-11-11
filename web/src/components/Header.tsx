@@ -1,28 +1,35 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Bell, Car, UserPlus, RefreshCw, Radio, Building2 } from 'lucide-react';
+import { ShieldCheck, Bell, Car, UserPlus, RefreshCw, Radio, LogOut, User } from 'lucide-react';
 
 interface HeaderProps {
   onOpenNewVehicle: () => void;
   onOpenNewUser: () => void;
-  onOpenNewTenant: () => void;
   onToggleNotifications: () => void;
   notificationCount: number;
   onRefresh: () => void;
   isRefreshing: boolean;
   selectedTenantName?: string;
+  currentUser?: {
+    name: string;
+    cpf: string;
+    role: string;
+    tenantName?: string;
+  } | null;
+  onLogout?: () => void;
 }
 
 export function Header({
   onOpenNewVehicle,
   onOpenNewUser,
-  onOpenNewTenant,
   onToggleNotifications,
   notificationCount,
   onRefresh,
   isRefreshing,
   selectedTenantName = 'MK Seguranca',
+  currentUser,
+  onLogout,
 }: HeaderProps) {
   const [time, setTime] = useState<string>('');
 
@@ -35,6 +42,26 @@ export function Header({
     const interval = setInterval(update, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const getRoleLabel = (role?: string) => {
+    switch (role) {
+      case 'ADMIN':
+        return 'Administrador';
+      case 'FLEET_MANAGER':
+        return 'Gestor de Frota';
+      case 'DRIVER':
+        return 'Motorista Operacional';
+      default:
+        return 'Colaborador';
+    }
+  };
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'US';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
 
   return (
     <header className="bg-[#111827] border-b border-slate-800 sticky top-0 z-30 px-6 py-3.5 shadow-xl">
@@ -53,7 +80,7 @@ export function Header({
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              Base Atual: <span className="text-emerald-400 font-bold">{selectedTenantName}</span>
+              Base da Empresa: <span className="text-emerald-400 font-bold">{currentUser?.tenantName || selectedTenantName}</span>
             </p>
           </div>
         </div>
@@ -88,43 +115,51 @@ export function Header({
             )}
           </button>
 
-          {/* Botão: Cadastrar Nova Empresa / Base */}
-          <button
-            onClick={onOpenNewTenant}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/20"
-            title="Cadastrar nova empresa cliente (ex: MK Segurança)"
-          >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>+ Empresa / Base</span>
-          </button>
+          {/* Ações Restritas ao ADMIN da empresa */}
+          {currentUser?.role === 'ADMIN' && (
+            <>
+              {/* Cadastrar Veículo */}
+              <button
+                onClick={onOpenNewVehicle}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/20"
+                title="Cadastrar viatura na frota"
+              >
+                <Car className="w-3.5 h-3.5" />
+                <span>+ Veículo</span>
+              </button>
 
-          {/* Cadastrar Veículo */}
-          <button
-            onClick={onOpenNewVehicle}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/20"
-          >
-            <Car className="w-3.5 h-3.5" />
-            <span>+ Veículo</span>
-          </button>
+              {/* Cadastrar Colaborador */}
+              <button
+                onClick={onOpenNewUser}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20"
+                title="Cadastrar motorista ou gestor"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Colaborador</span>
+              </button>
+            </>
+          )}
 
-          {/* Cadastrar Colaborador */}
-          <button
-            onClick={onOpenNewUser}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>+ Colaborador</span>
-          </button>
-
-          {/* Perfil do Gestor */}
+          {/* Perfil do Usuário Logado */}
           <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
             <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-xs text-blue-400">
-              MK
+              {getInitials(currentUser?.name)}
             </div>
             <div className="hidden sm:block text-left">
-              <p className="text-xs font-bold text-slate-200">Admin MK Segurança</p>
-              <p className="text-[10px] text-slate-400">Gestor Geral</p>
+              <p className="text-xs font-bold text-slate-200">{currentUser?.name || 'Usuário'}</p>
+              <p className="text-[10px] text-emerald-400 font-semibold">{getRoleLabel(currentUser?.role)}</p>
             </div>
+
+            {/* Botão Sair */}
+            {onLogout && (
+              <button
+                onClick={onLogout}
+                className="p-1.5 ml-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                title="Sair do Sistema"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
