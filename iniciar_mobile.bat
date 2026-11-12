@@ -1,4 +1,5 @@
 @echo off
+setlocal enabledelayedexpansion
 title ROTALOG - App Mobile (React Native Expo)
 
 echo ============================================================
@@ -12,27 +13,37 @@ echo  [2] MODO WEB (Abrir o App Mobile direto no Navegador do PC)
 echo      Excelente para apresentar em sala se nao quiser usar o celular.
 echo.
 echo  [3] MODO LAN (Padrao de rede local)
-echo      Requer que celular e PC estejam exatamente na mesma rede Wi-Fi.
+echo      Requer que celular e PC estejam na mesma rede Wi-Fi.
 echo.
 echo ============================================================
+set MODO=1
 set /p MODO="Escolha o modo [1, 2 ou 3] e pressione ENTER (Padrao: 1): "
-
-if "%MODO%"=="" set MODO=1
 
 cd /d "%~dp0mobile"
 
-if "%MODO%"=="1" (
-    echo.
-    echo [INFO] Iniciando Expo com TUNNEL (Garante conexao no celular)...
-    call npx expo start --tunnel -c
-) else if "%MODO%"=="2" (
-    echo.
-    echo [INFO] Abrindo o App Mobile direto no navegador (Modo Web)...
-    call npx expo start --web
-) else (
-    echo.
-    echo [INFO] Iniciando Expo no modo LAN local...
-    call npx expo start -c
-)
+if "%MODO%"=="2" goto EXEC_WEB
+if "%MODO%"=="3" goto EXEC_LAN
 
+:EXEC_TUNNEL
+echo.
+echo [INFO] Iniciando Expo com TUNNEL (Modo seguro para celular)...
+echo [DICA] Aguarde alguns segundos enquanto o tunel e o QR Code sao gerados...
+call npx.cmd expo start --tunnel -c
+goto FIM
+
+:EXEC_WEB
+echo.
+echo [INFO] Abrindo o App Mobile no Navegador do PC (Modo Web)...
+call npx.cmd expo start --web
+goto FIM
+
+:EXEC_LAN
+echo.
+echo [INFO] Iniciando Expo no modo LAN local...
+call npx.cmd expo start -c
+goto FIM
+
+:FIM
+echo.
+echo [INFO] Processo finalizado.
 pause
