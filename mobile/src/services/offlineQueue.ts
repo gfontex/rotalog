@@ -39,8 +39,12 @@ export const offlineQueue = {
 
   // Retorna quantidade de batidas pendentes
   getPendingCount: async (): Promise<number> => {
-    const list = await offlineQueue.getAll();
-    return list.length;
+    try {
+      const list = await offlineQueue.getAll();
+      return Array.isArray(list) ? list.length : 0;
+    } catch {
+      return 0;
+    }
   },
 
   // Sincroniza a fila com o backend

@@ -69,7 +69,97 @@ interface VehicleUsage {
   };
 }
 
-export default function App() {
+// Formatadores de data e hora 100% compativeis com o motor JavaScript Hermes do Android
+function safeFormatTime(dateInput: any): string {
+  if (!dateInput) return '--:--';
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return '--:--';
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const s = String(d.getSeconds()).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
+function safeFormatShortTime(dateInput: any): string {
+  if (!dateInput) return '--:--';
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return '--:--';
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+function safeFormatFullDate(dateInput: any): string {
+  if (!dateInput) return '';
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  const days = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+  const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const dayName = days[d.getDay()];
+  const day = String(d.getDate()).padStart(2, '0');
+  const monthName = months[d.getMonth()];
+  const year = d.getFullYear();
+  return `${dayName}, ${day} de ${monthName} de ${year}`;
+}
+
+function safeFormatShortDate(dateInput: any): string {
+  if (!dateInput) return '';
+  const d = dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const dayName = days[d.getDay()];
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${dayName}, ${day}/${month}/${year}`;
+}
+
+// ErrorBoundary para capturar qualquer excecao de renderizacao sem fechar o app
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('ROTALOG Runtime Crash:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#070B14', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: '#1E293B', padding: 20, borderRadius: 16, width: '100%', borderWidth: 1, borderColor: '#EF4444' }}>
+            <Text style={{ color: '#EF4444', fontSize: 18, fontWeight: 'bold', marginBottom: 8 }}>
+              ⚠️ Recuperação de Falha
+            </Text>
+            <Text style={{ color: '#CBD5E1', fontSize: 12, marginBottom: 16, lineHeight: 18 }}>
+              {this.state.error?.message || 'Ocorreu um erro inesperado no aplicativo.'}
+            </Text>
+            <TouchableOpacity
+              style={{ backgroundColor: '#3B82F6', padding: 12, borderRadius: 10, alignItems: 'center' }}
+              onPress={() => this.setState({ hasError: false, error: null })}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 }}>Recarregar Aplicativo</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function MainApp() {
   // Estado de Autenticacao
   const [user, setUser] = useState<UserProfile | null>(null);
   const [companyInput, setCompanyInput] = useState('MK Seguranca');
@@ -425,7 +515,7 @@ export default function App() {
         isOffline: false,
       });
       setTodayPunches((prev) => [...prev, punch]);
-      setPunchFeedback(`✅ [${typeLabels[type]}] registrado às ${new Date().toLocaleTimeString('pt-BR')}!`);
+      setPunchFeedback(`✅ [${typeLabels[type]}] registrado às ${safeFormatTime(new Date())}!`);
       setTimeout(() => setPunchFeedback(null), 4000);
     } catch {
       await offlineQueue.enqueue({
@@ -900,10 +990,10 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.tabContent}>
           <View style={styles.clockCard}>
             <Text style={styles.clockDate}>
-              {currentTime.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+              {safeFormatFullDate(currentTime)}
             </Text>
             <Text style={styles.clockTime}>
-              {currentTime.toLocaleTimeString('pt-BR')}
+              {safeFormatTime(currentTime)}
             </Text>
             <View style={styles.cltTag}>
               <Ionicons name="document-text-outline" size={14} color="#10B981" />
@@ -978,7 +1068,7 @@ export default function App() {
                     </Text>
                   </View>
                   <Text style={styles.punchRecordTime}>
-                    {new Date(p.timestamp).toLocaleTimeString('pt-BR')}
+                    {safeFormatTime(p.timestamp)}
                   </Text>
                 </View>
               );
@@ -1029,7 +1119,7 @@ export default function App() {
                   <View style={styles.tripHeaderRow}>
                     <View>
                       <Text style={styles.tripDateTitle}>
-                        {startDt.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        {safeFormatShortDate(startDt)}
                       </Text>
                       <Text style={styles.tripPlate}>
                         {trip.vehicle?.plate} • {trip.vehicle?.brand} {trip.vehicle?.model}
@@ -1044,7 +1134,7 @@ export default function App() {
                   <View style={styles.tripTimeBox}>
                     <View style={styles.timeDetailCol}>
                       <Text style={styles.timeDetailLabel}>🟢 SAÍDA</Text>
-                      <Text style={styles.timeDetailVal}>{startDt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</Text>
+                      <Text style={styles.timeDetailVal}>{safeFormatShortTime(startDt)}</Text>
                       <Text style={styles.timeDetailKm}>Km: {trip.entryChecklist?.mileage || '-'}</Text>
                     </View>
 
@@ -1052,7 +1142,7 @@ export default function App() {
                       <Text style={styles.timeDetailLabel}>☕ ALMOÇO</Text>
                       <Text style={styles.timeDetailVal}>
                         {lunchStartDt && lunchEndDt
-                          ? `${lunchStartDt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} - ${lunchEndDt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                          ? `${safeFormatShortTime(lunchStartDt)} - ${safeFormatShortTime(lunchEndDt)}`
                           : trip.totalLunchMinutes > 0
                           ? `${trip.totalLunchMinutes} min`
                           : 'Sem Pausa'}
@@ -1063,7 +1153,7 @@ export default function App() {
                     <View style={styles.timeDetailCol}>
                       <Text style={styles.timeDetailLabel}>🏁 DEVOLUÇÃO</Text>
                       <Text style={styles.timeDetailVal}>
-                        {endDt ? endDt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : 'Em Aberto'}
+                        {endDt ? safeFormatShortTime(endDt) : 'Em Aberto'}
                       </Text>
                       <Text style={styles.timeDetailKm}>Km: {trip.exitChecklist?.mileage || '-'}</Text>
                     </View>
@@ -2142,3 +2232,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
+
+export default function App() {
+  return (
+    <RootErrorBoundary>
+      <MainApp />
+    </RootErrorBoundary>
+  );
+}
