@@ -79,6 +79,28 @@ export default function App() {
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [customServerUrl, setCustomServerUrl] = useState(BASE_URL);
   const [showServerConfig, setShowServerConfig] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'IDLE' | 'OK' | 'FAIL'>('IDLE');
+
+  const testServerConnection = async (targetUrl?: string) => {
+    const url = targetUrl || customServerUrl;
+    setTestingConnection(true);
+    try {
+      setCustomApiUrl(url);
+      await api.getVehicles();
+      setConnectionStatus('OK');
+      Alert.alert('✅ Conexão Estabelecida!', `Servidor respondendo com sucesso em:\n${url}`);
+      loadQuickUsers();
+    } catch (err: any) {
+      setConnectionStatus('FAIL');
+      Alert.alert(
+        '❌ Falha na Conexão',
+        `Não foi possível alcançar o servidor em:\n${url}\n\nDica: Se estiver usando celular físico, certifique-se de que o PC e o celular estão no mesmo Wi-Fi ou inicie o Expo com o MODO 1 (TUNNEL).`
+      );
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   // Navegacao por Abas
   const [activeTab, setActiveTab] = useState<'route' | 'timeclock' | 'history'>('route');
@@ -570,37 +592,98 @@ export default function App() {
             })}
           </View>
 
-          {/* Config Servidor */}
+          {/* Configuração de Conexão com o Servidor */}
           <TouchableOpacity
             style={styles.serverConfigToggle}
             onPress={() => setShowServerConfig(!showServerConfig)}
           >
-            <Ionicons name="settings-outline" size={14} color="#94A3B8" />
+            <Ionicons
+              name={connectionStatus === 'OK' ? 'checkmark-circle' : connectionStatus === 'FAIL' ? 'alert-circle' : 'settings-outline'}
+              size={15}
+              color={connectionStatus === 'OK' ? '#10B981' : connectionStatus === 'FAIL' ? '#EF4444' : '#94A3B8'}
+            />
             <Text style={styles.serverConfigToggleText}>
-              Configurar Servidor ({BASE_URL})
+              Servidor: {BASE_URL} {connectionStatus === 'OK' ? '🟢 Online' : ''}
             </Text>
           </TouchableOpacity>
 
           {showServerConfig && (
             <View style={styles.serverConfigBox}>
-              <Text style={styles.inputLabel}>Endpoint da API:</Text>
+              <Text style={styles.inputLabel}>Endereço da API Backend:</Text>
               <TextInput
                 style={styles.textInput}
                 value={customServerUrl}
                 onChangeText={setCustomServerUrl}
                 autoCapitalize="none"
+                placeholder="Ex: http://192.168.99.111:3001"
+                placeholderTextColor="#64748B"
               />
-              <TouchableOpacity
-                style={styles.saveServerBtn}
-                onPress={() => {
-                  setCustomApiUrl(customServerUrl);
-                  setShowServerConfig(false);
-                  loadQuickUsers();
-                  Alert.alert('Atualizado', `Endpoint: ${customServerUrl}`);
-                }}
-              >
-                <Text style={styles.saveServerBtnText}>Salvar Endpoint</Text>
-              </TouchableOpacity>
+
+              {/* Atalhos Rápidos de IP */}
+              <Text style={[styles.inputLabel, { marginTop: 8, fontSize: 11 }]}>Atalhos Rápidos de Rede:</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <TouchableOpacity
+                  style={styles.serverPresetBtn}
+                  onPress={() => {
+                    const u = 'http://192.168.99.111:3001';
+                    setCustomServerUrl(u);
+                    setCustomApiUrl(u);
+                    testServerConnection(u);
+                  }}
+                >
+                  <Text style={styles.serverPresetText}>🏠 Wi-Fi Local (192.168.99.111)</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.serverPresetBtn}
+                  onPress={() => {
+                    const u = 'http://localhost:3001';
+                    setCustomServerUrl(u);
+                    setCustomApiUrl(u);
+                    testServerConnection(u);
+                  }}
+                >
+                  <Text style={styles.serverPresetText}>🌐 Localhost (Web)</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.serverPresetBtn}
+                  onPress={() => {
+                    const u = 'http://10.0.2.2:3001';
+                    setCustomServerUrl(u);
+                    setCustomApiUrl(u);
+                    testServerConnection(u);
+                  }}
+                >
+                  <Text style={styles.serverPresetText}>📱 Emulador Android</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  style={[styles.saveServerBtn, { flex: 1, backgroundColor: '#059669' }]}
+                  disabled={testingConnection}
+                  onPress={() => testServerConnection()}
+                >
+                  {testingConnection ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.saveServerBtnText}>🔌 Testar Conexão</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.saveServerBtn, { flex: 1, backgroundColor: '#3B82F6' }]}
+                  onPress={() => {
+                    setCustomApiUrl(customServerUrl);
+                    setShowServerConfig(false);
+                    loadQuickUsers();
+                    Alert.alert('Salvo', `Servidor atualizado para:\n${customServerUrl}`);
+                  }}
+                >
+                  <Text style={styles.saveServerBtnText}>Salvar</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </ScrollView>
@@ -1393,6 +1476,19 @@ const styles = StyleSheet.create({
     marginTop: 10,
     borderWidth: 1,
     borderColor: '#334155',
+  },
+  serverPresetBtn: {
+    backgroundColor: '#0F172A',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  serverPresetText: {
+    color: '#CBD5E1',
+    fontSize: 10,
+    fontWeight: '600',
   },
   saveServerBtn: {
     backgroundColor: '#3B82F6',
