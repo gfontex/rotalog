@@ -247,6 +247,21 @@ export default function DashboardPage() {
     }
   };
 
+  const handlePunch = async (type: 'ENTRADA' | 'ALMOCO_SAIDA' | 'ALMOCO_RETORNO' | 'SAIDA') => {
+    if (!currentUser) return;
+    try {
+      await webApi.punchTimeClock({
+        userId: currentUser.id,
+        type,
+        tenantId: currentUser.tenantId,
+      });
+      loadAllData();
+      alert(`Ponto registrado com sucesso! Tipo: ${type}`);
+    } catch (err: any) {
+      alert('Erro ao registrar ponto: ' + (err.message || 'Erro inesperado.'));
+    }
+  };
+
   // =========================================================================
   // 1. TELA DE LOGIN UNIFICADA (RESPONSIVA NO CELULAR E NO PC)
   // =========================================================================
@@ -596,6 +611,87 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Registro de Ponto Eletrônico CLT (Batidas do Dia) */}
+          <div className="bg-[#0F172A] border border-slate-800 rounded-3xl p-6 shadow-2xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-extrabold text-white">Registro de Ponto Eletrônico CLT</h2>
+                  <p className="text-xs text-slate-400">Controle de jornada e intervalos em conformidade trabalhista</p>
+                </div>
+              </div>
+              <span className="text-xs font-mono text-purple-300 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20 self-start sm:self-auto">
+                {driverPunches.length} batidas registradas hoje
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <button
+                type="button"
+                onClick={() => handlePunch('ENTRADA')}
+                className="p-3.5 rounded-2xl bg-emerald-950/30 hover:bg-emerald-900/40 border border-emerald-500/30 hover:border-emerald-500/60 text-emerald-300 font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-emerald-950/20"
+              >
+                <span className="text-lg">🟢</span>
+                <span>Entrada Turno</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePunch('ALMOCO_SAIDA')}
+                className="p-3.5 rounded-2xl bg-amber-950/30 hover:bg-amber-900/40 border border-amber-500/30 hover:border-amber-500/60 text-amber-300 font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-amber-950/20"
+              >
+                <span className="text-lg">🥪</span>
+                <span>Saída Almoço</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePunch('ALMOCO_RETORNO')}
+                className="p-3.5 rounded-2xl bg-blue-950/30 hover:bg-blue-900/40 border border-blue-500/30 hover:border-blue-500/60 text-blue-300 font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-blue-950/20"
+              >
+                <span className="text-lg">☕</span>
+                <span>Retorno Almoço</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePunch('SAIDA')}
+                className="p-3.5 rounded-2xl bg-rose-950/30 hover:bg-rose-900/40 border border-rose-500/30 hover:border-rose-500/60 text-rose-300 font-bold text-xs flex flex-col items-center gap-1.5 transition-all cursor-pointer shadow-lg shadow-rose-950/20"
+              >
+                <span className="text-lg">🔴</span>
+                <span>Saída Turno</span>
+              </button>
+            </div>
+
+            {driverPunches.length > 0 && (
+              <div className="mt-4 pt-3.5 border-t border-slate-800/80">
+                <span className="text-[11px] font-extrabold uppercase text-slate-400 tracking-wider block mb-2">
+                  Histórico de Batidas de Hoje:
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {driverPunches.map((p) => {
+                    const timeStr = new Date(p.timestamp).toLocaleTimeString('pt-BR');
+                    const typeLabels: any = {
+                      ENTRADA: 'Entrada Turno',
+                      ALMOCO_SAIDA: 'Saída Almoço',
+                      ALMOCO_RETORNO: 'Retorno Almoço',
+                      SAIDA: 'Saída Turno',
+                    };
+                    return (
+                      <span key={p.id} className="text-xs font-mono px-3 py-1.5 rounded-xl bg-[#070B14] border border-slate-800 text-slate-300 flex items-center gap-1.5">
+                        <Clock className="w-3 h-3 text-purple-400" />
+                        <strong>{typeLabels[p.type] || p.type}</strong>: {timeStr}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Histórico Privativo de Viagens */}
           <div className="bg-[#0F172A] border border-slate-800 rounded-3xl p-6 shadow-2xl">
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
@@ -869,6 +965,7 @@ export default function DashboardPage() {
         onClose={() => setIsNewUserOpen(false)}
         onSuccess={loadAllData}
         tenants={[{ id: currentUser.tenantId, name: currentUser.tenantName }]}
+        currentUserRole={currentUser.role}
       />
 
       {/* Modais de Checklist e Devolução no PC */}

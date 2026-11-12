@@ -343,16 +343,24 @@ interface NewUserModalProps {
   onClose: () => void;
   onSuccess: () => void;
   tenants?: any[];
+  currentUserRole?: 'ADMIN' | 'FLEET_MANAGER' | 'DRIVER' | string;
 }
 
-export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [] }: NewUserModalProps) {
+export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], currentUserRole = 'ADMIN' }: NewUserModalProps) {
+  const isFleetManager = currentUserRole === 'FLEET_MANAGER';
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState('DRIVER');
+  const [role, setRole] = useState(isFleetManager ? 'DRIVER' : 'DRIVER');
   const [password, setPassword] = useState('');
   const [tenantId, setTenantId] = useState(tenants[0]?.id || '');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isFleetManager) {
+      setRole('DRIVER');
+    }
+  }, [isFleetManager]);
 
   useEffect(() => {
     if (tenants.length > 0 && !tenantId) {
@@ -462,20 +470,32 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [] }: NewUs
             />
           </div>
 
-          {/* Hierarquia em 3 Niveis */}
+          {/* Hierarquia Operacional / Perfil de Acesso */}
           <div>
             <label className="block text-xs font-semibold text-slate-400 mb-1">
               Hierarquia Operacional / Perfil de Acesso *
             </label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
-            >
-              <option value="DRIVER">🚗 Motorista Operacional (Acesso restrito às suas viagens)</option>
-              <option value="FLEET_MANAGER">👔 Gestor de Rota / Frota (Acesso a todos os veículos e checklists)</option>
-              <option value="ADMIN">👑 Administrador Geral (Gestão de carros, equipe e senhas)</option>
-            </select>
+            {isFleetManager ? (
+              <div className="p-3 bg-slate-900 border border-blue-500/30 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-blue-400">🚗 Motorista Operacional</span>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-mono">Restrito</span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  O perfil de <strong>Gestor de Frota</strong> tem permissão para cadastrar apenas motoristas. O cadastro de novos gestores e administradores é exclusivo do Dono da Empresa (Master).
+                </p>
+              </div>
+            ) : (
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
+              >
+                <option value="DRIVER">🚗 Motorista Operacional (Acesso restrito às suas viagens)</option>
+                <option value="FLEET_MANAGER">👔 Gestor de Rota / Frota (Controle da frota e cadastro de motoristas)</option>
+                <option value="ADMIN">👑 Administrador Geral / Dono (Gestão completa, frotas e equipe)</option>
+              </select>
+            )}
           </div>
 
           {/* Campo de Senha com Recomendacao */}

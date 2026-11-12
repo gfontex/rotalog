@@ -105,6 +105,17 @@ export const webApi = {
 
   // Ponto CLT
   getTimeClockReport: (tenantId?: string) => fetcher(`/timeclock/report${tenantId ? `?tenantId=${tenantId}` : ''}`),
+  punchTimeClock: (data: {
+    userId: string;
+    type: 'ENTRADA' | 'ALMOCO_SAIDA' | 'ALMOCO_RETORNO' | 'SAIDA';
+    latitude?: number;
+    longitude?: number;
+    tenantId?: string;
+  }) =>
+    fetcher('/timeclock/punch', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // Notificações e Auditoria
   getNotifications: (tenantId?: string) => fetcher(`/notifications${tenantId ? `?tenantId=${tenantId}` : ''}`),
