@@ -1,6 +1,6 @@
 'use client';
 
-// Resumo: Espelho de ponto CLT dos colaboradores e exportacao para Excel (.xlsx)
+// Espelho de ponto CLT dos funcionarios e exportacao Excel (.xlsx)
 
 import React, { useState } from 'react';
 import { Clock, Search, WifiOff, Wifi, Download } from 'lucide-react';

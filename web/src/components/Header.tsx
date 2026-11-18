@@ -1,6 +1,6 @@
 'use client';
 
-// Resumo: Cabecalho superior com identificacao do usuario e atalhos
+// Cabecalho do painel, identificacao do usuario e atalhos de cadastro
 
 import React, { useState, useEffect } from 'react';
 import { Bell, Car, UserPlus, RefreshCw, Radio, LogOut, Building2 } from 'lucide-react';

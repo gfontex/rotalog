@@ -1,3 +1,5 @@
+// Autenticacao de login (validacao de CPF, senha e identificacao de hierarquia Admin, Gestor e Motorista)
+
 import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';

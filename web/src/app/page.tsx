@@ -1,6 +1,6 @@
 'use client';
 
-// Resumo: Pagina principal do painel web - login, visao do motorista e visao da gestao
+// Painel web principal - login, operacao do motorista e gestao da frota
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
@@ -126,6 +126,7 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
+  // Autenticacao de login (identifica perfil Admin, Gestor ou Motorista)
   const handleLogin = async (
     e?: React.FormEvent,
     customCpf?: string,
@@ -284,6 +285,7 @@ export default function DashboardPage() {
     }
   };
 
+  // Alteracao de status de veiculos (disponivel ou oficina)
   const handleChangeVehicleStatus = async (
     vehicle: any,
     newStatus: 'AVAILABLE' | 'MAINTENANCE'

@@ -1,4 +1,4 @@
-// Resumo: Populacao inicial do banco de dados para apresentacao (empresa Teste Apresentação)
+// Populacao inicial do banco de dados (empresa Teste Apresentação, funcionarios, veiculos e historicos)
 
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';

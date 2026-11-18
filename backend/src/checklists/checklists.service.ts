@@ -1,3 +1,5 @@
+// Check list preenchimento, validacao de avarias e exportacao de relatorio Excel (.xlsx)
+
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateChecklistDto } from './dto/create-checklist.dto';

@@ -1,4 +1,4 @@
-// Resumo: Aplicativo mobile (Expo) - login, controle de rotas, check list e ponto CLT
+// Aplicativo mobile (Expo) - login, controle de rotas, check list, ponto CLT e cadastros
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -388,6 +388,7 @@ function MainApp() {
     }
   };
 
+  // Autenticacao de login (identifica perfil Admin, Gestor ou Motorista)
   const handleLogin = async (
     customCompany?: string,
     customCpf?: string,
@@ -428,6 +429,7 @@ function MainApp() {
     }
   };
 
+  // Cadastro e inclusao de veiculos na frota
   const handleCreateVehicle = async () => {
     if (!vehPlate.trim() || !vehBrand.trim() || !vehModel.trim()) {
       Alert.alert('Validação', 'Preencha Placa, Marca e Modelo do veículo.');
@@ -459,6 +461,7 @@ function MainApp() {
     }
   };
 
+  // Alteracao de status de veiculos (disponivel ou oficina)
   const handleToggleVehicleStatus = async (vehicle: Vehicle) => {
     if (vehicle.status === 'IN_USE') {
       Alert.alert(
@@ -482,6 +485,7 @@ function MainApp() {
     }
   };
 
+  // Cadastro e inclusao de funcionarios (Admin cadastra gestor/motorista; Gestor cadastra motorista)
   const handleCreateUser = async () => {
     if (!usrName.trim() || !usrCpf.trim()) {
       Alert.alert('Validação', 'Preencha Nome Completo e CPF do colaborador.');
@@ -557,6 +561,7 @@ function MainApp() {
     }
   };
 
+  // Check list preenchimento de saida e inicio de rota
   const openStartModal = (vehicle: Vehicle) => {
     if (vehicle.status !== 'AVAILABLE') {
       Alert.alert(
@@ -612,6 +617,7 @@ function MainApp() {
     }
   };
 
+  // Controle de pausa e retomada de almoco na rota
   const handlePauseLunch = async () => {
     if (!activeUsage) return;
     try {
@@ -640,6 +646,7 @@ function MainApp() {
     }
   };
 
+  // Check list preenchimento de devolucao e encerramento de rota
   const openFinishModal = () => {
     if (!activeUsage) return;
     const initialKm =
@@ -706,6 +713,7 @@ function MainApp() {
     }
   };
 
+  // Registro de ponto CLT (entrada, almoco e saida)
   const handlePunchClock = async (
     type: 'ENTRADA' | 'ALMOCO_SAIDA' | 'ALMOCO_RETORNO' | 'SAIDA'
   ) => {

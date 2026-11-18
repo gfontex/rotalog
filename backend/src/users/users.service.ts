@@ -1,3 +1,5 @@
+// Cadastro, inclusao e listagem de funcionarios (com regra de permissao para Admin e Gestor)
+
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';

@@ -1,13 +1,13 @@
 'use client';
 
-// Resumo: Modais de cadastro de empresas, veiculos e cadastro de funcionarios
+// Cadastro, inclusao e alteracao de empresas, veiculos e funcionarios
 
 import React, { useState, useEffect } from 'react';
 import { X, Car, UserPlus, Save, Building2, ShieldCheck, KeyRound, Info } from 'lucide-react';
 import { webApi } from '../services/api';
 import { UI_TOKENS } from '../theme';
 
-// Cadastro de empresa
+// Cadastro e inclusao de empresa
 interface NewTenantModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -172,7 +172,7 @@ export function NewTenantModal({ isOpen, onClose, onSuccess }: NewTenantModalPro
   );
 }
 
-// Cadastro de veiculos
+// Cadastro e inclusao de veiculos
 interface NewVehicleModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -353,7 +353,7 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
   );
 }
 
-// Cadastro de funcionarios
+// Cadastro e inclusao de funcionarios (definicao de cargo e senha)
 interface NewUserModalProps {
   isOpen: boolean;
   onClose: () => void;

@@ -1,3 +1,5 @@
+// Controle de rotas (inicio de viagem, pausa de almoco, retomada e devolucao de veiculo)
+
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChecklistsService } from '../checklists/checklists.service';

@@ -1,3 +1,5 @@
+// Conexao do aplicativo mobile com a API do backend (requisicoes HTTP)
+
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 

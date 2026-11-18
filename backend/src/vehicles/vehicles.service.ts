@@ -1,3 +1,5 @@
+// Cadastro, inclusao, listagem e alteracao de status de veiculos (disponivel, em uso e oficina)
+
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVehicleDto, UpdateVehicleStatusDto } from './dto/create-vehicle.dto';

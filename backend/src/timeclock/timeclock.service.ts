@@ -1,3 +1,5 @@
+// Registro de ponto CLT (entrada, almoco, saida) e exportacao de planilha Excel (.xlsx)
+
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PunchClockDto, SyncTimeClocksDto } from './dto/timeclock.dto';

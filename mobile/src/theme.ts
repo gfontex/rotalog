@@ -1,4 +1,4 @@
-// Resumo: Configuracao de cores, espacamentos e temas (modo escuro e modo claro)
+// Configuracao de cores, espacamentos e temas (modo escuro e modo claro)
 
 export type ThemeMode = 'dark' | 'light';
 

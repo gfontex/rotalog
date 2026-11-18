@@ -1,3 +1,5 @@
+// Conexao do painel web com a API do backend (requisicoes HTTP)
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 async function fetcher(endpoint: string, options: RequestInit = {}) {

@@ -1,6 +1,6 @@
 'use client';
 
-// Resumo: Relatorio de viagens, historico de check lists e exportacao Excel (.xlsx)
+// Relatorio de viagens, historico de check lists e exportacao Excel (.xlsx)
 
 import React, { useState } from 'react';
 import { Download, Search, FileText, CheckCircle2, Clock, Coffee, AlertTriangle } from 'lucide-react';

@@ -1,4 +1,4 @@
-// Resumo: Configuracao de temas (modo escuro e claro) e estilos padrao
+// Configuracao de temas (modo escuro e modo claro) e estilos dos componentes
 
 export type AppThemeId = 'rotalog-navy' | 'titanium-light';
 

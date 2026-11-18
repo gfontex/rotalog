@@ -1,6 +1,6 @@
 'use client';
 
-// Resumo: Check list preenchimento (vistoria de saida do veiculo)
+// Check list preenchimento de saida e liberacao de rota
 
 import React, { useState, useEffect } from 'react';
 import {

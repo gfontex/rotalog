@@ -1,6 +1,6 @@
 'use client';
 
-// Resumo: Listagem de veiculos da frota, filtros e controle de status
+// Listagem, busca e alteracao de status de veiculos da frota
 
 import React, { useState } from 'react';
 import {

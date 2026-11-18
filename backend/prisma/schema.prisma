@@ -1,5 +1,4 @@
-// ROTALOG - Prisma Schema com Persistencia em Disco (SQLite / PostgreSQL)
-// Gestao de Frotas e Tropas Operacionais com Checklist e Ponto CLT
+// Modelagem do banco de dados SQLite (tabelas de empresas, funcionarios, veiculos, checklists, rotas e ponto CLT)
 
 datasource db {
   provider = "sqlite"
