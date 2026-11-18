@@ -162,9 +162,10 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, E
 }
 
 const MOBILE_THEMES = {
-  navy: {
-    id: 'navy' as const,
-    label: 'Navy',
+  dark: {
+    id: 'dark' as const,
+    label: '🌙 Modo Escuro',
+    shortLabel: '🌙 Escuro',
     bg: '#040D21',
     card: '#0A1633',
     inputBg: '#061129',
@@ -174,45 +175,10 @@ const MOBILE_THEMES = {
     subtext: '#94A3B8',
     isLight: false,
   },
-  emerald: {
-    id: 'emerald' as const,
-    label: 'Obsidian',
-    bg: '#060B11',
-    card: '#0E1722',
-    inputBg: '#091018',
-    border: '#1F3549',
-    accent: '#10B981',
-    text: '#F8FAFC',
-    subtext: '#94A3B8',
-    isLight: false,
-  },
-  royal: {
-    id: 'royal' as const,
-    label: 'Royal',
-    bg: '#09071A',
-    card: '#13112E',
-    inputBg: '#0D0B21',
-    border: '#302B6E',
-    accent: '#8B5CF6',
-    text: '#F8FAFC',
-    subtext: '#A5B4FC',
-    isLight: false,
-  },
-  amber: {
-    id: 'amber' as const,
-    label: 'Express',
-    bg: '#0D0E12',
-    card: '#171922',
-    inputBg: '#101218',
-    border: '#363C52',
-    accent: '#F59E0B',
-    text: '#F8FAFC',
-    subtext: '#A1A1AA',
-    isLight: false,
-  },
   light: {
     id: 'light' as const,
-    label: 'Claro',
+    label: '☀️ Modo Claro',
+    shortLabel: '☀️ Claro',
     bg: '#F1F5F9',
     card: '#FFFFFF',
     inputBg: '#F8FAFC',
@@ -227,9 +193,10 @@ const MOBILE_THEMES = {
 type MobileThemeId = keyof typeof MOBILE_THEMES;
 
 function MainApp() {
-  // Aparência / Tema visual selecionável no app
-  const [appTheme, setAppTheme] = useState<MobileThemeId>('navy');
+  // Aparência / Tema visual selecionável no app (Modo Escuro ou Modo Claro)
+  const [appTheme, setAppTheme] = useState<MobileThemeId>('dark');
   const themeColors = MOBILE_THEMES[appTheme];
+  const styles = React.useMemo(() => createStyles(themeColors), [themeColors]);
 
   // Estado de Autenticacao Unica (perfil definido ao logar)
   const [user, setUser] = useState<UserProfile & { tenantId?: string } | null>(null);
@@ -793,7 +760,7 @@ function MainApp() {
             </View>
           </View>
 
-          {/* Seletor de Aparências (5 Temas) */}
+          {/* Seletor de Aparência (Modo Escuro / Modo Claro) */}
           <View style={styles.themePickerRow}>
             {(Object.values(MOBILE_THEMES)).map((t) => {
               const selected = appTheme === t.id;
@@ -809,38 +776,22 @@ function MainApp() {
                   ]}
                   onPress={() => setAppTheme(t.id)}
                 >
-                  <View style={[styles.themeDot, { backgroundColor: t.bg, borderColor: '#FFFFFF' }]} />
+                  <Ionicons
+                    name={t.isLight ? 'sunny' : 'moon'}
+                    size={14}
+                    color={selected ? '#FFFFFF' : themeColors.subtext}
+                  />
                   <Text
                     style={[
                       styles.themeChipText,
                       { color: selected ? '#FFFFFF' : themeColors.subtext },
                     ]}
                   >
-                    {t.label}
+                    {t.isLight ? 'Modo Claro' : 'Modo Escuro'}
                   </Text>
                 </TouchableOpacity>
               );
             })}
-          </View>
-
-          {/* Legenda dos 3 Tipos de Acesso Reconhecidos Automaticamente no Login */}
-          <View style={styles.loginTabsRow}>
-            {(
-              [
-                { key: 'ADMIN', label: '👑 Admin', color: '#8B5CF6' },
-                { key: 'FLEET_MANAGER', label: '👔 Gestor', color: '#3B82F6' },
-                { key: 'DRIVER', label: '🚗 Motorista', color: '#10B981' },
-              ] as const
-            ).map((badge) => (
-              <View
-                key={badge.key}
-                style={[styles.loginTabBtn, { backgroundColor: themeColors.card, borderColor: badge.color }]}
-              >
-                <Text style={[styles.loginTabText, { color: badge.color }]}>
-                  {badge.label}
-                </Text>
-              </View>
-            ))}
           </View>
 
           {/* Formulario Unico de Login */}
@@ -848,7 +799,7 @@ function MainApp() {
             <Text style={[styles.cardTitle, { color: themeColors.text }]}>Acesso ao Sistema</Text>
             <View style={[styles.permissionBox, { backgroundColor: themeColors.inputBg, borderColor: themeColors.border }]}>
               <Text style={[styles.permissionBoxText, { color: themeColors.subtext }]}>
-                Informe seu CPF e senha. O tipo de login (Admin, Gestor ou Motorista) e suas permissões são definidos automaticamente ao entrar.
+                Informe seu CPF e senha para entrar no painel.
               </Text>
             </View>
 
@@ -1111,22 +1062,20 @@ function MainApp() {
         </View>
 
         <View style={styles.topBarRight}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: 8 }}>
-            {(Object.values(MOBILE_THEMES)).map((t) => (
-              <TouchableOpacity
-                key={t.id}
-                onPress={() => setAppTheme(t.id)}
-                style={{
-                  width: 14,
-                  height: 14,
-                  borderRadius: 7,
-                  backgroundColor: t.accent,
-                  borderWidth: appTheme === t.id ? 2 : 1,
-                  borderColor: appTheme === t.id ? themeColors.text : 'rgba(255,255,255,0.35)',
-                }}
-              />
-            ))}
-          </View>
+          <TouchableOpacity
+            style={[styles.offlineChip, { backgroundColor: themeColors.inputBg, borderColor: themeColors.border }]}
+            onPress={() => setAppTheme(appTheme === 'dark' ? 'light' : 'dark')}
+          >
+            <Ionicons
+              name={themeColors.isLight ? 'sunny' : 'moon'}
+              size={13}
+              color={themeColors.accent}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={[styles.offlineChipText, { color: themeColors.text }]}>
+              {themeColors.isLight ? 'Claro' : 'Escuro'}
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.offlineChip, { backgroundColor: themeColors.inputBg, borderColor: themeColors.border }, isSimulatedOffline && styles.offlineChipActive]}
@@ -2087,10 +2036,11 @@ function MainApp() {
   );
 }
 
-const styles = StyleSheet.create({
+function createStyles(themeColors: (typeof MOBILE_THEMES)[MobileThemeId]) {
+  return StyleSheet.create({
   darkContainer: {
     flex: 1,
-    backgroundColor: '#040D21',
+    backgroundColor: themeColors.bg,
   },
   loginContent: {
     padding: 24,
@@ -2107,7 +2057,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: '#040D21',
     borderWidth: 1.5,
-    borderColor: '#1D9BF0',
+    borderColor: themeColors.accent,
     padding: 6,
     alignItems: 'center',
     justifyContent: 'center',
@@ -2134,24 +2084,26 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 14,
     borderWidth: 1,
+    backgroundColor: themeColors.card,
+    borderColor: themeColors.border,
   },
   pillarText: {
     fontSize: 10,
     fontWeight: '700',
+    color: themeColors.subtext,
   },
   themePickerRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
     marginBottom: 14,
   },
   themeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
   },
@@ -2162,14 +2114,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   themeChipText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
   },
   shieldIconContainer: {
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -2180,12 +2132,12 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: '900',
     fontStyle: 'italic',
-    color: '#F8FAFC',
+    color: themeColors.text,
     letterSpacing: 1.5,
   },
   brandSubtitle: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: themeColors.subtext,
     marginTop: 4,
     textAlign: 'center',
   },
@@ -2207,23 +2159,23 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   card: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     borderRadius: 16,
     padding: 18,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
     marginBottom: 16,
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#F8FAFC',
+    color: themeColors.text,
     marginBottom: 14,
   },
   inputLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: themeColors.subtext,
     marginBottom: 6,
   },
   inputTip: {
@@ -2234,22 +2186,22 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0B1120',
+    backgroundColor: themeColors.inputBg,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
     paddingHorizontal: 12,
     marginBottom: 12,
   },
   textInput: {
     flex: 1,
     height: 46,
-    color: '#F8FAFC',
+    color: themeColors.text,
     fontSize: 14,
   },
   primaryButton: {
     flexDirection: 'row',
-    backgroundColor: '#2563EB',
+    backgroundColor: themeColors.accent,
     height: 48,
     borderRadius: 10,
     alignItems: 'center',
@@ -2262,11 +2214,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   quickCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   quickHeader: {
     flexDirection: 'row',
@@ -2280,19 +2232,19 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   quickDesc: {
-    color: '#94A3B8',
+    color: themeColors.subtext,
     fontSize: 11,
     marginBottom: 12,
   },
   quickUserItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0B1120',
+    backgroundColor: themeColors.inputBg,
     padding: 10,
     borderRadius: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   avatarCircle: {
     width: 36,
@@ -2307,13 +2259,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   quickUserName: {
-    color: '#F8FAFC',
+    color: themeColors.text,
     fontWeight: '700',
     fontSize: 13,
   },
   quickUserSub: {
     fontSize: 10,
-    color: '#94A3B8',
+    color: themeColors.subtext,
   },
   serverConfigToggle: {
     flexDirection: 'row',
@@ -2322,34 +2274,34 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   serverConfigToggleText: {
-    color: '#94A3B8',
+    color: themeColors.subtext,
     fontSize: 11,
     marginLeft: 6,
     textDecorationLine: 'underline',
   },
   serverConfigBox: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     padding: 14,
     borderRadius: 12,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   serverPresetBtn: {
-    backgroundColor: '#0F172A',
+    backgroundColor: themeColors.inputBg,
     paddingVertical: 5,
     paddingHorizontal: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   serverPresetText: {
-    color: '#CBD5E1',
+    color: themeColors.subtext,
     fontSize: 10,
     fontWeight: '600',
   },
   saveServerBtn: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: themeColors.accent,
     paddingVertical: 8,
     borderRadius: 8,
     alignItems: 'center',
@@ -2368,9 +2320,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 18,
     paddingVertical: 12,
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: themeColors.border,
   },
   topBarLeft: {
     flex: 1,
@@ -2378,11 +2330,11 @@ const styles = StyleSheet.create({
   topBarName: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#F8FAFC',
+    color: themeColors.text,
   },
   topBarTenant: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: themeColors.subtext,
   },
   topBarRight: {
     flexDirection: 'row',
@@ -2391,13 +2343,13 @@ const styles = StyleSheet.create({
   offlineChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0B1120',
+    backgroundColor: themeColors.inputBg,
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: 14,
     marginRight: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   offlineChipActive: {
     borderColor: '#F59E0B',
@@ -2410,7 +2362,7 @@ const styles = StyleSheet.create({
   },
   offlineChipText: {
     fontSize: 11,
-    color: '#F8FAFC',
+    color: themeColors.text,
     fontWeight: '600',
   },
   logoutBtn: {
@@ -2438,14 +2390,14 @@ const styles = StyleSheet.create({
   sectionHeading: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#F8FAFC',
+    color: themeColors.text,
     marginBottom: 10,
     marginTop: 6,
   },
 
   // Rota Ativa
   activeRouteCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     borderRadius: 16,
     padding: 18,
     borderWidth: 1,
@@ -2475,27 +2427,27 @@ const styles = StyleSheet.create({
   routePlate: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#3B82F6',
+    color: themeColors.accent,
   },
   routeModel: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#F8FAFC',
+    color: themeColors.text,
     marginTop: 6,
   },
   timerDisplayBox: {
-    backgroundColor: '#0B1120',
+    backgroundColor: themeColors.inputBg,
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
     marginVertical: 14,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   timerLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: themeColors.subtext,
     letterSpacing: 1,
   },
   timerValue: {
@@ -2549,23 +2501,23 @@ const styles = StyleSheet.create({
 
   // Sem Rota
   noRouteHero: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     padding: 18,
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
     marginBottom: 16,
   },
   noRouteTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#F8FAFC',
+    color: themeColors.text,
     marginTop: 8,
   },
   noRouteSub: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: themeColors.subtext,
     textAlign: 'center',
     marginTop: 4,
     lineHeight: 16,
@@ -2573,17 +2525,17 @@ const styles = StyleSheet.create({
 
   // Cards de Veiculos
   vehicleCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
     marginBottom: 10,
   },
   vehicleCardDisabled: {
-    backgroundColor: '#131B2A',
-    borderColor: '#1E293B',
-    opacity: 0.65, // REGRA DO MOTORISTA: CINZA E APAGADO
+    backgroundColor: themeColors.isLight ? '#E2E8F0' : '#131B2A',
+    borderColor: themeColors.border,
+    opacity: 0.65,
   },
   vehicleCardHeader: {
     flexDirection: 'row',
@@ -2593,7 +2545,7 @@ const styles = StyleSheet.create({
   vehiclePlateBadge: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#3B82F6',
+    color: themeColors.accent,
   },
   availableTag: {
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -2613,7 +2565,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   inUseTagText: {
-    color: '#94A3B8',
+    color: themeColors.subtext,
     fontWeight: '700',
     fontSize: 10,
   },
@@ -2631,7 +2583,7 @@ const styles = StyleSheet.create({
   vehicleName: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#F8FAFC',
+    color: themeColors.text,
     marginTop: 4,
   },
   vehicleMetaRow: {
@@ -2642,13 +2594,13 @@ const styles = StyleSheet.create({
   },
   vehicleMeta: {
     fontSize: 11,
-    color: '#94A3B8',
+    color: themeColors.subtext,
   },
   startTripPrompt: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0B1120',
+    backgroundColor: themeColors.inputBg,
     marginTop: 10,
     paddingVertical: 8,
     paddingHorizontal: 10,
@@ -2657,12 +2609,12 @@ const styles = StyleSheet.create({
   startTripPromptText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#3B82F6',
+    color: themeColors.accent,
   },
   disabledTripPrompt: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0B1120',
+    backgroundColor: themeColors.inputBg,
     marginTop: 10,
     paddingVertical: 7,
     paddingHorizontal: 10,
@@ -2677,23 +2629,23 @@ const styles = StyleSheet.create({
 
   // Ponto CLT
   clockCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
     marginBottom: 16,
   },
   clockDate: {
     fontSize: 12,
-    color: '#94A3B8',
+    color: themeColors.subtext,
     textTransform: 'capitalize',
   },
   clockTime: {
     fontSize: 44,
     fontWeight: '900',
-    color: '#F8FAFC',
+    color: themeColors.text,
     marginVertical: 4,
     fontVariant: ['tabular-nums'],
   },
@@ -2752,33 +2704,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     padding: 14,
     borderRadius: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   punchRecordType: {
-    color: '#F8FAFC',
+    color: themeColors.text,
     fontWeight: '700',
     fontSize: 13,
   },
   punchRecordSub: {
-    color: '#94A3B8',
+    color: themeColors.subtext,
     fontSize: 10,
   },
   punchRecordTime: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#3B82F6',
+    color: themeColors.accent,
   },
 
   // Historico Restrito
   privacyNoticeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
@@ -2788,16 +2740,16 @@ const styles = StyleSheet.create({
   },
   privacyNoticeText: {
     flex: 1,
-    color: '#E2E8F0',
+    color: themeColors.text,
     fontSize: 11,
     lineHeight: 15,
   },
   tripHistoryCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
     marginBottom: 12,
   },
   tripHeaderRow: {
@@ -2808,12 +2760,12 @@ const styles = StyleSheet.create({
   tripDateTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#F8FAFC',
+    color: themeColors.text,
     textTransform: 'capitalize',
   },
   tripPlate: {
     fontSize: 12,
-    color: '#3B82F6',
+    color: themeColors.accent,
     fontWeight: '700',
     marginTop: 2,
   },
@@ -2830,12 +2782,12 @@ const styles = StyleSheet.create({
   },
   tripTimeBox: {
     flexDirection: 'row',
-    backgroundColor: '#0B1120',
+    backgroundColor: themeColors.inputBg,
     borderRadius: 10,
     padding: 10,
     marginVertical: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   timeDetailCol: {
     flex: 1,
@@ -2844,13 +2796,13 @@ const styles = StyleSheet.create({
   timeDetailLabel: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#94A3B8',
+    color: themeColors.subtext,
     letterSpacing: 0.5,
   },
   timeDetailVal: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#F8FAFC',
+    color: themeColors.text,
     marginTop: 2,
   },
   timeDetailKm: {
@@ -2859,7 +2811,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   observationRow: {
-    backgroundColor: '#131B2A',
+    backgroundColor: themeColors.inputBg,
     padding: 8,
     borderRadius: 6,
     marginTop: 6,
@@ -2867,21 +2819,23 @@ const styles = StyleSheet.create({
   obsLabel: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: themeColors.subtext,
   },
   obsText: {
     fontSize: 11,
-    color: '#E2E8F0',
+    color: themeColors.text,
     marginTop: 2,
   },
   emptyCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     padding: 18,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: themeColors.border,
     alignItems: 'center',
   },
   emptyText: {
-    color: '#94A3B8',
+    color: themeColors.subtext,
     fontSize: 12,
   },
 
@@ -2892,12 +2846,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -2908,30 +2862,30 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#F8FAFC',
+    color: themeColors.text,
   },
   modalSub: {
     fontSize: 12,
-    color: '#3B82F6',
+    color: themeColors.accent,
     marginTop: 2,
   },
   checklistItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0B1120',
+    backgroundColor: themeColors.inputBg,
     padding: 10,
     borderRadius: 8,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   checklistItemRowProblem: {
     borderColor: '#EF4444',
     backgroundColor: 'rgba(239, 68, 68, 0.08)',
   },
   checkItemText: {
-    color: '#F8FAFC',
+    color: themeColors.text,
     fontSize: 12,
     fontWeight: '600',
     flex: 1,
@@ -2974,10 +2928,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 64,
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#334155',
+    borderTopColor: themeColors.border,
     paddingBottom: 8,
   },
   navItem: {
@@ -2987,20 +2941,20 @@ const styles = StyleSheet.create({
   },
   navItemActive: {
     borderTopWidth: 2,
-    borderTopColor: '#3B82F6',
+    borderTopColor: themeColors.accent,
   },
   navText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: themeColors.subtext,
     marginTop: 3,
   },
   navTextActive: {
-    color: '#3B82F6',
+    color: themeColors.accent,
     fontWeight: '700',
   },
 
-  // Estilos das 3 Paginas de Login & Gestao
+  // Estilos Auxiliares de Gestao
   loginTabsRow: {
     flexDirection: 'row',
     gap: 8,
@@ -3010,26 +2964,26 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
     alignItems: 'center',
   },
   loginTabText: {
-    color: '#94A3B8',
+    color: themeColors.subtext,
     fontSize: 12,
     fontWeight: '800',
   },
   permissionBox: {
-    backgroundColor: '#0F172A',
+    backgroundColor: themeColors.inputBg,
     borderWidth: 1,
-    borderColor: '#3B82F6',
+    borderColor: themeColors.border,
     borderRadius: 10,
     padding: 10,
     marginBottom: 12,
   },
   permissionBoxText: {
-    color: '#CBD5E1',
+    color: themeColors.subtext,
     fontSize: 11,
     lineHeight: 16,
   },
@@ -3072,22 +3026,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   userMgmtCard: {
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     padding: 14,
     borderRadius: 12,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
     flexDirection: 'row',
     alignItems: 'center',
   },
   userMgmtName: {
-    color: '#F8FAFC',
+    color: themeColors.text,
     fontSize: 14,
     fontWeight: '700',
   },
   userMgmtMeta: {
-    color: '#94A3B8',
+    color: themeColors.subtext,
     fontSize: 11,
     marginTop: 3,
   },
@@ -3098,20 +3052,20 @@ const styles = StyleSheet.create({
   },
   reportKpiBox: {
     flex: 1,
-    backgroundColor: '#1E293B',
+    backgroundColor: themeColors.card,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
     alignItems: 'center',
   },
   reportKpiVal: {
-    color: '#F8FAFC',
+    color: themeColors.text,
     fontSize: 16,
     fontWeight: '900',
   },
   reportKpiLbl: {
-    color: '#94A3B8',
+    color: themeColors.subtext,
     fontSize: 10,
     fontWeight: '700',
     marginTop: 2,
@@ -3120,16 +3074,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: '#0F172A',
+    backgroundColor: themeColors.inputBg,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: themeColors.border,
   },
   roleOptionText: {
-    color: '#F8FAFC',
+    color: themeColors.text,
     fontSize: 12,
     fontWeight: '700',
   },
-});
+  });
+}
 
 export default function App() {
   return (

@@ -1,14 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Clock, ClipboardCheck, Car, Palette, Check } from 'lucide-react';
+import { Clock, ClipboardCheck, Car, Sun, Moon } from 'lucide-react';
 
-export type AppThemeId =
-  | 'rotalog-navy'
-  | 'obsidian-emerald'
-  | 'cyber-royal'
-  | 'sunset-amber'
-  | 'titanium-light';
+export type AppThemeId = 'rotalog-navy' | 'titanium-light';
 
 export interface AppThemeOption {
   id: AppThemeId;
@@ -24,48 +19,18 @@ export interface AppThemeOption {
 export const APP_THEMES: AppThemeOption[] = [
   {
     id: 'rotalog-navy',
-    name: 'RotaLog Original (Navy & Ciano)',
-    shortName: 'Navy',
-    badgeColor: '#0EA5E9',
+    name: 'Modo Escuro',
+    shortName: 'Modo Escuro',
+    badgeColor: '#1D9BF0',
     previewBg: '#040D21',
     previewCard: '#0A1633',
     previewAccent: '#1D9BF0',
     isLight: false,
   },
   {
-    id: 'obsidian-emerald',
-    name: 'Obsidian Tático (Esmeralda)',
-    shortName: 'Obsidian',
-    badgeColor: '#10B981',
-    previewBg: '#060B11',
-    previewCard: '#0E1722',
-    previewAccent: '#10B981',
-    isLight: false,
-  },
-  {
-    id: 'cyber-royal',
-    name: 'Royal Command (Safira & Violeta)',
-    shortName: 'Royal',
-    badgeColor: '#8B5CF6',
-    previewBg: '#09071A',
-    previewCard: '#13112E',
-    previewAccent: '#8B5CF6',
-    isLight: false,
-  },
-  {
-    id: 'sunset-amber',
-    name: 'Via Expressa (Grafite & Âmbar)',
-    shortName: 'Via Expressa',
-    badgeColor: '#F59E0B',
-    previewBg: '#0D0E12',
-    previewCard: '#171922',
-    previewAccent: '#F59E0B',
-    isLight: false,
-  },
-  {
     id: 'titanium-light',
-    name: 'Titanium Claro (Diurno Executivo)',
-    shortName: 'Claro',
+    name: 'Modo Claro',
+    shortName: 'Modo Claro',
     badgeColor: '#0284C7',
     previewBg: '#F1F5F9',
     previewCard: '#FFFFFF',
@@ -152,79 +117,66 @@ export function ThemeSwitcherBar({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <div
-        className="flex items-center gap-1.5 bg-[#070B14] border border-slate-800 rounded-xl px-2 py-1"
+        className="flex items-center gap-1 bg-[#070B14] border border-slate-800 rounded-xl p-1"
         role="group"
-        aria-label="Selecionar aparência do sistema"
+        aria-label="Selecionar tema claro ou escuro"
       >
-        <Palette className="w-3.5 h-3.5 text-sky-400 shrink-0 hidden sm:block" />
-        <div className="flex items-center gap-1">
-          {APP_THEMES.map((item) => {
-            const active = theme === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setTheme(item.id)}
-                title={item.name}
-                aria-label={`Aparência: ${item.name}`}
-                aria-pressed={active}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                  active
-                    ? 'keep-white ring-2 ring-sky-400 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-                style={{
-                  backgroundColor: active ? item.previewAccent : 'transparent',
-                }}
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full border border-white/40 shrink-0"
-                  style={{ backgroundColor: item.previewBg }}
-                />
-                <span className="hidden xl:inline">{item.shortName}</span>
-              </button>
-            );
-          })}
-        </div>
+        {APP_THEMES.map((item) => {
+          const active = theme === item.id;
+          const Icon = item.isLight ? Sun : Moon;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setTheme(item.id)}
+              title={item.name}
+              aria-label={item.name}
+              aria-pressed={active}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                active
+                  ? 'keep-white text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+              style={{
+                backgroundColor: active ? item.previewAccent : 'transparent',
+              }}
+            >
+              <Icon className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">{item.isLight ? 'Claro' : 'Escuro'}</span>
+            </button>
+          );
+        })}
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
-      <div className="flex items-center justify-center gap-1.5 mb-2">
-        <Palette className="w-3.5 h-3.5 text-sky-400" />
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-          Escolha a Aparência do Site
-        </span>
-      </div>
-      <div className="flex flex-wrap items-center justify-center gap-2">
+    <div className="flex items-center justify-center">
+      <div
+        className="inline-flex items-center gap-1.5 bg-[#0F172A] border border-slate-800 rounded-2xl p-1.5 shadow-lg"
+        role="group"
+        aria-label="Alternar entre Modo Escuro e Modo Claro"
+      >
         {APP_THEMES.map((item) => {
           const active = theme === item.id;
+          const Icon = item.isLight ? Sun : Moon;
           return (
             <button
               key={item.id}
               type="button"
               onClick={() => setTheme(item.id)}
               aria-pressed={active}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                 active
-                  ? 'border-sky-400 bg-sky-500/15 text-sky-300 shadow-lg shadow-sky-500/15 scale-[1.02]'
-                  : 'border-slate-800 bg-[#0F172A]/80 text-slate-300 hover:border-slate-600'
+                  ? 'keep-white text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
+              style={{
+                backgroundColor: active ? item.previewAccent : 'transparent',
+              }}
             >
-              <span className="flex items-center -space-x-1">
-                <span
-                  className="w-3.5 h-3.5 rounded-full border border-white/30"
-                  style={{ backgroundColor: item.previewBg }}
-                />
-                <span
-                  className="w-3.5 h-3.5 rounded-full border border-white/30"
-                  style={{ backgroundColor: item.previewAccent }}
-                />
-              </span>
-              <span>{item.shortName}</span>
-              {active && <Check className="w-3 h-3 text-sky-400" />}
+              <Icon className="w-4 h-4" />
+              <span>{item.name}</span>
             </button>
           );
         })}
@@ -264,7 +216,6 @@ export function RotaLogHeaderBrand() {
 export function RotaLogBrandHero() {
   return (
     <div className="flex flex-col items-center text-center">
-      {/* Glow radial azul elétrico da marca */}
       <div className="relative group">
         <div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-sky-500/30 via-blue-600/20 to-cyan-400/30 blur-xl opacity-80 group-hover:opacity-100 transition-opacity" />
         <div className="logo-navy-box relative w-52 sm:w-64 rounded-3xl bg-[#040D21] border border-sky-500/30 p-3 shadow-2xl shadow-sky-500/20 overflow-hidden">
@@ -276,7 +227,6 @@ export function RotaLogBrandHero() {
         </div>
       </div>
 
-      {/* Tipografia oficial e pilares */}
       <div className="mt-4 flex flex-col items-center">
         <div className="flex items-center gap-2.5">
           <span className="h-[1px] w-8 bg-gradient-to-r from-transparent to-sky-400/70" />

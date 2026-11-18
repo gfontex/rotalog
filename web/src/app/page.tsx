@@ -299,15 +299,9 @@ export default function DashboardPage() {
 
     return (
       <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8 selection:bg-sky-500 selection:text-white">
-        <div className="max-w-3xl w-full mx-auto flex flex-col gap-4 py-2">
-          <div className="flex items-center justify-between gap-3">
-            <RotaLogHeaderBrand />
-            <span className="text-[10px] font-extrabold uppercase px-3 py-1 rounded-full bg-[#0F172A] border border-slate-800 text-sky-400">
-              Login Único • 3 Perfis
-            </span>
-          </div>
-
-          <ThemeSwitcherBar />
+        <div className="max-w-lg w-full mx-auto flex items-center justify-between gap-3 py-2">
+          <RotaLogHeaderBrand />
+          <ThemeSwitcherBar compact />
         </div>
 
         <div className="max-w-lg w-full mx-auto my-5 bg-[#0F172A] border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
@@ -319,24 +313,8 @@ export default function DashboardPage() {
               Portal de Acesso
             </h1>
             <p className="text-xs text-slate-400 mt-1 text-center">
-              O perfil de acesso é definido automaticamente após o login pelo seu CPF e senha.
+              Entre com seu CPF e senha para acessar o painel.
             </p>
-          </div>
-
-          {/* Resumo dos 3 Tipos de Login */}
-          <div className="grid grid-cols-3 gap-2 mb-4 text-center">
-            <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/25">
-              <div className="text-[11px] font-extrabold text-purple-300">👑 Admin</div>
-              <div className="text-[10px] text-slate-400">Permissão total</div>
-            </div>
-            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/25">
-              <div className="text-[11px] font-extrabold text-blue-300">👔 Gestor</div>
-              <div className="text-[10px] text-slate-400">Frota & Motoristas</div>
-            </div>
-            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
-              <div className="text-[11px] font-extrabold text-emerald-300">🚗 Motorista</div>
-              <div className="text-[10px] text-slate-400">Rotas & Checklists</div>
-            </div>
           </div>
 
           {loginError && (

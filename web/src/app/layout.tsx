@@ -14,7 +14,7 @@ const themeInitScript = `
 (function() {
   try {
     var saved = localStorage.getItem('@rotalog:theme');
-    var allowed = ['rotalog-navy', 'obsidian-emerald', 'cyber-royal', 'sunset-amber', 'titanium-light'];
+    var allowed = ['rotalog-navy', 'titanium-light'];
     var theme = saved && allowed.indexOf(saved) !== -1 ? saved : 'rotalog-navy';
     document.documentElement.setAttribute('data-theme', theme);
     var isLight = theme === 'titanium-light';

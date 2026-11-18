@@ -16,45 +16,6 @@ html[data-theme='rotalog-navy'] {
   --text-muted: #64748B;
 }
 
-html[data-theme='obsidian-emerald'] {
-  color-scheme: dark;
-  --bg-main: #060B11;
-  --bg-card: #0E1722;
-  --bg-elevated: #142231;
-  --border-primary: #1F3549;
-  --brand-accent: #10B981;
-  --brand-glow: rgba(16, 185, 129, 0.24);
-  --text-primary: #F8FAFC;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-}
-
-html[data-theme='cyber-royal'] {
-  color-scheme: dark;
-  --bg-main: #09071A;
-  --bg-card: #13112E;
-  --bg-elevated: #1D1A45;
-  --border-primary: #302B6E;
-  --brand-accent: #8B5CF6;
-  --brand-glow: rgba(139, 92, 246, 0.26);
-  --text-primary: #F8FAFC;
-  --text-secondary: #A5B4FC;
-  --text-muted: #818CF8;
-}
-
-html[data-theme='sunset-amber'] {
-  color-scheme: dark;
-  --bg-main: #0D0E12;
-  --bg-card: #171922;
-  --bg-elevated: #212533;
-  --border-primary: #363C52;
-  --brand-accent: #F59E0B;
-  --brand-glow: rgba(245, 158, 11, 0.24);
-  --text-primary: #F8FAFC;
-  --text-secondary: #A1A1AA;
-  --text-muted: #71717A;
-}
-
 html[data-theme='titanium-light'] {
   color-scheme: light;
   --bg-main: #F1F5F9;
