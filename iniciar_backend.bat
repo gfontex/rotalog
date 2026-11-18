@@ -15,13 +15,19 @@ if not exist .env (
     )
 )
 
-if not exist node_modules (
+set NEED_INSTALL=0
+if not exist "node_modules\.bin\nest.cmd" set NEED_INSTALL=1
+if not exist "node_modules\.bin\prisma.cmd" set NEED_INSTALL=1
+
+if "%NEED_INSTALL%"=="1" (
     echo [INFO] Instalando dependencias do backend...
-    call npm install
+    call npm install --include=dev
 )
 
-echo [INFO] Gerando Prisma Client...
-call npx prisma generate
+if not exist "node_modules\.prisma\client\index.js" (
+    echo [INFO] Gerando Prisma Client local...
+    call .\node_modules\.bin\prisma.cmd generate
+)
 
 echo.
 echo [INFO] Iniciando servidor NestJS na porta 3001...

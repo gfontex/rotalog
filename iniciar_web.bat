@@ -8,9 +8,9 @@ echo.
 
 cd /d "%~dp0web"
 
-if not exist node_modules (
+if not exist "node_modules\.bin\next.cmd" (
     echo [INFO] Instalando dependencias do painel web...
-    call npm install
+    call npm install --include=dev
 )
 
 echo.

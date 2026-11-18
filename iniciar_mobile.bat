@@ -21,9 +21,9 @@ set /p MODO="Escolha o modo [1, 2 ou 3] e pressione ENTER (Padrao: 1): "
 
 cd /d "%~dp0mobile"
 
-if not exist node_modules (
+if not exist "node_modules\.bin\expo.cmd" (
     echo [INFO] Instalando dependencias do app mobile...
-    call npm install
+    call npm install --include=dev
 )
 
 if "%MODO%"=="2" goto EXEC_WEB
