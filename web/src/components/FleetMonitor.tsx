@@ -1,5 +1,7 @@
 'use client';
 
+// Resumo: Listagem de veiculos da frota, filtros e controle de status
+
 import React, { useState } from 'react';
 import {
   Car,

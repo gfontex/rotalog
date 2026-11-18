@@ -1,3 +1,5 @@
+// Resumo: Aplicativo mobile (Expo) - login, controle de rotas, check list e ponto CLT
+
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -251,7 +253,6 @@ function MainApp() {
   const [companyInput, setCompanyInput] = useState('Teste Apresentação');
   const [cpfInput, setCpfInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
-  const [quickUsers, setQuickUsers] = useState<any[]>([]);
   const [loadingAuth, setLoadingAuth] = useState(false);
   const [customServerUrl, setCustomServerUrl] = useState(BASE_URL);
   const [showServerConfig, setShowServerConfig] = useState(false);
@@ -269,7 +270,6 @@ function MainApp() {
         'Conexão Estabelecida',
         `Servidor respondendo com sucesso em:\n${url}`
       );
-      loadQuickUsers();
     } catch {
       setConnectionStatus('FAIL');
       Alert.alert(
@@ -343,7 +343,6 @@ function MainApp() {
   }, [activeUsage]);
 
   useEffect(() => {
-    loadQuickUsers();
     updateOfflineCount();
   }, []);
 
@@ -365,17 +364,6 @@ function MainApp() {
   const updateOfflineCount = async () => {
     const count = await offlineQueue.getPendingCount();
     setOfflinePendingCount(count);
-  };
-
-  const loadQuickUsers = async () => {
-    try {
-      const data = await api.getQuickUsers();
-      if (Array.isArray(data)) {
-        setQuickUsers(data);
-      }
-    } catch {
-      // Fallback
-    }
   };
 
   const loadUsersList = async () => {
@@ -529,7 +517,6 @@ function MainApp() {
       setUsrRole('DRIVER');
       setNewUserModalVisible(false);
       loadUsersList();
-      loadQuickUsers();
     } catch (err: any) {
       Alert.alert('Erro no cadastro', err.message || 'Não foi possível cadastrar.');
     }
@@ -791,12 +778,8 @@ function MainApp() {
       .padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // =========================================================================
-  // TELA ÚNICA DE LOGIN (ZERO EMOJIS • TOKENS CENTRALIZADOS)
-  // =========================================================================
+  // Tela de login
   if (!user) {
-    const allQuickUsers = Array.isArray(quickUsers) ? quickUsers : [];
-
     return (
       <SafeAreaView style={styles.darkContainer}>
         <StatusBar barStyle={themeColors.isLight ? 'dark-content' : 'light-content'} />
@@ -856,7 +839,7 @@ function MainApp() {
             </View>
           </View>
 
-          {/* Seletor de Aparência (Modo Escuro / Modo Claro) */}
+          {/* Seletor de tema (Modo Escuro / Modo Claro) */}
           <View style={styles.themePickerRow}>
             {Object.values(THEMES).map((t) => {
               const selected = appTheme === t.id;
@@ -900,7 +883,7 @@ function MainApp() {
             })}
           </View>
 
-          {/* Formulário Único de Login */}
+          {/* Formulario de acesso */}
           <View
             style={[
               styles.card,
@@ -908,11 +891,6 @@ function MainApp() {
             ]}
           >
             <Text style={styles.cardTitle}>Acesso ao Sistema</Text>
-            <View style={styles.permissionBox}>
-              <Text style={styles.permissionBoxText}>
-                Informe seu CPF e senha para entrar no painel.
-              </Text>
-            </View>
 
             <Text style={styles.inputLabel}>Empresa / Base Operacional *</Text>
             <View style={styles.inputRow}>
@@ -949,16 +927,7 @@ function MainApp() {
               />
             </View>
 
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-              }}
-            >
-              <Text style={styles.inputLabel}>Senha de Acesso *</Text>
-              <Text style={styles.inputTip}>Padrão fictícia: 123456</Text>
-            </View>
+            <Text style={styles.inputLabel}>Senha de Acesso *</Text>
             <View style={styles.inputRow}>
               <Ionicons
                 name="lock-closed-outline"
@@ -968,7 +937,7 @@ function MainApp() {
               />
               <TextInput
                 style={styles.textInput}
-                placeholder="Digite sua senha (ex: 123456)"
+                placeholder="Digite sua senha"
                 placeholderTextColor={themeColors.text.muted}
                 value={passwordInput}
                 onChangeText={setPasswordInput}
@@ -997,92 +966,7 @@ function MainApp() {
             </TouchableOpacity>
           </View>
 
-          {/* Atalhos Fictícios da Empresa Teste Apresentação */}
-          <View style={styles.quickCard}>
-            <View style={styles.quickHeader}>
-              <Ionicons
-                name="flash"
-                size={16}
-                color={themeColors.semantic.warning.main}
-              />
-              <Text style={styles.quickTitle}>
-                Acessos Fictícios • Teste Apresentação
-              </Text>
-            </View>
-            <Text style={styles.quickDesc}>
-              Toque em qualquer colaborador para entrar direto (o sistema identifica o perfil automaticamente):
-            </Text>
-
-            {allQuickUsers.map((u) => {
-              const roleSemantic =
-                u.role === 'ADMIN'
-                  ? themeColors.semantic.admin
-                  : u.role === 'FLEET_MANAGER'
-                  ? themeColors.semantic.info
-                  : themeColors.semantic.success;
-              const roleBadge =
-                u.role === 'ADMIN'
-                  ? 'Admin (Representante Legal)'
-                  : u.role === 'FLEET_MANAGER'
-                  ? 'Gestor de Frota'
-                  : 'Motorista';
-              const roleIcon =
-                u.role === 'ADMIN'
-                  ? 'shield-checkmark-outline'
-                  : u.role === 'FLEET_MANAGER'
-                  ? 'briefcase-outline'
-                  : 'car-sport-outline';
-              const userPassword = u.password || '123456';
-
-              return (
-                <TouchableOpacity
-                  key={u.id}
-                  style={styles.quickUserItem}
-                  onPress={() => {
-                    const comp = u.tenant?.name || 'Teste Apresentação';
-                    setCompanyInput(comp);
-                    setCpfInput(u.cpf);
-                    setPasswordInput(userPassword);
-                    handleLogin(comp, u.cpf, userPassword);
-                  }}
-                >
-                  <View
-                    style={[
-                      styles.avatarCircle,
-                      { backgroundColor: roleSemantic.main },
-                    ]}
-                  >
-                    <Ionicons
-                      name={roleIcon as any}
-                      size={16}
-                      color={themeColors.text.inverse}
-                    />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: SPACING.sm }}>
-                    <Text style={styles.quickUserName}>{u.name}</Text>
-                    <Text
-                      style={[
-                        styles.quickUserSub,
-                        { color: roleSemantic.main, fontWeight: '700' },
-                      ]}
-                    >
-                      {roleBadge}
-                    </Text>
-                    <Text style={styles.quickUserSub}>
-                      CPF: {u.cpf} • Senha: {userPassword}
-                    </Text>
-                  </View>
-                  <Ionicons
-                    name="arrow-forward-circle"
-                    size={22}
-                    color={themeColors.brand.primary}
-                  />
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Configuração de Conexão com o Servidor */}
+          {/* Configuracao de conexao com o servidor */}
           <TouchableOpacity
             style={styles.serverConfigToggle}
             onPress={() => setShowServerConfig(!showServerConfig)}
@@ -1216,7 +1100,6 @@ function MainApp() {
                   onPress={() => {
                     setCustomApiUrl(customServerUrl);
                     setShowServerConfig(false);
-                    loadQuickUsers();
                     Alert.alert(
                       'Salvo',
                       `Servidor atualizado para:\n${customServerUrl}`
@@ -1233,9 +1116,7 @@ function MainApp() {
     );
   }
 
-  // =========================================================================
-  // PAINEL LOGADO
-  // =========================================================================
+  // Painel principal e controle de rotas
   const isDriver = user.role === 'DRIVER';
 
   return (
@@ -1352,9 +1233,7 @@ function MainApp() {
         </TouchableOpacity>
       )}
 
-      {/* ===================================================================== */}
-      {/* ABA 1: ROTA & VEÍCULOS                                                */}
-      {/* ===================================================================== */}
+      {/* Controle de rotas e veiculos */}
       {activeTab === 'route' && (
         <ScrollView contentContainerStyle={styles.tabContent}>
           {activeUsage ? (
@@ -1659,9 +1538,7 @@ function MainApp() {
         </ScrollView>
       )}
 
-      {/* ===================================================================== */}
-      {/* ABA 2: PONTO ELETRÔNICO CLT                                           */}
-      {/* ===================================================================== */}
+      {/* Controle de ponto CLT */}
       {activeTab === 'timeclock' && (
         <ScrollView contentContainerStyle={styles.tabContent}>
           <View style={styles.clockCard}>
@@ -1857,9 +1734,7 @@ function MainApp() {
         </ScrollView>
       )}
 
-      {/* ===================================================================== */}
-      {/* ABA 3: CADASTRO DE EQUIPE / MOTORISTAS                                */}
-      {/* ===================================================================== */}
+      {/* Cadastro de funcionarios */}
       {activeTab === 'users' && !isDriver && (
         <ScrollView contentContainerStyle={styles.tabContent}>
           <View style={styles.noRouteHero}>
@@ -1958,9 +1833,7 @@ function MainApp() {
         </ScrollView>
       )}
 
-      {/* ===================================================================== */}
-      {/* ABA 4: HISTÓRICO & RELATÓRIOS                                         */}
-      {/* ===================================================================== */}
+      {/* Historico de viagens e relatorios */}
       {activeTab === 'history' && (
         <ScrollView contentContainerStyle={styles.tabContent}>
           {isDriver ? (
@@ -2209,9 +2082,7 @@ function MainApp() {
         </ScrollView>
       )}
 
-      {/* ===================================================================== */}
-      {/* MODAIS DE CHECKLIST (SAÍDA & DEVOLUÇÃO)                               */}
-      {/* ===================================================================== */}
+      {/* Check list preenchimento (saida e devolucao) */}
       <Modal visible={startModalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -2424,9 +2295,7 @@ function MainApp() {
         </View>
       </Modal>
 
-      {/* ===================================================================== */}
-      {/* MODAL DE GESTÃO: CADASTRAR NOVO VEÍCULO                               */}
-      {/* ===================================================================== */}
+      {/* Cadastro de veiculos */}
       <Modal
         visible={newVehicleModalVisible}
         animationType="slide"
@@ -2577,9 +2446,7 @@ function MainApp() {
         </View>
       </Modal>
 
-      {/* ===================================================================== */}
-      {/* MODAL DE GESTÃO: CADASTRAR COLABORADOR                                */}
-      {/* ===================================================================== */}
+      {/* Cadastro de funcionarios (modal) */}
       <Modal
         visible={newUserModalVisible}
         animationType="slide"
@@ -2858,6 +2725,7 @@ function MainApp() {
   );
 }
 
+// Estilos da interface
 function createStyles(themeColors: ThemeTokens) {
   return StyleSheet.create({
     darkContainer: {
@@ -3797,7 +3665,7 @@ function createStyles(themeColors: ThemeTokens) {
       fontWeight: '700',
     },
 
-    // Gestão
+    // Estilos dos modais e listagens
     permissionBox: {
       backgroundColor: themeColors.surfaces.input,
       borderWidth: 1,

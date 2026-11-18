@@ -1,7 +1,4 @@
-// ============================================================================
-// ROTALOG DESIGN SYSTEM — ENTERPRISE TOKENS (WEB / NEXT.JS)
-// Centraliza tokens semânticos de superfície, marca, tipografia e estados
-// ============================================================================
+// Resumo: Configuracao de temas (modo escuro e claro) e estilos padrao
 
 export type AppThemeId = 'rotalog-navy' | 'titanium-light';
 

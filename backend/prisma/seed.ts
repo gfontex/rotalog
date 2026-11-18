@@ -1,3 +1,5 @@
+// Resumo: Populacao inicial do banco de dados para apresentacao (empresa Teste Apresentação)
+
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 

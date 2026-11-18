@@ -1,5 +1,7 @@
 'use client';
 
+// Resumo: Componentes da logo RotaLog e seletor de tema claro/escuro
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, ClipboardCheck, Car, Sun, Moon } from 'lucide-react';
 import { APP_THEMES, AppThemeId, ASSETS } from '../theme';

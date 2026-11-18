@@ -1,5 +1,7 @@
 'use client';
 
+// Resumo: Pagina principal do painel web - login, visao do motorista e visao da gestao
+
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Header } from '../components/Header';
@@ -37,7 +39,6 @@ import {
   Utensils,
   Coffee,
   Briefcase,
-  Sparkles,
   Play,
   Pause,
   Flag,
@@ -295,61 +296,8 @@ export default function DashboardPage() {
     }
   };
 
-  // =========================================================================
-  // 1. TELA ÚNICA DE LOGIN (ZERO EMOJIS • TOKENS SEMÂNTICOS)
-  // =========================================================================
+  // Tela de login
   if (!currentUser) {
-    const sampleAccounts = [
-      {
-        name: 'Ricardo Almeida',
-        roleLabel: 'Admin',
-        icon: ShieldCheck,
-        badge: UI_TOKENS.badgeAdmin,
-        cpf: '111.111.111-11',
-        pass: '123456',
-      },
-      {
-        name: 'Roberto Mendes',
-        roleLabel: 'Gestor',
-        icon: Briefcase,
-        badge: UI_TOKENS.badgeInfo,
-        cpf: '222.222.222-22',
-        pass: '123456',
-      },
-      {
-        name: 'Fernanda Costa',
-        roleLabel: 'Gestora',
-        icon: Briefcase,
-        badge: UI_TOKENS.badgeInfo,
-        cpf: '222.333.444-55',
-        pass: '123456',
-      },
-      {
-        name: 'Carlos Eduardo Silva',
-        roleLabel: 'Motorista',
-        icon: Car,
-        badge: UI_TOKENS.badgeSuccess,
-        cpf: '333.333.333-33',
-        pass: '123456',
-      },
-      {
-        name: 'Marcos Vinícius',
-        roleLabel: 'Motorista',
-        icon: Car,
-        badge: UI_TOKENS.badgeSuccess,
-        cpf: '444.444.444-44',
-        pass: '123456',
-      },
-      {
-        name: 'Lucas Gabriel Pereira',
-        roleLabel: 'Motorista',
-        icon: Car,
-        badge: UI_TOKENS.badgeSuccess,
-        cpf: '555.555.555-55',
-        pass: '123456',
-      },
-    ];
-
     return (
       <div className={`${UI_TOKENS.pageBg} flex flex-col justify-between p-4 sm:p-6 lg:p-8`}>
         <div className="max-w-lg w-full mx-auto flex items-center justify-between gap-3 py-2">
@@ -365,9 +313,6 @@ export default function DashboardPage() {
             <h1 className="text-xl sm:text-2xl font-black text-content-primary tracking-tight text-center mt-5">
               Portal de Acesso
             </h1>
-            <p className="text-xs text-content-secondary mt-1 text-center">
-              Entre com seu CPF e senha para acessar o painel.
-            </p>
           </div>
 
           {loginError && (
@@ -415,7 +360,7 @@ export default function DashboardPage() {
               </label>
               <input
                 type="password"
-                placeholder="Digite sua senha (padrão: 123456)"
+                placeholder="Digite sua senha"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 className={UI_TOKENS.input}
@@ -431,44 +376,6 @@ export default function DashboardPage() {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Acessos Fictícios da Empresa Teste Apresentação */}
-          <div className="mt-5 pt-4 border-t border-surface-border">
-            <p className="text-[10px] font-extrabold text-content-secondary uppercase tracking-wider mb-2.5 text-center flex items-center justify-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              Acessos Fictícios • Teste Apresentação (Senha: 123456)
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {sampleAccounts.map((acc) => {
-                const RoleIcon = acc.icon;
-                return (
-                  <button
-                    key={acc.cpf}
-                    type="button"
-                    onClick={() =>
-                      handleLogin(undefined, acc.cpf, acc.pass, 'Teste Apresentação')
-                    }
-                    className="p-2.5 bg-surface-bg hover:bg-surface-elevated border border-surface-border hover:border-brand-primary/40 rounded-xl text-left transition-all cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="text-xs font-bold text-content-primary truncate">
-                        {acc.name}
-                      </span>
-                      <span
-                        className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 ${acc.badge}`}
-                      >
-                        <RoleIcon className="w-3 h-3" />
-                        {acc.roleLabel}
-                      </span>
-                    </div>
-                    <div className="text-[10px] text-content-secondary font-mono mt-1">
-                      CPF: {acc.cpf} • Senha: {acc.pass}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
 
         <div className="max-w-lg w-full mx-auto text-center py-2">
@@ -484,9 +391,7 @@ export default function DashboardPage() {
     );
   }
 
-  // =========================================================================
-  // 2. PAINEL DO COLABORADOR / MOTORISTA
-  // =========================================================================
+  // Painel do motorista (rotas, check list e ponto CLT)
   if (isDriver) {
     const driverTrips = trips.filter((t) => t.driverId === currentUser.id);
     const driverPunches = punches.filter((p) => p.userId === currentUser.id);
@@ -735,7 +640,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Registro de Ponto Eletrônico CLT (Ícones Vetoriais • Zero Emojis) */}
+          {/* Controle de ponto CLT */}
           <div className={`${UI_TOKENS.card} p-6`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-surface-border">
               <div className="flex items-center gap-2.5">
@@ -904,9 +809,7 @@ export default function DashboardPage() {
     );
   }
 
-  // =========================================================================
-  // 3. PAINEL DO ADMIN E DO GESTOR DE FROTA
-  // =========================================================================
+  // Painel do admin e gestor de frota
   return (
     <div className={`${UI_TOKENS.pageBg} flex flex-col`}>
       <Header

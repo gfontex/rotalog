@@ -1,7 +1,4 @@
-// ============================================================================
-// ROTALOG DESIGN SYSTEM — ENTERPRISE TOKENS (MOBILE / EXPO)
-// Centraliza superfícies, marca, tipografia, semânticas e grid 4px/8px
-// ============================================================================
+// Resumo: Configuracao de cores, espacamentos e temas (modo escuro e modo claro)
 
 export type ThemeMode = 'dark' | 'light';
 

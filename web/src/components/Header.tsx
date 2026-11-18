@@ -1,5 +1,7 @@
 'use client';
 
+// Resumo: Cabecalho superior com identificacao do usuario e atalhos
+
 import React, { useState, useEffect } from 'react';
 import { Bell, Car, UserPlus, RefreshCw, Radio, LogOut, Building2 } from 'lucide-react';
 import { RotaLogHeaderBrand, ThemeSwitcherBar } from './BrandLogo';

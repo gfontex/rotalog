@@ -1,5 +1,7 @@
 'use client';
 
+// Resumo: Espelho de ponto CLT dos colaboradores e exportacao para Excel (.xlsx)
+
 import React, { useState } from 'react';
 import { Clock, Search, WifiOff, Wifi, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';

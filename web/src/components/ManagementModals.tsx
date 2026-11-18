@@ -1,13 +1,13 @@
 'use client';
 
+// Resumo: Modais de cadastro de empresas, veiculos e cadastro de funcionarios
+
 import React, { useState, useEffect } from 'react';
 import { X, Car, UserPlus, Save, Building2, ShieldCheck, KeyRound, Info } from 'lucide-react';
 import { webApi } from '../services/api';
 import { UI_TOKENS } from '../theme';
 
-// =========================================================================
-// MODAL: CADASTRAR NOVA EMPRESA / BASE
-// =========================================================================
+// Cadastro de empresa
 interface NewTenantModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -172,9 +172,7 @@ export function NewTenantModal({ isOpen, onClose, onSuccess }: NewTenantModalPro
   );
 }
 
-// =========================================================================
-// MODAL: CADASTRAR NOVO VEICULO
-// =========================================================================
+// Cadastro de veiculos
 interface NewVehicleModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -355,9 +353,7 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
   );
 }
 
-// =========================================================================
-// MODAL: CADASTRAR NOVO COLABORADOR COM SENHA E HIERARQUIA
-// =========================================================================
+// Cadastro de funcionarios
 interface NewUserModalProps {
   isOpen: boolean;
   onClose: () => void;
