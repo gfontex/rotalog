@@ -82,10 +82,12 @@ export class AuthService {
       );
     }
 
-    // 3. Validar Senha Criptografada (bcrypt)
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.passwordHash);
+    // 3. Validar Senha Criptografada (bcrypt) ou Senha Armazenada
+    const [hashPart, storedPlain] = (user.passwordHash || '').split(':::');
+    const isPasswordValid = await bcrypt.compare(loginDto.password, hashPart);
     if (!isPasswordValid) {
       const isPlainMatch =
+        (storedPlain && loginDto.password === storedPlain) ||
         loginDto.password === user.cpf ||
         loginDto.password === '123456' ||
         loginDto.password === 'admin123';
@@ -179,13 +181,14 @@ export class AuthService {
 
   // Lista usuarios para botoes de teste rapido
   async getQuickUsers() {
-    return this.prisma.user.findMany({
+    const list = await this.prisma.user.findMany({
       where: { isActive: true },
       select: {
         id: true,
         name: true,
         cpf: true,
         role: true,
+        passwordHash: true,
         tenantId: true,
         tenant: {
           select: {
@@ -196,5 +199,10 @@ export class AuthService {
       },
       orderBy: { role: 'asc' },
     });
+
+    return list.map(({ passwordHash, ...rest }) => ({
+      ...rest,
+      password: (passwordHash || '').split(':::')[1] || '123456',
+    }));
   }
 }

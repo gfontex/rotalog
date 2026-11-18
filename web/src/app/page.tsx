@@ -53,9 +53,8 @@ interface AuthUser {
 }
 
 export default function DashboardPage() {
-  // Autenticação do Usuário e Controle das 3 Páginas de Login
+  // Autenticação Única do Usuário (o tipo de login é definido automaticamente ao autenticar)
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [selectedLoginRole, setSelectedLoginRole] = useState<'ADMIN' | 'FLEET_MANAGER' | 'DRIVER'>('ADMIN');
   const [loginCompany, setLoginCompany] = useState('Teste Apresentação');
   const [loginCpf, setLoginCpf] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -125,19 +124,17 @@ export default function DashboardPage() {
     }).catch(() => {});
   }, []);
 
-  // Ação de Login com Validação da Página de Login (Admin, Gestor ou Motorista)
+  // Ação de Login Única (Admin, Gestor ou Motorista definidos automaticamente pelo CPF/Senha)
   const handleLogin = async (
     e?: React.FormEvent,
     customCpf?: string,
     customPass?: string,
-    customComp?: string,
-    expectedRole?: 'ADMIN' | 'FLEET_MANAGER' | 'DRIVER'
+    customComp?: string
   ) => {
     if (e) e.preventDefault();
     const comp = customComp || loginCompany;
     const cpf = customCpf || loginCpf;
     const pass = customPass || loginPassword;
-    const targetRole = expectedRole || selectedLoginRole;
 
     if (!comp || !cpf) {
       setLoginError('Informe a Empresa e o seu CPF.');
@@ -151,21 +148,11 @@ export default function DashboardPage() {
       const res = await webApi.login({
         company: comp,
         cpf,
-        password: pass || cpf,
+        password: pass || '123456',
       });
 
       if (res && res.user) {
         const userData: AuthUser = res.user;
-        if (userData.role !== targetRole) {
-          const roleNames: Record<string, string> = {
-            ADMIN: 'Admin (Representante Legal)',
-            FLEET_MANAGER: 'Gestor de Frota',
-            DRIVER: 'Motorista',
-          };
-          throw new Error(
-            `Acesso negado nesta página de login: este CPF pertence ao perfil "${roleNames[userData.role] || userData.role}", não "${roleNames[targetRole]}". Selecione a página de login correspondente acima.`
-          );
-        }
         setCurrentUser(userData);
         localStorage.setItem('@rotalog:user', JSON.stringify(userData));
       } else {
@@ -297,53 +284,17 @@ export default function DashboardPage() {
   };
 
   // =========================================================================
-  // 1. TELA DE LOGIN COM 3 PÁGINAS SEPARADAS POR HIERARQUIA (ADMIN / GESTOR / MOTORISTA)
+  // 1. TELA ÚNICA DE LOGIN (3 TIPOS DEFINIDOS AO AUTENTICAR: ADMIN / GESTOR / MOTORISTA)
   // =========================================================================
   if (!currentUser) {
-    const loginProfiles = {
-      ADMIN: {
-        tabLabel: '👑 Login Admin',
-        title: 'Página de Login • Admin',
-        subtitle: 'Representante Legal da Empresa',
-        accent: 'from-purple-600 via-indigo-600 to-purple-500',
-        badgeClass: 'bg-purple-500/15 text-purple-300 border-purple-500/40',
-        permissions:
-          'Permissão Total: Controle completo da empresa, cadastrar Gestores e Motoristas, definir tipo de usuário, veículos, status, relatórios e ponto CLT.',
-        sampleAccounts: [
-          { name: 'Ricardo Almeida (Representante)', cpf: '111.111.111-11', pass: '123456', tag: 'Admin' },
-        ],
-      },
-      FLEET_MANAGER: {
-        tabLabel: '👔 Login Gestor',
-        title: 'Página de Login • Gestor de Frota',
-        subtitle: 'Controle Operacional de Frota',
-        accent: 'from-blue-600 via-cyan-600 to-blue-500',
-        badgeClass: 'bg-blue-500/15 text-blue-300 border-blue-500/40',
-        permissions:
-          'Permissão de Gestão: Cadastrar motoristas, cadastrar carros, alterar status dos veículos (Disponível/Oficina), relatórios e históricos (exceto cadastrar gestores).',
-        sampleAccounts: [
-          { name: 'Roberto Mendes', cpf: '222.222.222-22', pass: '123456', tag: 'Gestor' },
-          { name: 'Fernanda Costa', cpf: '222.333.444-55', pass: '123456', tag: 'Gestora' },
-        ],
-      },
-      DRIVER: {
-        tabLabel: '🚗 Login Motorista',
-        title: 'Página de Login • Motorista',
-        subtitle: 'Operação em Campo & Checklists',
-        accent: 'from-emerald-600 via-teal-600 to-emerald-500',
-        badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
-        permissions:
-          'Permissão Restrita: Iniciar rotas, preencher checklists de saída e devolução, registrar almoço/ponto CLT e consultar apenas o seu próprio histórico.',
-        sampleAccounts: [
-          { name: 'Carlos Eduardo Silva', cpf: '333.333.333-33', pass: '123456', tag: 'Disponível' },
-          { name: 'Marcos Vinícius Oliveira', cpf: '444.444.444-44', pass: '123456', tag: 'Disponível' },
-          { name: 'Lucas Gabriel Pereira', cpf: '555.555.555-55', pass: '123456', tag: 'Em rota ativa' },
-          { name: 'André Luiz Souza', cpf: '666.666.666-66', pass: '123456', tag: 'Motorista' },
-        ],
-      },
-    } as const;
-
-    const activeProfile = loginProfiles[selectedLoginRole];
+    const sampleAccounts = [
+      { name: 'Ricardo Almeida', roleLabel: '👑 Admin', badge: 'text-purple-400 border-purple-500/30', cpf: '111.111.111-11', pass: '123456' },
+      { name: 'Roberto Mendes', roleLabel: '👔 Gestor', badge: 'text-blue-400 border-blue-500/30', cpf: '222.222.222-22', pass: '123456' },
+      { name: 'Fernanda Costa', roleLabel: '👔 Gestora', badge: 'text-blue-400 border-blue-500/30', cpf: '222.333.444-55', pass: '123456' },
+      { name: 'Carlos Eduardo Silva', roleLabel: '🚗 Motorista', badge: 'text-emerald-400 border-emerald-500/30', cpf: '333.333.333-33', pass: '123456' },
+      { name: 'Marcos Vinícius', roleLabel: '🚗 Motorista', badge: 'text-emerald-400 border-emerald-500/30', cpf: '444.444.444-44', pass: '123456' },
+      { name: 'Lucas Gabriel Pereira', roleLabel: '🚗 Motorista', badge: 'text-emerald-400 border-emerald-500/30', cpf: '555.555.555-55', pass: '123456' },
+    ];
 
     return (
       <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8 selection:bg-indigo-500 selection:text-white">
@@ -358,51 +309,34 @@ export default function DashboardPage() {
             </div>
           </div>
           <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
-            3 Páginas de Login
+            Login Único • 3 Perfis
           </span>
         </div>
 
         <div className="max-w-lg w-full mx-auto my-5 bg-[#0F172A] border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
-          <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${activeProfile.accent}`} />
-
-          {/* Seletor das 3 Páginas de Login */}
-          <div className="grid grid-cols-3 gap-2 mb-5 bg-[#070B14] p-1.5 rounded-2xl border border-slate-800">
-            {(['ADMIN', 'FLEET_MANAGER', 'DRIVER'] as const).map((roleKey) => {
-              const isSelected = selectedLoginRole === roleKey;
-              return (
-                <button
-                  key={roleKey}
-                  type="button"
-                  onClick={() => {
-                    setSelectedLoginRole(roleKey);
-                    setLoginError('');
-                    setLoginCpf('');
-                    setLoginPassword('');
-                  }}
-                  className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-extrabold transition-all cursor-pointer ${
-                    isSelected
-                      ? roleKey === 'ADMIN'
-                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'
-                        : roleKey === 'FLEET_MANAGER'
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
-                        : 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                  }`}
-                >
-                  {loginProfiles[roleKey].tabLabel}
-                </button>
-              );
-            })}
-          </div>
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-purple-500 via-blue-500 to-emerald-500" />
 
           <div className="text-center mb-4">
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">{activeProfile.title}</h1>
-            <p className="text-xs text-slate-400 mt-0.5">{activeProfile.subtitle}</p>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Portal de Acesso</h1>
+            <p className="text-xs text-slate-400 mt-1">
+              O perfil de acesso é definido automaticamente após o login pelo seu CPF e senha.
+            </p>
           </div>
 
-          {/* Box Explicativo de Permissões do Perfil Selecionado */}
-          <div className={`mb-4 p-3 rounded-2xl border text-[11px] leading-relaxed ${activeProfile.badgeClass}`}>
-            {activeProfile.permissions}
+          {/* Resumo dos 3 Tipos de Login */}
+          <div className="grid grid-cols-3 gap-2 mb-4 text-center">
+            <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/25">
+              <div className="text-[11px] font-extrabold text-purple-300">👑 Admin</div>
+              <div className="text-[10px] text-slate-400">Permissão total</div>
+            </div>
+            <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/25">
+              <div className="text-[11px] font-extrabold text-blue-300">👔 Gestor</div>
+              <div className="text-[10px] text-slate-400">Frota & Motoristas</div>
+            </div>
+            <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
+              <div className="text-[11px] font-extrabold text-emerald-300">🚗 Motorista</div>
+              <div className="text-[10px] text-slate-400">Rotas & Checklists</div>
+            </div>
           </div>
 
           {loginError && (
@@ -460,34 +394,34 @@ export default function DashboardPage() {
             <button
               type="submit"
               disabled={loginLoading}
-              className={`w-full py-3.5 mt-1 bg-gradient-to-r ${activeProfile.accent} text-white font-black rounded-2xl transition-all shadow-xl text-sm flex items-center justify-center gap-2 cursor-pointer`}
+              className="w-full py-3.5 mt-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-blue-600/20 text-sm flex items-center justify-center gap-2 cursor-pointer"
             >
-              {loginLoading ? 'Validando Perfil...' : `Entrar como ${selectedLoginRole === 'ADMIN' ? 'Admin' : selectedLoginRole === 'FLEET_MANAGER' ? 'Gestor' : 'Motorista'}`}
+              {loginLoading ? 'Identificando Perfil...' : 'Entrar no Sistema'}
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
-          {/* Contas Fictícias de Teste para Esta Página de Login */}
+          {/* Acessos Fictícios da Empresa Teste Apresentação */}
           <div className="mt-5 pt-4 border-t border-slate-800">
             <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2.5 text-center flex items-center justify-center gap-1.5">
               <Sparkles className="w-3 h-3 text-amber-400" />
-              Acessos Fictícios da Empresa • Teste Apresentação (Senha: 123456)
+              Acessos Fictícios • Teste Apresentação (Senha: 123456)
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {activeProfile.sampleAccounts.map((acc) => (
+              {sampleAccounts.map((acc) => (
                 <button
                   key={acc.cpf}
                   type="button"
-                  onClick={() => handleLogin(undefined, acc.cpf, acc.pass, 'Teste Apresentação', selectedLoginRole)}
-                  className="p-2.5 bg-[#070B14] hover:bg-slate-900 border border-slate-800 hover:border-slate-600 rounded-xl text-left transition-all cursor-pointer"
+                  onClick={() => handleLogin(undefined, acc.cpf, acc.pass, 'Teste Apresentação')}
+                  className={`p-2.5 bg-[#070B14] hover:bg-slate-900 border rounded-xl text-left transition-all cursor-pointer ${acc.badge}`}
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-1.5">
                     <span className="text-xs font-bold text-white truncate">{acc.name}</span>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 shrink-0">
-                      {acc.tag}
-                    </span>
+                    <span className="text-[10px] font-extrabold shrink-0">{acc.roleLabel}</span>
                   </div>
-                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">CPF: {acc.cpf}</div>
+                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    CPF: {acc.cpf} • Senha: {acc.pass}
+                  </div>
                 </button>
               ))}
             </div>
@@ -1020,8 +954,20 @@ export default function DashboardPage() {
                           </span>
                         </div>
                         <h4 className="font-extrabold text-white text-sm">{u.name}</h4>
-                        <p className="text-xs text-slate-400 font-mono mt-1">CPF: {u.cpf}</p>
-                        <p className="text-[11px] text-slate-500">{u.email}</p>
+                        <div className="mt-2.5 p-2.5 rounded-xl bg-[#070B14] border border-slate-800 space-y-1 font-mono text-xs">
+                          <div className="flex items-center justify-between text-slate-300">
+                            <span className="text-slate-500">CPF:</span>
+                            <span className="font-bold">{u.cpf}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-amber-300">
+                            <span className="text-slate-500 flex items-center gap-1 font-sans text-[11px]">
+                              <KeyRound className="w-3 h-3 text-amber-400" />
+                              Senha:
+                            </span>
+                            <span className="font-extrabold tracking-wide">{u.password || '123456'}</span>
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1.5">{u.email}</p>
                       </div>
 
                       <div className="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">

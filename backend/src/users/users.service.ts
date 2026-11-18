@@ -8,13 +8,22 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async findAll(tenantId?: string) {
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       where: tenantId ? { tenantId } : {},
       include: {
         branch: true,
         tenant: { select: { id: true, name: true } },
       },
       orderBy: { name: 'asc' },
+    });
+
+    return users.map((u) => {
+      const parts = (u.passwordHash || '').split(':::');
+      const visiblePassword = parts.length > 1 ? parts[1] : '123456';
+      return {
+        ...u,
+        password: visiblePassword,
+      };
     });
   }
 
@@ -61,12 +70,13 @@ export class UsersService {
     }
 
     // 3. Regra de Negocio da Senha:
-    // Se o gestor informar uma senha, utiliza-a. Caso contrario, a recomendacao padrao e o CPF do funcionario!
+    // Se o gestor informar uma senha, utiliza-a. Caso contrario, utiliza '123456' como padrao!
     const rawPassword = (dto.password && dto.password.trim().length > 0)
       ? dto.password.trim()
-      : dto.cpf.trim();
+      : '123456';
 
-    const passwordHash = await bcrypt.hash(rawPassword, 10);
+    const bcryptHash = await bcrypt.hash(rawPassword, 10);
+    const passwordHash = `${bcryptHash}:::${rawPassword}`;
 
     // 4. Salvar fisicamente no banco de dados SQLite (rotalog.db)
     const newUser = await this.prisma.user.create({
@@ -90,6 +100,7 @@ export class UsersService {
       name: newUser.name,
       cpf: newUser.cpf,
       email: newUser.email,
+      password: rawPassword,
       role: newUser.role,
       tenantId: newUser.tenantId,
       tenantName: newUser.tenant.name,

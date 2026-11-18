@@ -161,9 +161,8 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, E
 }
 
 function MainApp() {
-  // Estado de Autenticacao & Controle das 3 Paginas de Login
+  // Estado de Autenticacao Unica (perfil definido ao logar)
   const [user, setUser] = useState<UserProfile & { tenantId?: string } | null>(null);
-  const [selectedLoginRole, setSelectedLoginRole] = useState<'ADMIN' | 'FLEET_MANAGER' | 'DRIVER'>('DRIVER');
   const [companyInput, setCompanyInput] = useState('Teste Apresentação');
   const [cpfInput, setCpfInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -322,17 +321,15 @@ function MainApp() {
     }
   };
 
-  // Login com Base + CPF + Senha + Validacao da Pagina de Login Selecionada
+  // Login Unico com Base + CPF + Senha (tipo de acesso definido automaticamente pelo perfil)
   const handleLogin = async (
     customCompany?: string,
     customCpf?: string,
-    customPass?: string,
-    expectedRole?: 'ADMIN' | 'FLEET_MANAGER' | 'DRIVER'
+    customPass?: string
   ) => {
     const company = customCompany || companyInput;
     const cpf = customCpf || cpfInput;
     const pass = customPass || passwordInput;
-    const targetRole = expectedRole || selectedLoginRole;
 
     if (!company || !cpf) {
       Alert.alert('Campos Obrigatórios', 'Informe o nome da Empresa e o seu CPF.');
@@ -346,19 +343,6 @@ function MainApp() {
         res = await api.login(company, cpf, pass);
       } else {
         res = await api.quickLogin(cpf);
-      }
-
-      if (res?.user && res.user.role !== targetRole) {
-        const roleLabels: Record<string, string> = {
-          ADMIN: 'Admin (Representante Legal)',
-          FLEET_MANAGER: 'Gestor de Frota',
-          DRIVER: 'Motorista',
-        };
-        Alert.alert(
-          'Página de Login Incorreta',
-          `Este CPF pertence ao perfil "${roleLabels[res.user.role] || res.user.role}", não "${roleLabels[targetRole]}". Selecione a página de login correta no topo da tela.`
-        );
-        return;
       }
 
       setUser(res.user);
@@ -698,30 +682,10 @@ function MainApp() {
   };
 
   // =========================================================================
-  // TELA DE LOGIN COM 3 PÁGINAS SEPARADAS: ADMIN / GESTOR / MOTORISTA
+  // TELA ÚNICA DE LOGIN (3 TIPOS DE ACESSO DETECTADOS NO LOGIN: ADMIN / GESTOR / MOTORISTA)
   // =========================================================================
   if (!user) {
-    const loginMeta = {
-      ADMIN: {
-        title: 'Login Admin (Representante Legal)',
-        color: '#8B5CF6',
-        desc: 'Permissão Total: cadastrar Gestores e Motoristas (definindo tipo), gerenciar carros, status, relatórios e ponto CLT.',
-      },
-      FLEET_MANAGER: {
-        title: 'Login Gestor de Frota',
-        color: '#3B82F6',
-        desc: 'Permissão de Gestão: cadastrar motoristas e carros, alterar status dos veículos, relatórios e históricos (exceto cadastrar gestores).',
-      },
-      DRIVER: {
-        title: 'Login Motorista Operacional',
-        color: '#10B981',
-        desc: 'Permissão Restrita: iniciar rotas, preencher checklists de saída/retorno, ponto CLT e visualizar apenas seu histórico.',
-      },
-    }[selectedLoginRole];
-
-    const filteredQuickUsers = Array.isArray(quickUsers)
-      ? quickUsers.filter((u) => u.role === selectedLoginRole)
-      : [];
+    const allQuickUsers = Array.isArray(quickUsers) ? quickUsers : [];
 
     return (
       <SafeAreaView style={styles.darkContainer}>
@@ -735,11 +699,11 @@ function MainApp() {
             <Text style={styles.brandSubtitle}>Gestão Operacional de Frotas & Ponto CLT</Text>
             <View style={styles.manualBadge}>
               <Ionicons name="layers-outline" size={14} color="#10B981" />
-              <Text style={styles.manualBadgeText}>3 Páginas de Acesso • Controle por Hierarquia</Text>
+              <Text style={styles.manualBadgeText}>Tela Única • 3 Tipos de Login por Perfil</Text>
             </View>
           </View>
 
-          {/* Seletor das 3 Paginas de Login */}
+          {/* Legenda dos 3 Tipos de Acesso Reconhecidos Automaticamente no Login */}
           <View style={styles.loginTabsRow}>
             {(
               [
@@ -747,34 +711,25 @@ function MainApp() {
                 { key: 'FLEET_MANAGER', label: '👔 Gestor', color: '#3B82F6' },
                 { key: 'DRIVER', label: '🚗 Motorista', color: '#10B981' },
               ] as const
-            ).map((tab) => {
-              const active = selectedLoginRole === tab.key;
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  style={[
-                    styles.loginTabBtn,
-                    active && { backgroundColor: tab.color, borderColor: tab.color },
-                  ]}
-                  onPress={() => {
-                    setSelectedLoginRole(tab.key);
-                    setCpfInput('');
-                    setPasswordInput('');
-                  }}
-                >
-                  <Text style={[styles.loginTabText, active && { color: '#FFFFFF' }]}>
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+            ).map((badge) => (
+              <View
+                key={badge.key}
+                style={[styles.loginTabBtn, { borderColor: badge.color }]}
+              >
+                <Text style={[styles.loginTabText, { color: badge.color }]}>
+                  {badge.label}
+                </Text>
+              </View>
+            ))}
           </View>
 
-          {/* Formulario da Pagina de Login Selecionada */}
-          <View style={[styles.card, { borderTopWidth: 3, borderTopColor: loginMeta.color }]}>
-            <Text style={styles.cardTitle}>{loginMeta.title}</Text>
-            <View style={[styles.permissionBox, { borderColor: loginMeta.color }]}>
-              <Text style={styles.permissionBoxText}>{loginMeta.desc}</Text>
+          {/* Formulario Unico de Login */}
+          <View style={[styles.card, { borderTopWidth: 3, borderTopColor: '#10B981' }]}>
+            <Text style={styles.cardTitle}>Acesso ao Sistema</Text>
+            <View style={[styles.permissionBox, { borderColor: '#334155' }]}>
+              <Text style={styles.permissionBoxText}>
+                Informe seu CPF e senha. O tipo de login (Admin, Gestor ou Motorista) e suas permissões são definidos automaticamente ao entrar.
+              </Text>
             </View>
 
             {/* Campo 1: Empresa / Base */}
@@ -822,7 +777,7 @@ function MainApp() {
             </View>
 
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: loginMeta.color }, loadingAuth && { opacity: 0.7 }]}
+              style={[styles.primaryButton, { backgroundColor: '#10B981' }, loadingAuth && { opacity: 0.7 }]}
               onPress={() => handleLogin()}
               disabled={loadingAuth}
             >
@@ -831,31 +786,36 @@ function MainApp() {
               ) : (
                 <>
                   <Ionicons name="log-in-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryButtonText}>
-                    Entrar como {selectedLoginRole === 'ADMIN' ? 'Admin' : selectedLoginRole === 'FLEET_MANAGER' ? 'Gestor' : 'Motorista'}
-                  </Text>
+                  <Text style={styles.primaryButtonText}>Entrar</Text>
                 </>
               )}
             </TouchableOpacity>
           </View>
 
-          {/* Atalhos Ficticios da Empresa Teste Apresentação Filtrados por Pagina de Login */}
+          {/* Atalhos Ficticios da Empresa Teste Apresentação (Todos os 3 Perfis) */}
           <View style={styles.quickCard}>
             <View style={styles.quickHeader}>
               <Ionicons name="flash" size={18} color="#F59E0B" />
               <Text style={styles.quickTitle}>Acessos Fictícios • Teste Apresentação</Text>
             </View>
             <Text style={styles.quickDesc}>
-              Toque em um colaborador desta página para entrar direto (Senha: 123456):
+              Toque em qualquer colaborador para entrar direto (o sistema identifica o perfil automaticamente):
             </Text>
 
-            {filteredQuickUsers.map((u) => {
+            {allQuickUsers.map((u) => {
+              const roleColor =
+                u.role === 'ADMIN'
+                  ? '#8B5CF6'
+                  : u.role === 'FLEET_MANAGER'
+                  ? '#3B82F6'
+                  : '#10B981';
               const roleBadge =
                 u.role === 'ADMIN'
                   ? '👑 Admin (Representante Legal)'
                   : u.role === 'FLEET_MANAGER'
                   ? '👔 Gestor de Frota'
                   : '🚗 Motorista';
+              const userPassword = u.password || '123456';
 
               return (
                 <TouchableOpacity
@@ -865,19 +825,21 @@ function MainApp() {
                     const comp = u.tenant?.name || 'Teste Apresentação';
                     setCompanyInput(comp);
                     setCpfInput(u.cpf);
-                    setPasswordInput('123456');
-                    handleLogin(comp, u.cpf, '123456', selectedLoginRole);
+                    setPasswordInput(userPassword);
+                    handleLogin(comp, u.cpf, userPassword);
                   }}
                 >
-                  <View style={[styles.avatarCircle, { backgroundColor: loginMeta.color }]}>
+                  <View style={[styles.avatarCircle, { backgroundColor: roleColor }]}>
                     <Text style={styles.avatarText}>{(u.name || 'U').charAt(0)}</Text>
                   </View>
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.quickUserName}>{u.name}</Text>
-                    <Text style={[styles.quickUserSub, { color: loginMeta.color, fontWeight: '700' }]}>
+                    <Text style={[styles.quickUserSub, { color: roleColor, fontWeight: '700' }]}>
                       {roleBadge}
                     </Text>
-                    <Text style={styles.quickUserSub}>CPF: {u.cpf}</Text>
+                    <Text style={styles.quickUserSub}>
+                      CPF: {u.cpf} • Senha: {userPassword}
+                    </Text>
                   </View>
                   <Ionicons name="arrow-forward-circle" size={22} color="#64748B" />
                 </TouchableOpacity>
@@ -1403,7 +1365,8 @@ function MainApp() {
                   <Text style={[styles.quickUserSub, { color: roleColor, fontWeight: '800', marginTop: 2 }]}>
                     {roleLabel}
                   </Text>
-                  <Text style={styles.userMgmtMeta}>CPF: {u.cpf} • {u.email}</Text>
+                  <Text style={styles.userMgmtMeta}>CPF: {u.cpf} • Senha: {u.password || '123456'}</Text>
+                  <Text style={styles.userMgmtMeta}>{u.email}</Text>
                 </View>
               </View>
             );
