@@ -59,12 +59,25 @@ export const webApi = {
     model: string;
     year: number;
     currentMileage: number;
+    status?: string;
     tenantId?: string;
     branchId?: string;
   }) =>
     fetcher('/vehicles', {
       method: 'POST',
       body: JSON.stringify(data),
+    }),
+  updateVehicleStatus: (
+    id: string,
+    status: 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE',
+    currentMileage?: number
+  ) =>
+    fetcher(`/vehicles/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status,
+        ...(currentMileage !== undefined ? { currentMileage } : {}),
+      }),
     }),
 
   // Relatórios de Viagens & Operação de Rotas
@@ -125,8 +138,9 @@ export const webApi = {
   createUser: (data: {
     name: string;
     cpf: string;
-    email: string;
+    email?: string;
     role: string;
+    creatorRole?: string;
     password?: string;
     tenantId?: string;
   }) =>

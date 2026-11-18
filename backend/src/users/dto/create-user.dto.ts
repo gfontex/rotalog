@@ -17,8 +17,8 @@ export class CreateUserDto {
   cpf: string;
 
   @IsEmail({}, { message: 'E-mail inválido' })
-  @IsNotEmpty({ message: 'E-mail é obrigatório' })
-  email: string;
+  @IsOptional()
+  email?: string;
 
   @IsString()
   @IsOptional()
@@ -27,6 +27,10 @@ export class CreateUserDto {
   @IsEnum(RoleEnum)
   @IsOptional()
   role?: RoleEnum;
+
+  @IsString()
+  @IsOptional()
+  creatorRole?: string;
 
   @IsString()
   @IsOptional()

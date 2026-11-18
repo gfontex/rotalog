@@ -13,6 +13,7 @@ import {
   CheckSquare,
   LogOut,
   Flag,
+  Wrench,
 } from 'lucide-react';
 
 interface VehicleItem {
@@ -35,6 +36,8 @@ interface FleetMonitorProps {
   onSelectVehicle?: (v: VehicleItem) => void;
   onStartRoute?: (v: VehicleItem) => void;
   onFinishRoute?: (v: VehicleItem) => void;
+  canManageVehicles?: boolean;
+  onChangeVehicleStatus?: (v: VehicleItem, newStatus: 'AVAILABLE' | 'MAINTENANCE') => void;
 }
 
 export function FleetMonitor({
@@ -42,6 +45,8 @@ export function FleetMonitor({
   onSelectVehicle,
   onStartRoute,
   onFinishRoute,
+  canManageVehicles = false,
+  onChangeVehicleStatus,
 }: FleetMonitorProps) {
   const [filter, setFilter] = useState<'ALL' | 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE'>('ALL');
   const [search, setSearch] = useState('');
@@ -219,8 +224,8 @@ export function FleetMonitor({
                   </div>
                 </div>
 
-                {/* BOTÕES DE AÇÃO: INICIAR ROTA (CHECKLIST) OU ENCERRAR ROTA */}
-                <div className="mt-4 pt-3 border-t border-slate-800/80">
+                {/* BOTÕES DE AÇÃO: INICIAR ROTA (CHECKLIST), DEVOLVER OU ALTERAR STATUS */}
+                <div className="mt-4 pt-3 border-t border-slate-800/80 space-y-2">
                   {isAvailable && onStartRoute && (
                     <button
                       type="button"
@@ -243,11 +248,31 @@ export function FleetMonitor({
                     </button>
                   )}
 
-                  {isMaintenance && (
+                  {canManageVehicles && isAvailable && onChangeVehicleStatus && (
+                    <button
+                      type="button"
+                      onClick={() => onChangeVehicleStatus(v, 'MAINTENANCE')}
+                      className="w-full py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[11px] rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Wrench className="w-3.5 h-3.5" />
+                      <span>Enviar p/ Oficina (Manutenção)</span>
+                    </button>
+                  )}
+
+                  {isMaintenance && canManageVehicles && onChangeVehicleStatus ? (
+                    <button
+                      type="button"
+                      onClick={() => onChangeVehicleStatus(v, 'AVAILABLE')}
+                      className="w-full py-2 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 font-extrabold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Liberar da Oficina (Disponível)</span>
+                    </button>
+                  ) : isMaintenance ? (
                     <div className="w-full py-1.5 text-center text-[11px] text-amber-400/80 font-bold bg-amber-500/5 rounded-xl border border-amber-500/20">
                       Indisponível no Momento
                     </div>
-                  )}
+                  ) : null}
                 </div>
               </div>
             );

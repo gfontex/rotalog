@@ -86,8 +86,49 @@ export const api = {
     }),
 
   // Veículos
-  getVehicles: () => request('/vehicles'),
+  getVehicles: (tenantId?: string) => request(`/vehicles${tenantId ? `?tenantId=${tenantId}` : ''}`),
   getAvailableVehicles: () => request('/vehicles/available'),
+  createVehicle: (data: {
+    plate: string;
+    brand: string;
+    model: string;
+    year: number;
+    currentMileage: number;
+    status?: 'AVAILABLE' | 'MAINTENANCE';
+    tenantId?: string;
+  }) =>
+    request('/vehicles', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateVehicleStatus: (
+    id: string,
+    status: 'AVAILABLE' | 'IN_USE' | 'MAINTENANCE',
+    currentMileage?: number
+  ) =>
+    request(`/vehicles/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status,
+        ...(currentMileage !== undefined ? { currentMileage } : {}),
+      }),
+    }),
+
+  // Usuários & Cadastros (Admin e Gestor)
+  getUsers: (tenantId?: string) => request(`/users${tenantId ? `?tenantId=${tenantId}` : ''}`),
+  createUser: (data: {
+    name: string;
+    cpf: string;
+    email?: string;
+    role: 'ADMIN' | 'FLEET_MANAGER' | 'DRIVER';
+    creatorRole?: string;
+    password?: string;
+    tenantId?: string;
+  }) =>
+    request('/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   // Checklist
   getChecklistTemplate: () => request('/checklists/template'),
@@ -96,7 +137,7 @@ export const api = {
   // Rota / Usages
   getActiveUsage: (driverId: string) => request(`/usages/active/${driverId}`),
   getDriverTrips: (driverId: string) => request(`/usages/driver/${driverId}`),
-  getAllTrips: () => request('/usages'),
+  getAllTrips: (tenantId?: string) => request(`/usages${tenantId ? `?tenantId=${tenantId}` : ''}`),
 
   startUsage: (data: {
     vehicleId: string;
@@ -149,6 +190,7 @@ export const api = {
       body: JSON.stringify({ clocks }),
     }),
   getTodayPunches: (userId: string) => request(`/timeclock/today/${userId}`),
+  getTimeClockReport: (tenantId?: string) => request(`/timeclock/report${tenantId ? `?tenantId=${tenantId}` : ''}`),
 
   // Notificações
   getNotifications: () => request('/notifications'),

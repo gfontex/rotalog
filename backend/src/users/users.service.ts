@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcryptjs';
@@ -19,8 +19,19 @@ export class UsersService {
   }
 
   async create(dto: CreateUserDto) {
-    const normalizedEmail = dto.email.toLowerCase().trim();
     const cleanCpf = dto.cpf.replace(/\D/g, '');
+    const assignedRole = dto.role || 'DRIVER';
+
+    // Regra de hierarquia: Gestor de Frota pode cadastrar apenas Motoristas
+    if (dto.creatorRole === 'FLEET_MANAGER' && assignedRole !== 'DRIVER') {
+      throw new ForbiddenException(
+        'O Gestor de Frota tem permissão para cadastrar apenas Motoristas. Para cadastrar outros gestores, acesse com o Admin.'
+      );
+    }
+
+    const normalizedEmail = (dto.email && dto.email.trim().length > 0)
+      ? dto.email.toLowerCase().trim()
+      : `${cleanCpf || Date.now()}@rotalog.local`;
 
     // 1. Verificar se já existe colaborador com o mesmo CPF ou Email
     const existing = await this.prisma.user.findFirst({
@@ -34,12 +45,12 @@ export class UsersService {
 
     if (existing) {
       if (existing.email.toLowerCase() === normalizedEmail) {
-        throw new ConflictException(`Já existe um colaborador cadastrado com o e-mail ${dto.email}.`);
+        throw new ConflictException(`Já existe um colaborador cadastrado com o e-mail ${normalizedEmail}.`);
       }
       throw new ConflictException(`Já existe um colaborador cadastrado com o CPF ${dto.cpf}.`);
     }
 
-    // 2. Se tenantId nao for enviado, vincula ao primeiro tenant disponivel (ex: MK Seguranca)
+    // 2. Se tenantId nao for enviado, vincula ao primeiro tenant disponivel (ex: Teste Apresentação)
     let tenantId = dto.tenantId;
     if (!tenantId) {
       const defaultTenant = await this.prisma.tenant.findFirst();
@@ -64,9 +75,9 @@ export class UsersService {
         branchId: dto.branchId || null,
         name: dto.name,
         cpf: dto.cpf,
-        email: dto.email,
+        email: normalizedEmail,
         passwordHash,
-        role: dto.role || 'DRIVER',
+        role: assignedRole,
         isActive: dto.isActive !== undefined ? dto.isActive : true,
       },
       include: {

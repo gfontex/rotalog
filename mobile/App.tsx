@@ -160,9 +160,10 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, E
 }
 
 function MainApp() {
-  // Estado de Autenticacao
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [companyInput, setCompanyInput] = useState('MK Seguranca');
+  // Estado de Autenticacao & Controle das 3 Paginas de Login
+  const [user, setUser] = useState<UserProfile & { tenantId?: string } | null>(null);
+  const [selectedLoginRole, setSelectedLoginRole] = useState<'ADMIN' | 'FLEET_MANAGER' | 'DRIVER'>('DRIVER');
+  const [companyInput, setCompanyInput] = useState('Teste Apresentação');
   const [cpfInput, setCpfInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [quickUsers, setQuickUsers] = useState<any[]>([]);
@@ -192,14 +193,31 @@ function MainApp() {
     }
   };
 
-  // Navegacao por Abas
-  const [activeTab, setActiveTab] = useState<'route' | 'timeclock' | 'history'>('route');
+  // Navegacao por Abas (4 para Admin/Gestor, 3 para Motorista)
+  const [activeTab, setActiveTab] = useState<'route' | 'users' | 'timeclock' | 'history'>('route');
 
   // Estados de Rota & Veiculos
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [activeUsage, setActiveUsage] = useState<VehicleUsage | null>(null);
   const [driverTrips, setDriverTrips] = useState<VehicleUsage[]>([]);
   const [routeSeconds, setRouteSeconds] = useState(0);
+
+  // Estados de Gestao (Admin e Gestor de Frota)
+  const [usersList, setUsersList] = useState<any[]>([]);
+  const [allPunches, setAllPunches] = useState<any[]>([]);
+  const [newVehicleModalVisible, setNewVehicleModalVisible] = useState(false);
+  const [newUserModalVisible, setNewUserModalVisible] = useState(false);
+  const [vehPlate, setVehPlate] = useState('');
+  const [vehBrand, setVehBrand] = useState('');
+  const [vehModel, setVehModel] = useState('');
+  const [vehYear, setVehYear] = useState('2024');
+  const [vehMileage, setVehMileage] = useState('0');
+  const [vehStatus, setVehStatus] = useState<'AVAILABLE' | 'MAINTENANCE'>('AVAILABLE');
+  const [usrName, setUsrName] = useState('');
+  const [usrCpf, setUsrCpf] = useState('');
+  const [usrEmail, setUsrEmail] = useState('');
+  const [usrPassword, setUsrPassword] = useState('');
+  const [usrRole, setUsrRole] = useState<'DRIVER' | 'FLEET_MANAGER' | 'ADMIN'>('DRIVER');
 
   // Estados dos Modais de Checklist
   const [startModalVisible, setStartModalVisible] = useState(false);
@@ -249,14 +267,19 @@ function MainApp() {
     updateOfflineCount();
   }, []);
 
-  // Ao logar, carrega dados especificos daquele usuario
+  // Ao logar, carrega dados especificos daquele usuario e nivel hierarquico
   useEffect(() => {
     if (user) {
+      setActiveTab('route');
       refreshActiveUsage();
       loadVehicles();
       loadTodayPunches();
       loadTripsHistory();
       updateOfflineCount();
+      if (user.role === 'ADMIN' || user.role === 'FLEET_MANAGER') {
+        loadUsersList();
+        loadAllPunchesReport();
+      }
     }
   }, [user]);
 
@@ -268,32 +291,75 @@ function MainApp() {
   const loadQuickUsers = async () => {
     try {
       const data = await api.getQuickUsers();
-      setQuickUsers(data);
+      if (Array.isArray(data)) {
+        setQuickUsers(data);
+      }
     } catch {
       // Fallback
     }
   };
 
-  // Login com Base + CPF + Senha
-  const handleLogin = async (customCompany?: string, customCpf?: string, customPass?: string) => {
+  const loadUsersList = async () => {
+    try {
+      const list = await api.getUsers(user?.tenantId);
+      if (Array.isArray(list)) {
+        setUsersList(list);
+      }
+    } catch (err) {
+      console.log('Erro ao carregar colaboradores:', err);
+    }
+  };
+
+  const loadAllPunchesReport = async () => {
+    try {
+      const report = await api.getTimeClockReport(user?.tenantId);
+      if (Array.isArray(report)) {
+        setAllPunches(report);
+      }
+    } catch (err) {
+      console.log('Erro ao carregar relatorio CLT:', err);
+    }
+  };
+
+  // Login com Base + CPF + Senha + Validacao da Pagina de Login Selecionada
+  const handleLogin = async (
+    customCompany?: string,
+    customCpf?: string,
+    customPass?: string,
+    expectedRole?: 'ADMIN' | 'FLEET_MANAGER' | 'DRIVER'
+  ) => {
     const company = customCompany || companyInput;
     const cpf = customCpf || cpfInput;
     const pass = customPass || passwordInput;
+    const targetRole = expectedRole || selectedLoginRole;
 
     if (!company || !cpf) {
-      Alert.alert('Campos Obrigatórios', 'Informe o nome da Empresa/Base e o seu CPF.');
+      Alert.alert('Campos Obrigatórios', 'Informe o nome da Empresa e o seu CPF.');
       return;
     }
 
     setLoadingAuth(true);
     try {
-      // Se clicou em atalho rapido e senha nao foi digitada, usa quickLogin ou CPF
       let res;
       if (pass) {
         res = await api.login(company, cpf, pass);
       } else {
         res = await api.quickLogin(cpf);
       }
+
+      if (res?.user && res.user.role !== targetRole) {
+        const roleLabels: Record<string, string> = {
+          ADMIN: 'Admin (Representante Legal)',
+          FLEET_MANAGER: 'Gestor de Frota',
+          DRIVER: 'Motorista',
+        };
+        Alert.alert(
+          'Página de Login Incorreta',
+          `Este CPF pertence ao perfil "${roleLabels[res.user.role] || res.user.role}", não "${roleLabels[targetRole]}". Selecione a página de login correta no topo da tela.`
+        );
+        return;
+      }
+
       setUser(res.user);
     } catch (err: any) {
       Alert.alert('Erro de Acesso', err.message || 'Falha ao autenticar.');
@@ -305,10 +371,94 @@ function MainApp() {
   // Carrega todos os veiculos para a tela
   const loadVehicles = async () => {
     try {
-      const list = await api.getVehicles();
-      setVehicles(list);
+      const list = await api.getVehicles(user?.tenantId);
+      if (Array.isArray(list)) setVehicles(list);
     } catch (err) {
       console.log('Erro ao carregar veiculos:', err);
+    }
+  };
+
+  // Acao de Gestao: Cadastrar Novo Veiculo
+  const handleCreateVehicle = async () => {
+    if (!vehPlate.trim() || !vehBrand.trim() || !vehModel.trim()) {
+      Alert.alert('Validação', 'Preencha Placa, Marca e Modelo do veículo.');
+      return;
+    }
+    try {
+      await api.createVehicle({
+        plate: vehPlate.toUpperCase().trim(),
+        brand: vehBrand.trim(),
+        model: vehModel.trim(),
+        year: parseInt(vehYear, 10) || 2024,
+        currentMileage: parseInt(vehMileage, 10) || 0,
+        status: vehStatus,
+        tenantId: user?.tenantId,
+      });
+      Alert.alert('✅ Veículo Cadastrado!', `${vehBrand} ${vehModel} (${vehPlate.toUpperCase()}) adicionado à frota.`);
+      setVehPlate('');
+      setVehBrand('');
+      setVehModel('');
+      setVehMileage('0');
+      setVehStatus('AVAILABLE');
+      setNewVehicleModalVisible(false);
+      loadVehicles();
+    } catch (err: any) {
+      Alert.alert('Erro ao cadastrar carro', err.message || 'Tente novamente.');
+    }
+  };
+
+  // Acao de Gestao: Alterar Status do Veiculo (Disponivel <-> Oficina)
+  const handleToggleVehicleStatus = async (vehicle: Vehicle) => {
+    if (vehicle.status === 'IN_USE') {
+      Alert.alert('Em Rota', 'Este veículo está em rota ativa no momento. Finalize a rota antes de alterar o status.');
+      return;
+    }
+    const nextStatus = vehicle.status === 'MAINTENANCE' ? 'AVAILABLE' : 'MAINTENANCE';
+    try {
+      await api.updateVehicleStatus(vehicle.id, nextStatus);
+      Alert.alert(
+        'Status Atualizado',
+        `Veículo ${vehicle.plate} agora está ${nextStatus === 'AVAILABLE' ? '🟢 DISPONÍVEL' : '🔧 EM OFICINA'}.`
+      );
+      loadVehicles();
+    } catch (err: any) {
+      Alert.alert('Erro', err.message || 'Falha ao atualizar status.');
+    }
+  };
+
+  // Acao de Gestao: Cadastrar Novo Colaborador (Admin escolhe Gestor/Motorista; Gestor apenas Motorista)
+  const handleCreateUser = async () => {
+    if (!usrName.trim() || !usrCpf.trim()) {
+      Alert.alert('Validação', 'Preencha Nome Completo e CPF do colaborador.');
+      return;
+    }
+    const assignedRole = user?.role === 'FLEET_MANAGER' ? 'DRIVER' : usrRole;
+    const chosenPassword = usrPassword.trim().length > 0 ? usrPassword.trim() : '123456';
+
+    try {
+      await api.createUser({
+        name: usrName.trim(),
+        cpf: usrCpf.trim(),
+        email: usrEmail.trim() || undefined,
+        role: assignedRole,
+        creatorRole: user?.role,
+        password: chosenPassword,
+        tenantId: user?.tenantId,
+      });
+      Alert.alert(
+        '✅ Cadastro Concluído!',
+        `${usrName} cadastrado como ${assignedRole === 'DRIVER' ? 'Motorista' : assignedRole === 'FLEET_MANAGER' ? 'Gestor de Frota' : 'Admin'}.\nSenha inicial: ${chosenPassword}`
+      );
+      setUsrName('');
+      setUsrCpf('');
+      setUsrEmail('');
+      setUsrPassword('');
+      setUsrRole('DRIVER');
+      setNewUserModalVisible(false);
+      loadUsersList();
+      loadQuickUsers();
+    } catch (err: any) {
+      Alert.alert('Erro no cadastro', err.message || 'Não foi possível cadastrar.');
     }
   };
 
@@ -547,28 +697,84 @@ function MainApp() {
   };
 
   // =========================================================================
-  // TELA DE LOGIN: EMPRESA/BASE + CPF + SENHA
+  // TELA DE LOGIN COM 3 PÁGINAS SEPARADAS: ADMIN / GESTOR / MOTORISTA
   // =========================================================================
   if (!user) {
+    const loginMeta = {
+      ADMIN: {
+        title: 'Login Admin (Representante Legal)',
+        color: '#8B5CF6',
+        desc: 'Permissão Total: cadastrar Gestores e Motoristas (definindo tipo), gerenciar carros, status, relatórios e ponto CLT.',
+      },
+      FLEET_MANAGER: {
+        title: 'Login Gestor de Frota',
+        color: '#3B82F6',
+        desc: 'Permissão de Gestão: cadastrar motoristas e carros, alterar status dos veículos, relatórios e históricos (exceto cadastrar gestores).',
+      },
+      DRIVER: {
+        title: 'Login Motorista Operacional',
+        color: '#10B981',
+        desc: 'Permissão Restrita: iniciar rotas, preencher checklists de saída/retorno, ponto CLT e visualizar apenas seu histórico.',
+      },
+    }[selectedLoginRole];
+
+    const filteredQuickUsers = Array.isArray(quickUsers)
+      ? quickUsers.filter((u) => u.role === selectedLoginRole)
+      : [];
+
     return (
       <SafeAreaView style={styles.darkContainer}>
         <StatusBar barStyle="light-content" />
         <ScrollView contentContainerStyle={styles.loginContent}>
           <View style={styles.brandHeader}>
             <View style={styles.shieldIconContainer}>
-              <Ionicons name="shield-checkmark" size={44} color="#10B981" />
+              <Ionicons name="shield-checkmark" size={40} color="#10B981" />
             </View>
             <Text style={styles.brandTitle}>ROTALOG</Text>
             <Text style={styles.brandSubtitle}>Gestão Operacional de Frotas & Ponto CLT</Text>
             <View style={styles.manualBadge}>
-              <Ionicons name="checkmark-circle-outline" size={14} color="#10B981" />
-              <Text style={styles.manualBadgeText}>Acesso Seguro por Base • Gestão Ágil e Direta</Text>
+              <Ionicons name="layers-outline" size={14} color="#10B981" />
+              <Text style={styles.manualBadgeText}>3 Páginas de Acesso • Controle por Hierarquia</Text>
             </View>
           </View>
 
-          {/* Formulario de Login */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Acesso Operacional do Colaborador</Text>
+          {/* Seletor das 3 Paginas de Login */}
+          <View style={styles.loginTabsRow}>
+            {(
+              [
+                { key: 'ADMIN', label: '👑 Admin', color: '#8B5CF6' },
+                { key: 'FLEET_MANAGER', label: '👔 Gestor', color: '#3B82F6' },
+                { key: 'DRIVER', label: '🚗 Motorista', color: '#10B981' },
+              ] as const
+            ).map((tab) => {
+              const active = selectedLoginRole === tab.key;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[
+                    styles.loginTabBtn,
+                    active && { backgroundColor: tab.color, borderColor: tab.color },
+                  ]}
+                  onPress={() => {
+                    setSelectedLoginRole(tab.key);
+                    setCpfInput('');
+                    setPasswordInput('');
+                  }}
+                >
+                  <Text style={[styles.loginTabText, active && { color: '#FFFFFF' }]}>
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Formulario da Pagina de Login Selecionada */}
+          <View style={[styles.card, { borderTopWidth: 3, borderTopColor: loginMeta.color }]}>
+            <Text style={styles.cardTitle}>{loginMeta.title}</Text>
+            <View style={[styles.permissionBox, { borderColor: loginMeta.color }]}>
+              <Text style={styles.permissionBoxText}>{loginMeta.desc}</Text>
+            </View>
 
             {/* Campo 1: Empresa / Base */}
             <Text style={styles.inputLabel}>Empresa / Base Operacional *</Text>
@@ -576,7 +782,7 @@ function MainApp() {
               <Ionicons name="business-outline" size={20} color="#94A3B8" style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.textInput}
-                placeholder="Ex: MK Seguranca"
+                placeholder="Ex: Teste Apresentação"
                 placeholderTextColor="#64748B"
                 value={companyInput}
                 onChangeText={setCompanyInput}
@@ -584,12 +790,12 @@ function MainApp() {
             </View>
 
             {/* Campo 2: CPF */}
-            <Text style={styles.inputLabel}>CPF do Colaborador *</Text>
+            <Text style={styles.inputLabel}>CPF do Usuário *</Text>
             <View style={styles.inputRow}>
               <Ionicons name="person-outline" size={20} color="#94A3B8" style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.textInput}
-                placeholder="Ex: 111.222.333-44"
+                placeholder="Ex: 111.111.111-11"
                 placeholderTextColor="#64748B"
                 value={cpfInput}
                 onChangeText={setCpfInput}
@@ -600,13 +806,13 @@ function MainApp() {
             {/* Campo 3: Senha */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={styles.inputLabel}>Senha de Acesso *</Text>
-              <Text style={styles.inputTip}>Padrão: CPF do colaborador</Text>
+              <Text style={styles.inputTip}>Padrão fictícia: 123456</Text>
             </View>
             <View style={styles.inputRow}>
               <Ionicons name="lock-closed-outline" size={20} color="#94A3B8" style={{ marginRight: 8 }} />
               <TextInput
                 style={styles.textInput}
-                placeholder="Informe sua senha ou CPF"
+                placeholder="Digite sua senha (ex: 123456)"
                 placeholderTextColor="#64748B"
                 value={passwordInput}
                 onChangeText={setPasswordInput}
@@ -615,7 +821,7 @@ function MainApp() {
             </View>
 
             <TouchableOpacity
-              style={[styles.primaryButton, loadingAuth && { opacity: 0.7 }]}
+              style={[styles.primaryButton, { backgroundColor: loginMeta.color }, loadingAuth && { opacity: 0.7 }]}
               onPress={() => handleLogin()}
               disabled={loadingAuth}
             >
@@ -624,54 +830,50 @@ function MainApp() {
               ) : (
                 <>
                   <Ionicons name="log-in-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.primaryButtonText}>Entrar no Sistema</Text>
+                  <Text style={styles.primaryButtonText}>
+                    Entrar como {selectedLoginRole === 'ADMIN' ? 'Admin' : selectedLoginRole === 'FLEET_MANAGER' ? 'Gestor' : 'Motorista'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
           </View>
 
-          {/* Atalhos para a Base MK Seguranca (3 Hierarquias) */}
+          {/* Atalhos Ficticios da Empresa Teste Apresentação Filtrados por Pagina de Login */}
           <View style={styles.quickCard}>
             <View style={styles.quickHeader}>
               <Ionicons name="flash" size={18} color="#F59E0B" />
-              <Text style={styles.quickTitle}>Atalhos de Teste • Base MK Segurança</Text>
+              <Text style={styles.quickTitle}>Acessos Fictícios • Teste Apresentação</Text>
             </View>
-            <Text style={styles.quickDesc}>Selecione um perfil para entrar direto com as permissões da hierarquia:</Text>
+            <Text style={styles.quickDesc}>
+              Toque em um colaborador desta página para entrar direto (Senha: 123456):
+            </Text>
 
-            {quickUsers.map((u) => {
+            {filteredQuickUsers.map((u) => {
               const roleBadge =
                 u.role === 'ADMIN'
-                  ? '👑 Administrador'
+                  ? '👑 Admin (Representante Legal)'
                   : u.role === 'FLEET_MANAGER'
                   ? '👔 Gestor de Frota'
                   : '🚗 Motorista';
-
-              const roleColor =
-                u.role === 'ADMIN'
-                  ? '#8B5CF6'
-                  : u.role === 'FLEET_MANAGER'
-                  ? '#3B82F6'
-                  : '#10B981';
 
               return (
                 <TouchableOpacity
                   key={u.id}
                   style={styles.quickUserItem}
                   onPress={() => {
-                    setCompanyInput(u.tenant?.name || 'MK Seguranca');
+                    const comp = u.tenant?.name || 'Teste Apresentação';
+                    setCompanyInput(comp);
                     setCpfInput(u.cpf);
-                    // Senha padrao
-                    const pass = u.role === 'ADMIN' ? 'admin123' : u.cpf;
-                    setPasswordInput(pass);
-                    handleLogin(u.tenant?.name || 'MK Seguranca', u.cpf, pass);
+                    setPasswordInput('123456');
+                    handleLogin(comp, u.cpf, '123456', selectedLoginRole);
                   }}
                 >
-                  <View style={[styles.avatarCircle, { backgroundColor: roleColor }]}>
-                    <Text style={styles.avatarText}>{u.name.charAt(0)}</Text>
+                  <View style={[styles.avatarCircle, { backgroundColor: loginMeta.color }]}>
+                    <Text style={styles.avatarText}>{(u.name || 'U').charAt(0)}</Text>
                   </View>
                   <View style={{ flex: 1, marginLeft: 10 }}>
                     <Text style={styles.quickUserName}>{u.name}</Text>
-                    <Text style={[styles.quickUserSub, { color: roleColor, fontWeight: '700' }]}>
+                    <Text style={[styles.quickUserSub, { color: loginMeta.color, fontWeight: '700' }]}>
                       {roleBadge}
                     </Text>
                     <Text style={styles.quickUserSub}>CPF: {u.cpf}</Text>
@@ -904,14 +1106,28 @@ function MainApp() {
               </View>
             </View>
           ) : (
-            // SELECAO DE VEICULO: DISPONIVEIS CLICAVEIS, OUTROS CINZA E IRCLICAVEIS
+            // SELECAO DE VEICULO & GESTAO DA FROTA
             <View>
               <View style={styles.noRouteHero}>
                 <Ionicons name="car-sport-outline" size={44} color="#3B82F6" />
-                <Text style={styles.noRouteTitle}>Seleção de Viatura & Checklist</Text>
-                <Text style={styles.noRouteSub}>
-                  Viaturas em verde estão disponíveis para o seu turno. Viaturas em cinza estão ocupadas ou em oficina e não podem ser selecionadas.
+                <Text style={styles.noRouteTitle}>
+                  {isDriver ? 'Seleção de Viatura & Checklist' : 'Gestão da Frota & Status'}
                 </Text>
+                <Text style={styles.noRouteSub}>
+                  {isDriver
+                    ? 'Viaturas em verde estão disponíveis para o seu turno. Viaturas em cinza estão ocupadas ou em oficina.'
+                    : 'Cadastre carros, altere o status (Disponível/Oficina) ou inicie uma rota de vistoria.'}
+                </Text>
+
+                {!isDriver && (
+                  <TouchableOpacity
+                    style={styles.addMgmtBtn}
+                    onPress={() => setNewVehicleModalVisible(true)}
+                  >
+                    <Ionicons name="add-circle" size={18} color="#FFFFFF" />
+                    <Text style={styles.addMgmtBtnText}>+ Cadastrar Novo Carro</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <Text style={styles.sectionHeading}>Veículos da Base ({vehicles.length})</Text>
@@ -919,63 +1135,91 @@ function MainApp() {
               {vehicles.map((v) => {
                 const isAvailable = v.status === 'AVAILABLE';
                 const isInUse = v.status === 'IN_USE';
-                const isMaintenance = v.status === 'MAINTENANCE';
 
                 return (
-                  <TouchableOpacity
+                  <View
                     key={v.id}
-                    disabled={!isAvailable} // REGRA: IRCLICAVEL SE NAO DISPONIVEL
                     style={[
                       styles.vehicleCard,
-                      !isAvailable && styles.vehicleCardDisabled, // REGRA: CINZA SE INDISPONIVEL
+                      !isAvailable && styles.vehicleCardDisabled,
                     ]}
-                    onPress={() => openStartModal(v)}
                   >
-                    <View style={styles.vehicleCardHeader}>
-                      <Text style={[styles.vehiclePlateBadge, !isAvailable && { color: '#64748B' }]}>
-                        {v.plate}
+                    <TouchableOpacity
+                      disabled={!isAvailable}
+                      onPress={() => openStartModal(v)}
+                    >
+                      <View style={styles.vehicleCardHeader}>
+                        <Text style={[styles.vehiclePlateBadge, !isAvailable && { color: '#64748B' }]}>
+                          {v.plate}
+                        </Text>
+
+                        {isAvailable ? (
+                          <View style={styles.availableTag}>
+                            <Text style={styles.availableTagText}>🟢 DISPONÍVEL</Text>
+                          </View>
+                        ) : isInUse ? (
+                          <View style={styles.inUseTag}>
+                            <Text style={styles.inUseTagText}>🔒 EM USO</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.maintenanceTag}>
+                            <Text style={styles.maintenanceTagText}>🔧 OFICINA</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <Text style={[styles.vehicleName, !isAvailable && { color: '#94A3B8' }]}>
+                        {v.brand} {v.model}
                       </Text>
 
+                      <View style={styles.vehicleMetaRow}>
+                        <Text style={styles.vehicleMeta}>Ano: {v.year}</Text>
+                        <Text style={styles.vehicleMeta}>•</Text>
+                        <Text style={styles.vehicleMeta}>Odômetro: {v.currentMileage} km</Text>
+                      </View>
+
                       {isAvailable ? (
-                        <View style={styles.availableTag}>
-                          <Text style={styles.availableTagText}>🟢 DISPONÍVEL</Text>
-                        </View>
-                      ) : isInUse ? (
-                        <View style={styles.inUseTag}>
-                          <Text style={styles.inUseTagText}>🔒 EM USO (INDISPONÍVEL)</Text>
+                        <View style={styles.startTripPrompt}>
+                          <Text style={styles.startTripPromptText}>Toque para Iniciar Rota & Checklist</Text>
+                          <Ionicons name="arrow-forward" size={16} color="#3B82F6" />
                         </View>
                       ) : (
-                        <View style={styles.maintenanceTag}>
-                          <Text style={styles.maintenanceTagText}>⚠️ OFICINA (BLOQUEADO)</Text>
+                        <View style={styles.disabledTripPrompt}>
+                          <Ionicons name="lock-closed" size={14} color="#64748B" />
+                          <Text style={styles.disabledTripPromptText}>
+                            {isInUse
+                              ? `Em trânsito: ${v.currentDriver?.name || 'Outro condutor'}`
+                              : 'Viatura em manutenção na oficina'}
+                          </Text>
                         </View>
                       )}
-                    </View>
+                    </TouchableOpacity>
 
-                    <Text style={[styles.vehicleName, !isAvailable && { color: '#94A3B8' }]}>
-                      {v.brand} {v.model}
-                    </Text>
-
-                    <View style={styles.vehicleMetaRow}>
-                      <Text style={styles.vehicleMeta}>Ano: {v.year}</Text>
-                      <Text style={styles.vehicleMeta}>•</Text>
-                      <Text style={styles.vehicleMeta}>Odômetro: {v.currentMileage} km</Text>
-                    </View>
-
-                    {/* Botao de Acao ou Aviso de Bloqueio */}
-                    {isAvailable ? (
-                      <View style={styles.startTripPrompt}>
-                        <Text style={styles.startTripPromptText}>Toque para Iniciar Viagem & Checklist</Text>
-                        <Ionicons name="arrow-forward" size={16} color="#3B82F6" />
-                      </View>
-                    ) : (
-                      <View style={styles.disabledTripPrompt}>
-                        <Ionicons name="lock-closed" size={14} color="#64748B" />
-                        <Text style={styles.disabledTripPromptText}>
-                          {isInUse ? 'Viatura em trânsito com outro condutor' : 'Viatura bloqueada para reparos mecânicos'}
+                    {/* Controle de Status do Veiculo (Admin e Gestor de Frota) */}
+                    {!isDriver && !isInUse && (
+                      <TouchableOpacity
+                        style={[
+                          styles.statusToggleBtn,
+                          isAvailable ? styles.statusToggleToMaint : styles.statusToggleToAvail,
+                        ]}
+                        onPress={() => handleToggleVehicleStatus(v)}
+                      >
+                        <Ionicons
+                          name={isAvailable ? 'construct-outline' : 'checkmark-circle-outline'}
+                          size={15}
+                          color={isAvailable ? '#FBBF24' : '#34D399'}
+                        />
+                        <Text
+                          style={[
+                            styles.statusToggleText,
+                            { color: isAvailable ? '#FBBF24' : '#34D399' },
+                          ]}
+                        >
+                          {isAvailable ? 'Enviar para Oficina (Manutenção)' : 'Liberar da Oficina (Disponível)'}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     )}
-                  </TouchableOpacity>
+                  </View>
                 );
               })}
             </View>
@@ -1074,11 +1318,87 @@ function MainApp() {
               );
             })
           )}
+
+          {/* Visao de Gestao: Espelho de Ponto de toda a Empresa */}
+          {!isDriver && (
+            <View style={{ marginTop: 18 }}>
+              <Text style={styles.sectionHeading}>
+                Espelho de Ponto CLT da Empresa ({allPunches.length})
+              </Text>
+              {allPunches.map((p, idx) => (
+                <View key={p.id || idx} style={styles.punchRecordItem}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.punchRecordType}>{p.userName}</Text>
+                    <Text style={styles.punchRecordSub}>
+                      {p.type} • CPF: {p.userCpf}
+                    </Text>
+                  </View>
+                  <Text style={styles.punchRecordTime}>
+                    {safeFormatTime(p.timestamp)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
       )}
 
       {/* ===================================================================== */}
-      {/* ABA 3: HISTORICO RESTRITO (O MOTORISTA SO VE AS SUAS PROPRIAS ROTAS) */}
+      {/* ABA EXCLUSIVA ADMIN & GESTOR: CADASTRO DE EQUIPE / MOTORISTAS         */}
+      {/* ===================================================================== */}
+      {activeTab === 'users' && !isDriver && (
+        <ScrollView contentContainerStyle={styles.tabContent}>
+          <View style={styles.noRouteHero}>
+            <Ionicons name="people-outline" size={42} color="#10B981" />
+            <Text style={styles.noRouteTitle}>Cadastros & Equipe da Empresa</Text>
+            <Text style={styles.noRouteSub}>
+              {user.role === 'ADMIN'
+                ? 'Como Admin (Representante Legal), você cadastra Gestores de Frota e Motoristas definindo tipo e senha.'
+                : 'Como Gestor de Frota, você tem permissão para cadastrar novos Motoristas Operacionais.'}
+            </Text>
+            <TouchableOpacity
+              style={[styles.addMgmtBtn, { backgroundColor: '#10B981' }]}
+              onPress={() => {
+                setUsrRole('DRIVER');
+                setNewUserModalVisible(true);
+              }}
+            >
+              <Ionicons name="person-add" size={18} color="#FFFFFF" />
+              <Text style={styles.addMgmtBtnText}>
+                {user.role === 'ADMIN' ? '+ Cadastrar Gestor / Motorista' : '+ Cadastrar Motorista'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.sectionHeading}>Colaboradores Cadastrados ({usersList.length})</Text>
+
+          {usersList.map((u) => {
+            const roleLabel =
+              u.role === 'ADMIN'
+                ? '👑 Admin (Representante)'
+                : u.role === 'FLEET_MANAGER'
+                ? '👔 Gestor de Frota'
+                : '🚗 Motorista';
+            const roleColor =
+              u.role === 'ADMIN' ? '#8B5CF6' : u.role === 'FLEET_MANAGER' ? '#3B82F6' : '#10B981';
+
+            return (
+              <View key={u.id} style={styles.userMgmtCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.userMgmtName}>{u.name}</Text>
+                  <Text style={[styles.quickUserSub, { color: roleColor, fontWeight: '800', marginTop: 2 }]}>
+                    {roleLabel}
+                  </Text>
+                  <Text style={styles.userMgmtMeta}>CPF: {u.cpf} • {u.email}</Text>
+                </View>
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      {/* ===================================================================== */}
+      {/* ABA 3: HISTORICO & RELATORIOS (MOTORISTA SO VE O PROPRIO; GESTAO VE TD) */}
       {/* ===================================================================== */}
       {activeTab === 'history' && (
         <ScrollView contentContainerStyle={styles.tabContent}>
@@ -1090,16 +1410,38 @@ function MainApp() {
               </Text>
             </View>
           ) : (
-            <View style={[styles.privacyNoticeCard, { borderColor: '#3B82F6' }]}>
-              <Ionicons name="eye" size={20} color="#3B82F6" />
-              <Text style={styles.privacyNoticeText}>
-                Visão de Gestão: visualizando viagens e relatórios operacionais de toda a base.
-              </Text>
+            <View>
+              <View style={[styles.privacyNoticeCard, { borderColor: '#3B82F6' }]}>
+                <Ionicons name="bar-chart" size={20} color="#3B82F6" />
+                <Text style={styles.privacyNoticeText}>
+                  Relatórios Gerenciais: histórico consolidado de rotas, quilometragem, checklists e ocorrências.
+                </Text>
+              </View>
+
+              {/* Resumo de Indicadores no Mobile para Admin / Gestor */}
+              <View style={styles.reportKpiRow}>
+                <View style={styles.reportKpiBox}>
+                  <Text style={styles.reportKpiVal}>{driverTrips.length}</Text>
+                  <Text style={styles.reportKpiLbl}>Viagens</Text>
+                </View>
+                <View style={styles.reportKpiBox}>
+                  <Text style={[styles.reportKpiVal, { color: '#10B981' }]}>
+                    {driverTrips.reduce((s, t) => s + (t.totalDistanceKm || 0), 0)} km
+                  </Text>
+                  <Text style={styles.reportKpiLbl}>Rodados</Text>
+                </View>
+                <View style={styles.reportKpiBox}>
+                  <Text style={[styles.reportKpiVal, { color: '#F59E0B' }]}>
+                    {vehicles.filter((v) => v.status === 'MAINTENANCE').length}
+                  </Text>
+                  <Text style={styles.reportKpiLbl}>Oficina</Text>
+                </View>
+              </View>
             </View>
           )}
 
           <Text style={styles.sectionHeading}>
-            {isDriver ? 'Minhas Rotas & Checklists Anteriores' : 'Histórico Geral de Viagens da Base'} ({driverTrips.length})
+            {isDriver ? 'Minhas Rotas & Checklists Anteriores' : 'Relatório Geral de Viagens'} ({driverTrips.length})
           </Text>
 
           {driverTrips.length === 0 ? (
@@ -1107,7 +1449,7 @@ function MainApp() {
               <Text style={styles.emptyText}>Nenhuma rota registrada até o momento.</Text>
             </View>
           ) : (
-            driverTrips.map((trip) => {
+            driverTrips.map((trip: any) => {
               const startDt = new Date(trip.startTime);
               const endDt = trip.endTime ? new Date(trip.endTime) : null;
               const lunchStartDt = trip.lunchStartTime ? new Date(trip.lunchStartTime) : null;
@@ -1117,9 +1459,9 @@ function MainApp() {
                 <View key={trip.id} style={styles.tripHistoryCard}>
                   {/* Topo do Card da Viagem */}
                   <View style={styles.tripHeaderRow}>
-                    <View>
+                    <View style={{ flex: 1 }}>
                       <Text style={styles.tripDateTitle}>
-                        {safeFormatShortDate(startDt)}
+                        {safeFormatShortDate(startDt)} {!isDriver && trip.driver?.name ? `• ${trip.driver.name}` : ''}
                       </Text>
                       <Text style={styles.tripPlate}>
                         {trip.vehicle?.plate} • {trip.vehicle?.brand} {trip.vehicle?.model}
@@ -1336,7 +1678,204 @@ function MainApp() {
         </View>
       </Modal>
 
-      {/* Barra Inferior (Tabs) */}
+      {/* ===================================================================== */}
+      {/* MODAL DE GESTAO: CADASTRAR NOVO VEICULO (ADMIN & GESTOR)              */}
+      {/* ===================================================================== */}
+      <Modal visible={newVehicleModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>Cadastrar Novo Veículo</Text>
+                <Text style={styles.modalSub}>Inclusão direta na frota da empresa</Text>
+              </View>
+              <TouchableOpacity onPress={() => setNewVehicleModalVisible(false)}>
+                <Ionicons name="close-circle" size={26} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 400 }}>
+              <Text style={styles.inputLabel}>Placa do Veículo *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={vehPlate}
+                onChangeText={setVehPlate}
+                autoCapitalize="characters"
+                placeholder="Ex: TAP7G07"
+                placeholderTextColor="#64748B"
+              />
+
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>Marca *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={vehBrand}
+                onChangeText={setVehBrand}
+                placeholder="Ex: Fiat"
+                placeholderTextColor="#64748B"
+              />
+
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>Modelo *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={vehModel}
+                onChangeText={setVehModel}
+                placeholder="Ex: Toro Volcano 2.0"
+                placeholderTextColor="#64748B"
+              />
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Ano</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    keyboardType="numeric"
+                    value={vehYear}
+                    onChangeText={setVehYear}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Odômetro (Km)</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    keyboardType="numeric"
+                    value={vehMileage}
+                    onChangeText={setVehMileage}
+                  />
+                </View>
+              </View>
+
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>Status Inicial</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  style={[
+                    styles.roleOptionChip,
+                    vehStatus === 'AVAILABLE' && { backgroundColor: '#059669', borderColor: '#10B981' },
+                  ]}
+                  onPress={() => setVehStatus('AVAILABLE')}
+                >
+                  <Text style={styles.roleOptionText}>🟢 Disponível</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.roleOptionChip,
+                    vehStatus === 'MAINTENANCE' && { backgroundColor: '#D97706', borderColor: '#F59E0B' },
+                  ]}
+                  onPress={() => setVehStatus('MAINTENANCE')}
+                >
+                  <Text style={styles.roleOptionText}>🔧 Oficina</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity style={styles.confirmModalBtn} onPress={handleCreateVehicle}>
+              <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.confirmModalBtnText}>Salvar Veículo</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ===================================================================== */}
+      {/* MODAL DE GESTAO: CADASTRAR COLABORADOR (ADMIN=TD; GESTOR=SO MOTORISTA) */}
+      {/* ===================================================================== */}
+      <Modal visible={newUserModalVisible} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>
+                  {user.role === 'ADMIN' ? 'Cadastrar Colaborador' : 'Cadastrar Motorista'}
+                </Text>
+                <Text style={styles.modalSub}>
+                  {user.role === 'ADMIN'
+                    ? 'Defina o tipo de acesso (Gestor ou Motorista)'
+                    : 'Gestores cadastram apenas Motoristas'}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setNewUserModalVisible(false)}>
+                <Ionicons name="close-circle" size={26} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }}>
+              <Text style={styles.inputLabel}>Nome Completo *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={usrName}
+                onChangeText={setUsrName}
+                placeholder="Ex: João Pedro Ferreira"
+                placeholderTextColor="#64748B"
+              />
+
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>CPF *</Text>
+              <TextInput
+                style={styles.textInput}
+                keyboardType="numeric"
+                value={usrCpf}
+                onChangeText={setUsrCpf}
+                placeholder="Ex: 777.777.777-77"
+                placeholderTextColor="#64748B"
+              />
+
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>E-mail (Opcional)</Text>
+              <TextInput
+                style={styles.textInput}
+                autoCapitalize="none"
+                value={usrEmail}
+                onChangeText={setUsrEmail}
+                placeholder="joao@testeapresentacao.com.br"
+                placeholderTextColor="#64748B"
+              />
+
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>Senha Inicial (Padrão: 123456)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={usrPassword}
+                onChangeText={setUsrPassword}
+                placeholder="Deixe vazio para usar 123456"
+                placeholderTextColor="#64748B"
+              />
+
+              <Text style={[styles.inputLabel, { marginTop: 12 }]}>Tipo / Permissão de Acesso *</Text>
+              {user.role === 'FLEET_MANAGER' ? (
+                <View style={styles.permissionBox}>
+                  <Text style={styles.permissionBoxText}>
+                    🚗 Motorista Operacional (Restrito: Gestores de Frota podem cadastrar apenas Motoristas; apenas o Admin cadastra outros Gestores).
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                  {(
+                    [
+                      { key: 'DRIVER', label: '🚗 Motorista', color: '#059669' },
+                      { key: 'FLEET_MANAGER', label: '👔 Gestor', color: '#2563EB' },
+                      { key: 'ADMIN', label: '👑 Admin', color: '#7C3AED' },
+                    ] as const
+                  ).map((opt) => (
+                    <TouchableOpacity
+                      key={opt.key}
+                      style={[
+                        styles.roleOptionChip,
+                        usrRole === opt.key && { backgroundColor: opt.color, borderColor: opt.color },
+                      ]}
+                      onPress={() => setUsrRole(opt.key)}
+                    >
+                      <Text style={styles.roleOptionText}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity style={[styles.confirmModalBtn, { backgroundColor: '#10B981' }]} onPress={handleCreateUser}>
+              <Ionicons name="person-add" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.confirmModalBtnText}>Salvar Cadastro</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Barra Inferior (Tabs Contextuais por Hierarquia) */}
       <View style={styles.bottomNav}>
         <TouchableOpacity
           style={[styles.navItem, activeTab === 'route' && styles.navItemActive]}
@@ -1344,13 +1883,29 @@ function MainApp() {
         >
           <Ionicons
             name={activeTab === 'route' ? 'car' : 'car-outline'}
-            size={22}
+            size={21}
             color={activeTab === 'route' ? '#3B82F6' : '#94A3B8'}
           />
           <Text style={[styles.navText, activeTab === 'route' && styles.navTextActive]}>
-            Viagem / Viatura
+            {isDriver ? 'Iniciar Rota' : 'Frota'}
           </Text>
         </TouchableOpacity>
+
+        {!isDriver && (
+          <TouchableOpacity
+            style={[styles.navItem, activeTab === 'users' && styles.navItemActive]}
+            onPress={() => setActiveTab('users')}
+          >
+            <Ionicons
+              name={activeTab === 'users' ? 'people' : 'people-outline'}
+              size={21}
+              color={activeTab === 'users' ? '#8B5CF6' : '#94A3B8'}
+            />
+            <Text style={[styles.navText, activeTab === 'users' && { color: '#8B5CF6' }]}>
+              Cadastros
+            </Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           style={[styles.navItem, activeTab === 'timeclock' && styles.navItemActive]}
@@ -1358,7 +1913,7 @@ function MainApp() {
         >
           <Ionicons
             name={activeTab === 'timeclock' ? 'time' : 'time-outline'}
-            size={22}
+            size={21}
             color={activeTab === 'timeclock' ? '#10B981' : '#94A3B8'}
           />
           <Text style={[styles.navText, activeTab === 'timeclock' && { color: '#10B981' }]}>
@@ -1372,11 +1927,11 @@ function MainApp() {
         >
           <Ionicons
             name={activeTab === 'history' ? 'document-text' : 'document-text-outline'}
-            size={22}
+            size={21}
             color={activeTab === 'history' ? '#F59E0B' : '#94A3B8'}
           />
           <Text style={[styles.navText, activeTab === 'history' && { color: '#F59E0B' }]}>
-            {isDriver ? 'Meu Histórico' : 'Histórico Base'}
+            {isDriver ? 'Histórico' : 'Relatórios'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -2229,6 +2784,136 @@ const styles = StyleSheet.create({
   },
   navTextActive: {
     color: '#3B82F6',
+    fontWeight: '700',
+  },
+
+  // Estilos das 3 Paginas de Login & Gestao
+  loginTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  loginTabBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'center',
+  },
+  loginTabText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  permissionBox: {
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#3B82F6',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+  },
+  permissionBoxText: {
+    color: '#CBD5E1',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  addMgmtBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563EB',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginTop: 12,
+    gap: 6,
+  },
+  addMgmtBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  statusToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 10,
+    gap: 6,
+  },
+  statusToggleToMaint: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: 'rgba(245, 158, 11, 0.35)',
+  },
+  statusToggleToAvail: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+  },
+  statusToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  userMgmtCard: {
+    backgroundColor: '#1E293B',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#334155',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userMgmtName: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  userMgmtMeta: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 3,
+  },
+  reportKpiRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  reportKpiBox: {
+    flex: 1,
+    backgroundColor: '#1E293B',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+    alignItems: 'center',
+  },
+  reportKpiVal: {
+    color: '#F8FAFC',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  reportKpiLbl: {
+    color: '#94A3B8',
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  roleOptionChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  roleOptionText: {
+    color: '#F8FAFC',
+    fontSize: 12,
     fontWeight: '700',
   },
 });

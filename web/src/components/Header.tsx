@@ -27,7 +27,7 @@ export function Header({
   notificationCount,
   onRefresh,
   isRefreshing,
-  selectedTenantName = 'MK Seguranca',
+  selectedTenantName = 'Teste Apresentação',
   currentUser,
   onLogout,
 }: HeaderProps) {
@@ -46,11 +46,11 @@ export function Header({
   const getRoleLabel = (role?: string) => {
     switch (role) {
       case 'ADMIN':
-        return 'Usuário Master (Admin)';
+        return 'Admin (Representante Legal)';
       case 'FLEET_MANAGER':
-        return 'Gestor de Controle da Frota';
+        return 'Gestor de Frota';
       case 'DRIVER':
-        return 'Colaborador / Motorista';
+        return 'Motorista';
       default:
         return 'Colaborador';
     }
@@ -148,8 +148,8 @@ export function Header({
             </button>
           )}
 
-          {/* Ações: Cadastrar Veículo (Exclusivo do Master) */}
-          {isMaster && (
+          {/* Ações: Cadastrar Veículo (Admin e Gestor de Frota) */}
+          {(isMaster || isControl) && (
             <button
               onClick={onOpenNewVehicle}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/90 hover:bg-blue-600 text-white text-xs font-bold transition-all shadow-md shadow-blue-600/20"
@@ -161,16 +161,16 @@ export function Header({
             </button>
           )}
 
-          {/* Ações: Cadastrar Colaborador (Master e Usuário de Controle) */}
+          {/* Ações: Cadastrar Colaborador / Motorista */}
           {canAddCollaborator && (
             <button
               onClick={onOpenNewUser}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600/90 hover:bg-emerald-600 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20"
-              title="Cadastrar colaborador / definir hierarquia"
+              title={isMaster ? 'Cadastrar gestor ou motorista' : 'Cadastrar motorista'}
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">+ Colaborador</span>
-              <span className="sm:hidden">+ Equipe</span>
+              <span className="hidden sm:inline">{isMaster ? '+ Colaborador' : '+ Motorista'}</span>
+              <span className="sm:hidden">{isMaster ? '+ Equipe' : '+ Motorista'}</span>
             </button>
           )}
 

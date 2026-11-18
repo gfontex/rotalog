@@ -53,15 +53,16 @@ interface AuthUser {
 }
 
 export default function DashboardPage() {
-  // Autenticação do Usuário
+  // Autenticação do Usuário e Controle das 3 Páginas de Login
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [loginCompany, setLoginCompany] = useState('MK Seguranca');
+  const [selectedLoginRole, setSelectedLoginRole] = useState<'ADMIN' | 'FLEET_MANAGER' | 'DRIVER'>('ADMIN');
+  const [loginCompany, setLoginCompany] = useState('Teste Apresentação');
   const [loginCpf, setLoginCpf] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
-  // Aba ativa do Painel (para Master e Controle)
+  // Aba ativa do Painel (para Admin e Gestor)
   const [activeTab, setActiveTab] = useState<'fleet' | 'trips' | 'timeclock' | 'users'>('fleet');
 
   // Dados do Servidor
@@ -97,14 +98,21 @@ export default function DashboardPage() {
   const [isReturnChecklistOpen, setIsReturnChecklistOpen] = useState(false);
   const [activeUsage, setActiveUsage] = useState<any | null>(null);
 
-  // Carregar sessão salva no navegador
+  // Carregar sessão salva no navegador (limpa sessões antigas fora da empresa atual)
   useEffect(() => {
     try {
       const saved = localStorage.getItem('@rotalog:user');
       if (saved) {
-        setCurrentUser(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.tenantName === 'Teste Apresentação') {
+          setCurrentUser(parsed);
+        } else {
+          localStorage.removeItem('@rotalog:user');
+        }
       }
-    } catch (_) {}
+    } catch (_) {
+      localStorage.removeItem('@rotalog:user');
+    }
   }, []);
 
   // Carregar lista de empresas para autocomplete/seleção
@@ -112,20 +120,27 @@ export default function DashboardPage() {
     webApi.getTenants().then((data) => {
       if (Array.isArray(data) && data.length > 0) {
         setTenants(data);
-        if (!loginCompany) setLoginCompany(data[0].name);
+        setLoginCompany(data[0].name);
       }
     }).catch(() => {});
   }, []);
 
-  // Ação de Login Unificada (por CPF e Senha)
-  const handleLogin = async (e?: React.FormEvent, customCpf?: string, customPass?: string, customComp?: string) => {
+  // Ação de Login com Validação da Página de Login (Admin, Gestor ou Motorista)
+  const handleLogin = async (
+    e?: React.FormEvent,
+    customCpf?: string,
+    customPass?: string,
+    customComp?: string,
+    expectedRole?: 'ADMIN' | 'FLEET_MANAGER' | 'DRIVER'
+  ) => {
     if (e) e.preventDefault();
     const comp = customComp || loginCompany;
     const cpf = customCpf || loginCpf;
     const pass = customPass || loginPassword;
+    const targetRole = expectedRole || selectedLoginRole;
 
     if (!comp || !cpf) {
-      setLoginError('Informe a Base da Empresa e o seu CPF.');
+      setLoginError('Informe a Empresa e o seu CPF.');
       return;
     }
 
@@ -141,6 +156,16 @@ export default function DashboardPage() {
 
       if (res && res.user) {
         const userData: AuthUser = res.user;
+        if (userData.role !== targetRole) {
+          const roleNames: Record<string, string> = {
+            ADMIN: 'Admin (Representante Legal)',
+            FLEET_MANAGER: 'Gestor de Frota',
+            DRIVER: 'Motorista',
+          };
+          throw new Error(
+            `Acesso negado nesta página de login: este CPF pertence ao perfil "${roleNames[userData.role] || userData.role}", não "${roleNames[targetRole]}". Selecione a página de login correspondente acima.`
+          );
+        }
         setCurrentUser(userData);
         localStorage.setItem('@rotalog:user', JSON.stringify(userData));
       } else {
@@ -262,13 +287,67 @@ export default function DashboardPage() {
     }
   };
 
+  const handleChangeVehicleStatus = async (vehicle: any, newStatus: 'AVAILABLE' | 'MAINTENANCE') => {
+    try {
+      await webApi.updateVehicleStatus(vehicle.id, newStatus);
+      loadAllData();
+    } catch (err: any) {
+      alert('Erro ao atualizar status do veículo: ' + (err.message || 'Erro inesperado.'));
+    }
+  };
+
   // =========================================================================
-  // 1. TELA DE LOGIN UNIFICADA (RESPONSIVA NO CELULAR E NO PC)
+  // 1. TELA DE LOGIN COM 3 PÁGINAS SEPARADAS POR HIERARQUIA (ADMIN / GESTOR / MOTORISTA)
   // =========================================================================
   if (!currentUser) {
+    const loginProfiles = {
+      ADMIN: {
+        tabLabel: '👑 Login Admin',
+        title: 'Página de Login • Admin',
+        subtitle: 'Representante Legal da Empresa',
+        accent: 'from-purple-600 via-indigo-600 to-purple-500',
+        badgeClass: 'bg-purple-500/15 text-purple-300 border-purple-500/40',
+        permissions:
+          'Permissão Total: Controle completo da empresa, cadastrar Gestores e Motoristas, definir tipo de usuário, veículos, status, relatórios e ponto CLT.',
+        sampleAccounts: [
+          { name: 'Ricardo Almeida (Representante)', cpf: '111.111.111-11', pass: '123456', tag: 'Admin' },
+        ],
+      },
+      FLEET_MANAGER: {
+        tabLabel: '👔 Login Gestor',
+        title: 'Página de Login • Gestor de Frota',
+        subtitle: 'Controle Operacional de Frota',
+        accent: 'from-blue-600 via-cyan-600 to-blue-500',
+        badgeClass: 'bg-blue-500/15 text-blue-300 border-blue-500/40',
+        permissions:
+          'Permissão de Gestão: Cadastrar motoristas, cadastrar carros, alterar status dos veículos (Disponível/Oficina), relatórios e históricos (exceto cadastrar gestores).',
+        sampleAccounts: [
+          { name: 'Roberto Mendes', cpf: '222.222.222-22', pass: '123456', tag: 'Gestor' },
+          { name: 'Fernanda Costa', cpf: '222.333.444-55', pass: '123456', tag: 'Gestora' },
+        ],
+      },
+      DRIVER: {
+        tabLabel: '🚗 Login Motorista',
+        title: 'Página de Login • Motorista',
+        subtitle: 'Operação em Campo & Checklists',
+        accent: 'from-emerald-600 via-teal-600 to-emerald-500',
+        badgeClass: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
+        permissions:
+          'Permissão Restrita: Iniciar rotas, preencher checklists de saída e devolução, registrar almoço/ponto CLT e consultar apenas o seu próprio histórico.',
+        sampleAccounts: [
+          { name: 'Carlos Eduardo Silva', cpf: '333.333.333-33', pass: '123456', tag: 'Disponível' },
+          { name: 'Marcos Vinícius Oliveira', cpf: '444.444.444-44', pass: '123456', tag: 'Disponível' },
+          { name: 'Lucas Gabriel Pereira', cpf: '555.555.555-55', pass: '123456', tag: 'Em rota ativa' },
+          { name: 'André Luiz Souza', cpf: '666.666.666-66', pass: '123456', tag: 'Motorista' },
+        ],
+      },
+    } as const;
+
+    const activeProfile = loginProfiles[selectedLoginRole];
+
     return (
       <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8 selection:bg-indigo-500 selection:text-white">
-        <div className="max-w-md w-full mx-auto flex items-center justify-between py-2">
+        <div className="max-w-lg w-full mx-auto flex items-center justify-between py-2">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/20">
               <ShieldCheck className="w-5 h-5 text-white" />
@@ -279,36 +358,69 @@ export default function DashboardPage() {
             </div>
           </div>
           <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
-            Acesso Único
+            3 Páginas de Login
           </span>
         </div>
 
-        <div className="max-w-md w-full mx-auto my-6 bg-[#0F172A] border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-blue-500 to-indigo-500" />
+        <div className="max-w-lg w-full mx-auto my-5 bg-[#0F172A] border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
+          <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${activeProfile.accent}`} />
 
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-black text-white mb-1.5 tracking-tight">Portal de Acesso</h1>
-            <p className="text-xs text-slate-400">
-              O sistema detecta sua hierarquia automaticamente pelo CPF.
-            </p>
+          {/* Seletor das 3 Páginas de Login */}
+          <div className="grid grid-cols-3 gap-2 mb-5 bg-[#070B14] p-1.5 rounded-2xl border border-slate-800">
+            {(['ADMIN', 'FLEET_MANAGER', 'DRIVER'] as const).map((roleKey) => {
+              const isSelected = selectedLoginRole === roleKey;
+              return (
+                <button
+                  key={roleKey}
+                  type="button"
+                  onClick={() => {
+                    setSelectedLoginRole(roleKey);
+                    setLoginError('');
+                    setLoginCpf('');
+                    setLoginPassword('');
+                  }}
+                  className={`py-2 px-2 rounded-xl text-[11px] sm:text-xs font-extrabold transition-all cursor-pointer ${
+                    isSelected
+                      ? roleKey === 'ADMIN'
+                        ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/25'
+                        : roleKey === 'FLEET_MANAGER'
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/25'
+                        : 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                  }`}
+                >
+                  {loginProfiles[roleKey].tabLabel}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="text-center mb-4">
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">{activeProfile.title}</h1>
+            <p className="text-xs text-slate-400 mt-0.5">{activeProfile.subtitle}</p>
+          </div>
+
+          {/* Box Explicativo de Permissões do Perfil Selecionado */}
+          <div className={`mb-4 p-3 rounded-2xl border text-[11px] leading-relaxed ${activeProfile.badgeClass}`}>
+            {activeProfile.permissions}
           </div>
 
           {loginError && (
-            <div className="mb-5 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-xs text-rose-300 flex items-start gap-2.5">
+            <div className="mb-4 p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl text-xs text-rose-300 flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
               <span className="leading-relaxed">{loginError}</span>
             </div>
           )}
 
-          <form onSubmit={(e) => handleLogin(e)} className="space-y-4">
+          <form onSubmit={(e) => handleLogin(e)} className="space-y-3.5">
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                 <Building2 className="w-3.5 h-3.5 text-indigo-400" />
                 Empresa / Base Operacional
               </label>
               <input
                 type="text"
-                placeholder="Ex: MK Seguranca"
+                placeholder="Ex: Teste Apresentação"
                 value={loginCompany}
                 onChange={(e) => setLoginCompany(e.target.value)}
                 className="w-full px-4 py-2.5 bg-[#070B14] border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 transition-all font-medium"
@@ -317,13 +429,13 @@ export default function DashboardPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                 <KeyRound className="w-3.5 h-3.5 text-emerald-400" />
-                CPF do Usuário (Identificador)
+                CPF do Usuário
               </label>
               <input
                 type="text"
-                placeholder="Ex: 000.111.222-33"
+                placeholder="Ex: 111.111.111-11"
                 value={loginCpf}
                 onChange={(e) => setLoginCpf(e.target.value)}
                 className="w-full px-4 py-2.5 bg-[#070B14] border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 font-mono transition-all"
@@ -332,79 +444,63 @@ export default function DashboardPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+              <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5 text-purple-400" />
                 Senha de Acesso
               </label>
               <input
                 type="password"
-                placeholder="Digite sua senha cadastrada"
+                placeholder="Digite sua senha (padrão: 123456)"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 className="w-full px-4 py-2.5 bg-[#070B14] border border-slate-700/80 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 transition-all"
               />
-              <p className="text-[11px] text-slate-500 mt-1">
-                A senha padrão do funcionário é o próprio CPF cadastrado pelo gestor.
-              </p>
             </div>
 
             <button
               type="submit"
               disabled={loginLoading}
-              className="w-full py-3.5 mt-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-blue-600/25 text-sm flex items-center justify-center gap-2 cursor-pointer"
+              className={`w-full py-3.5 mt-1 bg-gradient-to-r ${activeProfile.accent} text-white font-black rounded-2xl transition-all shadow-xl text-sm flex items-center justify-center gap-2 cursor-pointer`}
             >
-              {loginLoading ? 'Identificando Hierarquia...' : 'Acessar Meu Painel'}
+              {loginLoading ? 'Validando Perfil...' : `Entrar como ${selectedLoginRole === 'ADMIN' ? 'Admin' : selectedLoginRole === 'FLEET_MANAGER' ? 'Gestor' : 'Motorista'}`}
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
 
-          {/* Atalhos Rápidos para Demonstração em Sala */}
-          <div className="mt-6 pt-5 border-t border-slate-800">
+          {/* Contas Fictícias de Teste para Esta Página de Login */}
+          <div className="mt-5 pt-4 border-t border-slate-800">
             <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2.5 text-center flex items-center justify-center gap-1.5">
               <Sparkles className="w-3 h-3 text-amber-400" />
-              Atalhos de Apresentação (3 Níveis de Acesso)
+              Acessos Fictícios da Empresa • Teste Apresentação (Senha: 123456)
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => handleLogin(undefined, '000.111.222-33', 'admin123', 'MK Seguranca')}
-                className="p-2.5 bg-[#070B14] hover:bg-slate-900 border border-purple-500/30 hover:border-purple-500/60 rounded-xl text-left transition-all group"
-              >
-                <div className="text-[10px] font-extrabold text-purple-400 group-hover:text-purple-300">👑 Master</div>
-                <div className="text-xs font-bold text-white truncate">Admin Geral</div>
-                <div className="text-[10px] text-slate-500">Cadastra tudo</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleLogin(undefined, '333.444.555-66', '333.444.555-66', 'MK Seguranca')}
-                className="p-2.5 bg-[#070B14] hover:bg-slate-900 border border-blue-500/30 hover:border-blue-500/60 rounded-xl text-left transition-all group"
-              >
-                <div className="text-[10px] font-extrabold text-blue-400 group-hover:text-blue-300">👔 Controle</div>
-                <div className="text-xs font-bold text-white truncate">Roberto (Gestor)</div>
-                <div className="text-[10px] text-slate-500">Frota & Equipe</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleLogin(undefined, '111.222.333-44', '111.222.333-44', 'MK Seguranca')}
-                className="p-2.5 bg-[#070B14] hover:bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 rounded-xl text-left transition-all group"
-              >
-                <div className="text-[10px] font-extrabold text-emerald-400 group-hover:text-emerald-300">🚗 Colaborador</div>
-                <div className="text-xs font-bold text-white truncate">Carlos Silva</div>
-                <div className="text-[10px] text-slate-500">Suas viagens</div>
-              </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {activeProfile.sampleAccounts.map((acc) => (
+                <button
+                  key={acc.cpf}
+                  type="button"
+                  onClick={() => handleLogin(undefined, acc.cpf, acc.pass, 'Teste Apresentação', selectedLoginRole)}
+                  className="p-2.5 bg-[#070B14] hover:bg-slate-900 border border-slate-800 hover:border-slate-600 rounded-xl text-left transition-all cursor-pointer"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-white truncate">{acc.name}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 shrink-0">
+                      {acc.tag}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">CPF: {acc.cpf}</div>
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="max-w-md w-full mx-auto text-center py-2">
+        <div className="max-w-lg w-full mx-auto text-center py-2">
           <Link
             href="/master"
             className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-400 transition-colors py-1.5 px-3 rounded-full hover:bg-indigo-950/30 border border-transparent hover:border-indigo-900/40"
           >
             <Lock className="w-3.5 h-3.5" />
-            <span>Portal Master MEU (Cadastrar Nova Empresa Cliente)</span>
+            <span>Portal Software House (/master)</span>
           </Link>
         </div>
       </div>
@@ -783,13 +879,13 @@ export default function DashboardPage() {
                   Base Operacional: <span className="text-emerald-400">{currentUser.tenantName}</span>
                 </h1>
                 <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${isMaster ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}>
-                  {isMaster ? '👑 Perfil: Usuário Master (Acesso Total)' : '👔 Perfil: Usuário de Controle da Frota'}
+                  {isMaster ? '👑 Admin (Representante Legal • Permissão Total)' : '👔 Gestor de Frota'}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
                 {isMaster
-                  ? 'Você pode cadastrar viaturas, definir senhas e cadastrar quem terá o controle da frota e os motoristas.'
-                  : 'Você tem controle em tempo real dos carros, relatórios de viagens, espelho de ponto CLT e pode cadastrar colaboradores.'}
+                  ? 'Permissão total: gerencie carros, status dos veículos, relatórios, ponto CLT e cadastre Gestores e Motoristas.'
+                  : 'Gerencie carros, status dos veículos, relatórios e históricos completos, além de cadastrar novos Motoristas (exceto gestores).'}
               </p>
             </div>
           </div>
@@ -863,6 +959,8 @@ export default function DashboardPage() {
               vehicles={vehicles}
               onStartRoute={handleStartRoute}
               onFinishRoute={handleFinishRoute}
+              canManageVehicles={isMaster || isControl}
+              onChangeVehicleStatus={handleChangeVehicleStatus}
             />
           )}
 
@@ -876,8 +974,8 @@ export default function DashboardPage() {
                   <h3 className="text-base font-extrabold text-white">Equipe e Colaboradores da Base</h3>
                   <p className="text-xs text-slate-400">
                     {isMaster
-                      ? 'Você pode cadastrar usuários de controle da frota e motoristas, definindo senhas e cargos.'
-                      : 'Você pode cadastrar os colaboradores operacionais e consultar os acessos da base.'}
+                      ? 'Como Admin, você cadastra Gestores de Frota e Motoristas definindo tipo de perfil e senha.'
+                      : 'Como Gestor de Frota, você pode cadastrar apenas Motoristas Operacionais.'}
                   </p>
                 </div>
                 <button
@@ -885,7 +983,7 @@ export default function DashboardPage() {
                   className="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
                 >
                   <Users className="w-4 h-4" />
-                  <span>+ Cadastrar Colaborador</span>
+                  <span>{isMaster ? '+ Cadastrar Gestor / Motorista' : '+ Cadastrar Motorista'}</span>
                 </button>
               </div>
 

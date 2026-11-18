@@ -4,259 +4,555 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 export async function main() {
-  console.log('Populando banco de dados persistente SQLite (rotalog.db)...');
+  console.log('Limpando banco de dados e populando base ficticia "Teste Apresentação"...');
 
-  // Limpa registros anteriores para seed limpo se existirem
+  // Limpa todos os registros anteriores
   await prisma.auditLog.deleteMany();
   await prisma.timeClocking.deleteMany();
   await prisma.vehicleUsage.deleteMany();
   await prisma.vehicleChecklist.deleteMany();
+  await prisma.checklistTemplate.deleteMany();
   await prisma.vehicle.deleteMany();
   await prisma.user.deleteMany();
   await prisma.branch.deleteMany();
   await prisma.tenant.deleteMany();
 
-  // 1. Criar Empresa / Base: "MK Seguranca"
-  const tenantMK = await prisma.tenant.create({
+  // 1. Criar Empresa: "Teste Apresentação"
+  const tenant = await prisma.tenant.create({
     data: {
-      name: 'MK Seguranca',
-      code: 'mkseguranca',
-      cnpj: '12.345.678/0001-90',
+      name: 'Teste Apresentação',
+      code: 'teste-apresentacao',
+      cnpj: '45.123.789/0001-10',
       status: 'ACTIVE',
     },
   });
-  console.log('Empresa criada no banco:', tenantMK.name);
+  console.log('Empresa criada:', tenant.name);
 
-  // Filial / Base Operacional
-  const branchMK = await prisma.branch.create({
+  // Filial Operacional
+  const branch = await prisma.branch.create({
     data: {
-      tenantId: tenantMK.id,
-      name: 'Base Operacional Central',
-      city: 'Sao Paulo',
+      tenantId: tenant.id,
+      name: 'Matriz Operacional - São Paulo',
+      city: 'São Paulo',
       state: 'SP',
     },
   });
 
-  // 2. Criar Usuarios com as 3 Hierarquias e Senhas Criptografadas com bcrypt
-  // Hierarquia 1: ADMIN (Administrador Master que cadastra funcionarios e viaturas)
-  const hashAdmin = await bcrypt.hash('admin123', 10);
+  // 2. Criar Funcionarios Ficticios (Senha padrao: 123456)
+  const defaultPasswordHash = await bcrypt.hash('123456', 10);
+
+  // Hierarquia 1: ADMIN (Representante Legal da Empresa)
   const userAdmin = await prisma.user.create({
     data: {
-      tenantId: tenantMK.id,
-      branchId: branchMK.id,
-      name: 'Admin MK Seguranca',
-      cpf: '000.111.222-33',
-      email: 'admin@mkseguranca.com.br',
-      passwordHash: hashAdmin,
+      tenantId: tenant.id,
+      branchId: branch.id,
+      name: 'Ricardo Almeida (Representante Legal)',
+      cpf: '111.111.111-11',
+      email: 'ricardo.almeida@testeapresentacao.com.br',
+      passwordHash: defaultPasswordHash,
       role: 'ADMIN',
       isActive: true,
     },
   });
 
-  // Hierarquia 2: FLEET_MANAGER (Gestor de Rotas e Controle de Frota)
-  const hashManager = await bcrypt.hash('333.444.555-66', 10); // Recomendacao: senha inicial e o proprio CPF
-  const userManager = await prisma.user.create({
+  // Hierarquia 2: FLEET_MANAGER (Gestores de Frota)
+  const userManager1 = await prisma.user.create({
     data: {
-      tenantId: tenantMK.id,
-      branchId: branchMK.id,
-      name: 'Roberto Santos',
-      cpf: '333.444.555-66',
-      email: 'roberto.santos@mkseguranca.com.br',
-      passwordHash: hashManager,
+      tenantId: tenant.id,
+      branchId: branch.id,
+      name: 'Roberto Mendes (Gestor de Frota)',
+      cpf: '222.222.222-22',
+      email: 'roberto.mendes@testeapresentacao.com.br',
+      passwordHash: defaultPasswordHash,
+      role: 'FLEET_MANAGER',
+      isActive: true,
+    },
+  });
+
+  const userManager2 = await prisma.user.create({
+    data: {
+      tenantId: tenant.id,
+      branchId: branch.id,
+      name: 'Fernanda Costa (Gestora Operacional)',
+      cpf: '222.333.444-55',
+      email: 'fernanda.costa@testeapresentacao.com.br',
+      passwordHash: defaultPasswordHash,
       role: 'FLEET_MANAGER',
       isActive: true,
     },
   });
 
   // Hierarquia 3: DRIVER (Motoristas Operacionais)
-  const hashDriver1 = await bcrypt.hash('111.222.333-44', 10); // Senha = CPF
-  const userDriver1 = await prisma.user.create({
+  const driver1 = await prisma.user.create({
     data: {
-      tenantId: tenantMK.id,
-      branchId: branchMK.id,
-      name: 'Carlos Silva',
-      cpf: '111.222.333-44',
-      email: 'carlos.silva@mkseguranca.com.br',
-      passwordHash: hashDriver1,
+      tenantId: tenant.id,
+      branchId: branch.id,
+      name: 'Carlos Eduardo Silva',
+      cpf: '333.333.333-33',
+      email: 'carlos.silva@testeapresentacao.com.br',
+      passwordHash: defaultPasswordHash,
       role: 'DRIVER',
       isActive: true,
     },
   });
 
-  const hashDriver2 = await bcrypt.hash('222.333.444-55', 10); // Senha = CPF
-  const userDriver2 = await prisma.user.create({
+  const driver2 = await prisma.user.create({
     data: {
-      tenantId: tenantMK.id,
-      branchId: branchMK.id,
-      name: 'Joao Pereira',
-      cpf: '222.333.444-55',
-      email: 'joao.pereira@mkseguranca.com.br',
-      passwordHash: hashDriver2,
+      tenantId: tenant.id,
+      branchId: branch.id,
+      name: 'Marcos Vinícius Oliveira',
+      cpf: '444.444.444-44',
+      email: 'marcos.oliveira@testeapresentacao.com.br',
+      passwordHash: defaultPasswordHash,
       role: 'DRIVER',
       isActive: true,
     },
   });
-  console.log('Usuarios e credenciais das 3 hierarquias gravados no banco.');
 
-  // 3. Criar Veiculos da Frota da MK Seguranca
+  const driver3 = await prisma.user.create({
+    data: {
+      tenantId: tenant.id,
+      branchId: branch.id,
+      name: 'Lucas Gabriel Pereira',
+      cpf: '555.555.555-55',
+      email: 'lucas.pereira@testeapresentacao.com.br',
+      passwordHash: defaultPasswordHash,
+      role: 'DRIVER',
+      isActive: true,
+    },
+  });
+
+  const driver4 = await prisma.user.create({
+    data: {
+      tenantId: tenant.id,
+      branchId: branch.id,
+      name: 'André Luiz Souza',
+      cpf: '666.666.666-66',
+      email: 'andre.souza@testeapresentacao.com.br',
+      passwordHash: defaultPasswordHash,
+      role: 'DRIVER',
+      isActive: true,
+    },
+  });
+
+  console.log('Funcionários criados: 1 Admin, 2 Gestores, 4 Motoristas.');
+
+  // 3. Criar Veiculos Ficticios da Frota
   const veh1 = await prisma.vehicle.create({
     data: {
-      tenantId: tenantMK.id,
-      branchId: branchMK.id,
-      plate: 'MKS1A01',
+      tenantId: tenant.id,
+      branchId: branch.id,
+      plate: 'TAP1A01',
       brand: 'Fiat',
       model: 'Strada Freedom 1.3',
-      year: 2023,
-      status: 'AVAILABLE', // Disponivel -> Motorista consegue clicar e iniciar rota
-      currentMileage: 45200,
+      year: 2024,
+      status: 'AVAILABLE',
+      currentMileage: 18450,
     },
   });
 
   const veh2 = await prisma.vehicle.create({
     data: {
-      tenantId: tenantMK.id,
-      branchId: branchMK.id,
-      plate: 'MKS2B02',
+      tenantId: tenant.id,
+      branchId: branch.id,
+      plate: 'TAP2B02',
       brand: 'Toyota',
-      model: 'Hilux CD 4x4 Power',
-      year: 2022,
-      status: 'AVAILABLE', // Disponivel -> Motorista consegue clicar e iniciar rota
-      currentMileage: 82150,
+      model: 'Hilux CD SRX 4x4',
+      year: 2023,
+      status: 'AVAILABLE',
+      currentMileage: 54200,
     },
   });
 
   const veh3 = await prisma.vehicle.create({
     data: {
-      tenantId: tenantMK.id,
-      branchId: branchMK.id,
-      plate: 'MKS3C03',
-      brand: 'Renault',
-      model: 'Duster Tatica 4x4',
-      year: 2023,
-      status: 'IN_USE', // Em Uso -> Aparece em cinza e irclicavel para o motorista
-      currentMileage: 114300,
+      tenantId: tenant.id,
+      branchId: branch.id,
+      plate: 'TAP3C03',
+      brand: 'Volkswagen',
+      model: 'Saveiro Robust 1.6',
+      year: 2024,
+      status: 'AVAILABLE',
+      currentMileage: 12300,
     },
   });
 
   const veh4 = await prisma.vehicle.create({
     data: {
-      tenantId: tenantMK.id,
-      branchId: branchMK.id,
-      plate: 'MKS4D04',
-      brand: 'Volkswagen',
-      model: 'Gol Patrulha 1.6',
-      year: 2021,
-      status: 'MAINTENANCE', // Manutencao/Oficina -> Aparece em cinza e irclicavel
-      currentMileage: 63800,
+      tenantId: tenant.id,
+      branchId: branch.id,
+      plate: 'TAP4D04',
+      brand: 'Renault',
+      model: 'Duster Iconic 1.6',
+      year: 2023,
+      status: 'IN_USE',
+      currentMileage: 41890,
     },
   });
-  console.log('Veiculos da frota cadastrados com status.');
+
+  const veh5 = await prisma.vehicle.create({
+    data: {
+      tenantId: tenant.id,
+      branchId: branch.id,
+      plate: 'TAP5E05',
+      brand: 'Chevrolet',
+      model: 'Montana LTZ 1.2',
+      year: 2024,
+      status: 'MAINTENANCE',
+      currentMileage: 29750,
+    },
+  });
+
+  const veh6 = await prisma.vehicle.create({
+    data: {
+      tenantId: tenant.id,
+      branchId: branch.id,
+      plate: 'TAP6F06',
+      brand: 'Fiat',
+      model: 'Fiorino Endurance 1.4',
+      year: 2022,
+      status: 'AVAILABLE',
+      currentMileage: 67400,
+    },
+  });
+
+  console.log('6 Veículos fictícios criados.');
 
   // 4. Template Padrao de Checklist
   await prisma.checklistTemplate.create({
     data: {
-      tenantId: tenantMK.id,
-      name: 'Checklist Operacional MK Seguranca',
+      tenantId: tenant.id,
+      name: 'Checklist Padrão - Teste Apresentação',
       items: JSON.stringify([
-        { id: 'fuel', label: 'Nivel de Combustivel e Tanque' },
+        { id: 'fuel', label: 'Nível de Combustível e Tanque' },
         { id: 'tires', label: 'Estado dos Pneus e Calibragem' },
-        { id: 'bodywork', label: 'Lataria, Vidros e Avarias' },
-        { id: 'lights', label: 'Farois, Lanternas e Giroflex' },
-        { id: 'docs', label: 'Documentacao CRLV e Chave de Roda' },
+        { id: 'bodywork', label: 'Lataria, Vidros e Pintura' },
+        { id: 'lights', label: 'Faróis, Lanternas e Setas' },
+        { id: 'docs', label: 'Documentação CRLV e Kit de Emergência' },
       ]),
     },
   });
 
-  // 5. Viagem de Exemplo Concluida para o Motorista Carlos Silva
-  // (Assim ele ja visualiza seu historico do Dia 1 com almoco e consideracoes)
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  yesterday.setHours(8, 0, 0, 0);
+  // Helper de datas relativas
+  const makeDate = (daysAgo: number, hour: number, minute = 0) => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  };
 
-  const lunchStart = new Date(yesterday);
-  lunchStart.setHours(12, 0, 0, 0);
+  // 5. Viagens Concluidas + Checklists
+  // Viagem 1: Carlos Eduardo Silva (veh1 - 3 dias atrás)
+  const v1Start = makeDate(3, 8, 5);
+  const v1LunchStart = makeDate(3, 12, 0);
+  const v1LunchEnd = makeDate(3, 13, 0);
+  const v1End = makeDate(3, 17, 40);
 
-  const lunchEnd = new Date(yesterday);
-  lunchEnd.setHours(13, 0, 0, 0);
-
-  const endTrip = new Date(yesterday);
-  endTrip.setHours(17, 30, 0, 0);
-
-  const chkEntry = await prisma.vehicleChecklist.create({
+  const chk1In = await prisma.vehicleChecklist.create({
     data: {
-      tenantId: tenantMK.id,
+      tenantId: tenant.id,
       vehicleId: veh1.id,
-      driverId: userDriver1.id,
+      driverId: driver1.id,
       type: 'ENTRY',
-      mileage: 45050,
-      itemsResult: JSON.stringify({
-        fuel: { ok: true },
-        tires: { ok: true },
-        bodywork: { ok: true },
-        lights: { ok: true },
-        docs: { ok: true },
-      }),
-      observation: 'Viatura liberada no patio em perfeito estado.',
+      mileage: 18310,
+      itemsResult: JSON.stringify({ fuel: { ok: true }, tires: { ok: true }, bodywork: { ok: true }, lights: { ok: true }, docs: { ok: true } }),
+      observation: 'Saída para rota Zona Sul - veículo abastecido e revisado.',
       hasProblem: false,
-      createdAt: yesterday,
+      createdAt: v1Start,
     },
   });
-
-  const chkExit = await prisma.vehicleChecklist.create({
+  const chk1Out = await prisma.vehicleChecklist.create({
     data: {
-      tenantId: tenantMK.id,
+      tenantId: tenant.id,
       vehicleId: veh1.id,
-      driverId: userDriver1.id,
+      driverId: driver1.id,
       type: 'EXIT',
-      mileage: 45200,
-      itemsResult: JSON.stringify({
-        fuel: { ok: true },
-        tires: { ok: true },
-        bodywork: { ok: true },
-        lights: { ok: true },
-        docs: { ok: true },
-      }),
-      observation: 'Devolucao regular sem ocorrencias operacionais.',
+      mileage: 18450,
+      itemsResult: JSON.stringify({ fuel: { ok: true }, tires: { ok: true }, bodywork: { ok: true }, lights: { ok: true }, docs: { ok: true } }),
+      observation: 'Retorno sem alterações, entregue lavado no pátio.',
       hasProblem: false,
-      createdAt: endTrip,
+      createdAt: v1End,
     },
   });
-
   await prisma.vehicleUsage.create({
     data: {
-      tenantId: tenantMK.id,
+      tenantId: tenant.id,
       vehicleId: veh1.id,
-      driverId: userDriver1.id,
-      entryChecklistId: chkEntry.id,
-      exitChecklistId: chkExit.id,
-      startTime: yesterday,
-      endTime: endTrip,
-      lunchStartTime: lunchStart,
-      lunchEndTime: lunchEnd,
+      driverId: driver1.id,
+      entryChecklistId: chk1In.id,
+      exitChecklistId: chk1Out.id,
+      startTime: v1Start,
+      endTime: v1End,
+      lunchStartTime: v1LunchStart,
+      lunchEndTime: v1LunchEnd,
       totalLunchMinutes: 60,
-      totalDurationMinutes: 510,
-      totalDistanceKm: 150,
+      totalDurationMinutes: 515,
+      totalDistanceKm: 140,
       status: 'COMPLETED',
-      createdAt: yesterday,
+      createdAt: v1Start,
     },
   });
 
-  // 6. Notificacao de exemplo
-  await prisma.auditLog.create({
+  // Viagem 2: Marcos Vinícius Oliveira (veh2 - 2 dias atrás)
+  const v2Start = makeDate(2, 7, 30);
+  const v2LunchStart = makeDate(2, 12, 15);
+  const v2LunchEnd = makeDate(2, 13, 15);
+  const v2End = makeDate(2, 18, 10);
+
+  const chk2In = await prisma.vehicleChecklist.create({
     data: {
-      tenantId: tenantMK.id,
-      userId: userAdmin.id,
-      action: 'INICIO_ROTA',
-      entityType: 'SYSTEM',
-      entityId: 'system',
-      details: JSON.stringify({
-        message: 'Base MK Seguranca inicializada com sucesso no banco de dados.',
-      }),
-      timestamp: new Date(),
+      tenantId: tenant.id,
+      vehicleId: veh2.id,
+      driverId: driver2.id,
+      type: 'ENTRY',
+      mileage: 53980,
+      itemsResult: JSON.stringify({ fuel: { ok: true }, tires: { ok: true }, bodywork: { ok: true }, lights: { ok: true }, docs: { ok: true } }),
+      observation: 'Viagem logística Guarulhos e região metropolitana.',
+      hasProblem: false,
+      createdAt: v2Start,
+    },
+  });
+  const chk2Out = await prisma.vehicleChecklist.create({
+    data: {
+      tenantId: tenant.id,
+      vehicleId: veh2.id,
+      driverId: driver2.id,
+      type: 'EXIT',
+      mileage: 54200,
+      itemsResult: JSON.stringify({ fuel: { ok: true }, tires: { ok: true }, bodywork: { ok: true }, lights: { ok: true }, docs: { ok: true } }),
+      observation: 'Entregas 100% concluídas, nenhum defeito reportado.',
+      hasProblem: false,
+      createdAt: v2End,
+    },
+  });
+  await prisma.vehicleUsage.create({
+    data: {
+      tenantId: tenant.id,
+      vehicleId: veh2.id,
+      driverId: driver2.id,
+      entryChecklistId: chk2In.id,
+      exitChecklistId: chk2Out.id,
+      startTime: v2Start,
+      endTime: v2End,
+      lunchStartTime: v2LunchStart,
+      lunchEndTime: v2LunchEnd,
+      totalLunchMinutes: 60,
+      totalDurationMinutes: 580,
+      totalDistanceKm: 220,
+      status: 'COMPLETED',
+      createdAt: v2Start,
     },
   });
 
-  console.log('Seed do banco rotalog.db concluido com sucesso!');
+  // Viagem 3: André Luiz Souza (veh5 Montana - 1 dia atrás -> voltou com avaria e foi para MAINTENANCE)
+  const v3Start = makeDate(1, 8, 15);
+  const v3LunchStart = makeDate(1, 12, 0);
+  const v3LunchEnd = makeDate(1, 12, 45);
+  const v3End = makeDate(1, 16, 20);
+
+  const chk3In = await prisma.vehicleChecklist.create({
+    data: {
+      tenantId: tenant.id,
+      vehicleId: veh5.id,
+      driverId: driver4.id,
+      type: 'ENTRY',
+      mileage: 29640,
+      itemsResult: JSON.stringify({ fuel: { ok: true }, tires: { ok: true }, bodywork: { ok: true }, lights: { ok: true }, docs: { ok: true } }),
+      observation: 'Viatura em condições normais na saída.',
+      hasProblem: false,
+      createdAt: v3Start,
+    },
+  });
+  const chk3Out = await prisma.vehicleChecklist.create({
+    data: {
+      tenantId: tenant.id,
+      vehicleId: veh5.id,
+      driverId: driver4.id,
+      type: 'EXIT',
+      mileage: 29750,
+      itemsResult: JSON.stringify({
+        fuel: { ok: true },
+        tires: { ok: false, observation: 'Pneu traseiro direito perdendo pressão' },
+        bodywork: { ok: true },
+        lights: { ok: false, observation: 'Lanterna traseira esquerda queimada' },
+        docs: { ok: true },
+      }),
+      observation: 'Pneu traseiro murcho e lâmpada da lanterna esquerda queimada. Encaminhado à oficina.',
+      hasProblem: true,
+      createdAt: v3End,
+    },
+  });
+  await prisma.vehicleUsage.create({
+    data: {
+      tenantId: tenant.id,
+      vehicleId: veh5.id,
+      driverId: driver4.id,
+      entryChecklistId: chk3In.id,
+      exitChecklistId: chk3Out.id,
+      startTime: v3Start,
+      endTime: v3End,
+      lunchStartTime: v3LunchStart,
+      lunchEndTime: v3LunchEnd,
+      totalLunchMinutes: 45,
+      totalDurationMinutes: 440,
+      totalDistanceKm: 110,
+      status: 'COMPLETED',
+      createdAt: v3Start,
+    },
+  });
+
+  // Viagem 4: Carlos Eduardo Silva (veh6 Fiorino - 1 dia atrás)
+  const v4Start = makeDate(1, 9, 0);
+  const v4End = makeDate(1, 15, 0);
+  const chk4In = await prisma.vehicleChecklist.create({
+    data: {
+      tenantId: tenant.id,
+      vehicleId: veh6.id,
+      driverId: driver1.id,
+      type: 'ENTRY',
+      mileage: 67315,
+      itemsResult: JSON.stringify({ fuel: { ok: true }, tires: { ok: true }, bodywork: { ok: true }, lights: { ok: true }, docs: { ok: true } }),
+      observation: 'Coleta rápida no centro.',
+      hasProblem: false,
+      createdAt: v4Start,
+    },
+  });
+  const chk4Out = await prisma.vehicleChecklist.create({
+    data: {
+      tenantId: tenant.id,
+      vehicleId: veh6.id,
+      driverId: driver1.id,
+      type: 'EXIT',
+      mileage: 67400,
+      itemsResult: JSON.stringify({ fuel: { ok: true }, tires: { ok: true }, bodywork: { ok: true }, lights: { ok: true }, docs: { ok: true } }),
+      observation: 'Operação concluída sem intercorrências.',
+      hasProblem: false,
+      createdAt: v4End,
+    },
+  });
+  await prisma.vehicleUsage.create({
+    data: {
+      tenantId: tenant.id,
+      vehicleId: veh6.id,
+      driverId: driver1.id,
+      entryChecklistId: chk4In.id,
+      exitChecklistId: chk4Out.id,
+      startTime: v4Start,
+      endTime: v4End,
+      totalLunchMinutes: 0,
+      totalDurationMinutes: 360,
+      totalDistanceKm: 85,
+      status: 'COMPLETED',
+      createdAt: v4Start,
+    },
+  });
+
+  // Viagem 5 (EM ANDAMENTO hoje): Lucas Gabriel Pereira com Renault Duster TAP4D04
+  const v5Start = makeDate(0, 8, 20);
+  const chk5In = await prisma.vehicleChecklist.create({
+    data: {
+      tenantId: tenant.id,
+      vehicleId: veh4.id,
+      driverId: driver3.id,
+      type: 'ENTRY',
+      mileage: 41890,
+      itemsResult: JSON.stringify({ fuel: { ok: true }, tires: { ok: true }, bodywork: { ok: true }, lights: { ok: true }, docs: { ok: true } }),
+      observation: 'Saída para rota Zona Oeste e Osasco.',
+      hasProblem: false,
+      createdAt: v5Start,
+    },
+  });
+  await prisma.vehicleUsage.create({
+    data: {
+      tenantId: tenant.id,
+      vehicleId: veh4.id,
+      driverId: driver3.id,
+      entryChecklistId: chk5In.id,
+      startTime: v5Start,
+      totalLunchMinutes: 0,
+      totalDurationMinutes: 0,
+      totalDistanceKm: 0,
+      status: 'IN_PROGRESS',
+      createdAt: v5Start,
+    },
+  });
+
+  // 6. Batidas de Ponto CLT Fictícias
+  const punchesData = [
+    { userId: driver1.id, type: 'ENTRADA', timestamp: makeDate(1, 8, 0), isOffline: false },
+    { userId: driver1.id, type: 'ALMOCO_SAIDA', timestamp: makeDate(1, 12, 0), isOffline: false },
+    { userId: driver1.id, type: 'ALMOCO_RETORNO', timestamp: makeDate(1, 13, 0), isOffline: false },
+    { userId: driver1.id, type: 'SAIDA', timestamp: makeDate(1, 17, 15), isOffline: false },
+    { userId: driver2.id, type: 'ENTRADA', timestamp: makeDate(0, 7, 45), isOffline: false },
+    { userId: driver2.id, type: 'ALMOCO_SAIDA', timestamp: makeDate(0, 12, 5), isOffline: true },
+    { userId: driver3.id, type: 'ENTRADA', timestamp: makeDate(0, 8, 10), isOffline: false },
+    { userId: driver4.id, type: 'ENTRADA', timestamp: makeDate(0, 8, 30), isOffline: false },
+  ];
+
+  for (const p of punchesData) {
+    await prisma.timeClocking.create({
+      data: {
+        tenantId: tenant.id,
+        userId: p.userId,
+        type: p.type,
+        timestamp: p.timestamp,
+        isOffline: p.isOffline,
+        createdAt: p.timestamp,
+      },
+    });
+  }
+
+  // 7. Logs e Notificacoes para o Gestor / Admin
+  await prisma.auditLog.createMany({
+    data: [
+      {
+        tenantId: tenant.id,
+        userId: userAdmin.id,
+        action: 'INICIO_ROTA',
+        entityType: 'SYSTEM',
+        entityId: tenant.id,
+        details: JSON.stringify({
+          message: 'Base Teste Apresentação inicializada com 7 colaboradores e 6 viaturas.',
+        }),
+        timestamp: makeDate(0, 7, 0),
+      },
+      {
+        tenantId: tenant.id,
+        userId: driver4.id,
+        action: 'ALERTA_AVARIA',
+        entityType: 'VEHICLE_CHECKLIST',
+        entityId: chk3Out.id,
+        details: JSON.stringify({
+          message: 'Avaria reportada no veículo TAP5E05 (Chevrolet Montana): Pneu traseiro murcho e lanterna queimada. Enviado para Oficina.',
+        }),
+        timestamp: v3End,
+      },
+      {
+        tenantId: tenant.id,
+        userId: driver3.id,
+        action: 'INICIO_ROTA',
+        entityType: 'VEHICLE_USAGE',
+        entityId: veh4.id,
+        details: JSON.stringify({
+          message: 'Lucas Gabriel Pereira iniciou rota com Renault Duster Iconic 1.6 (TAP4D04). Km inicial: 41890 km.',
+        }),
+        timestamp: v5Start,
+      },
+      {
+        tenantId: tenant.id,
+        userId: userManager1.id,
+        action: 'BATIDA_PONTO',
+        entityType: 'TIME_CLOCKING',
+        entityId: driver2.id,
+        details: JSON.stringify({
+          message: 'Marcos Vinícius Oliveira sincronizou batida de ponto CLT offline (Saída Almoço).',
+        }),
+        timestamp: makeDate(0, 12, 10),
+      },
+    ],
+  });
+
+  console.log('Seed da empresa "Teste Apresentação" concluido com sucesso!');
 }
 
 if (require.main === module) {

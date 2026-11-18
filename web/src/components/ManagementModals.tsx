@@ -66,7 +66,7 @@ export function NewTenantModal({ isOpen, onClose, onSuccess }: NewTenantModalPro
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
           <div className="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-lg text-xs text-indigo-300">
-            Ao cadastrar uma nova empresa (ex: MK Segurança), o sistema gera automaticamente a conta de <strong>Administrador Geral</strong> que receberá as credenciais para gerenciar a frota e os colaboradores.
+            Ao cadastrar uma nova empresa (ex: Teste Apresentação), o sistema gera automaticamente a conta de <strong>Administrador Geral</strong> que receberá as credenciais para gerenciar a frota e os colaboradores.
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -74,7 +74,7 @@ export function NewTenantModal({ isOpen, onClose, onSuccess }: NewTenantModalPro
               <label className="block text-xs font-semibold text-slate-400 mb-1">Nome da Empresa / Base *</label>
               <input
                 type="text"
-                placeholder="Ex: MK Segurança"
+                placeholder="Ex: Teste Apresentação"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
@@ -185,8 +185,9 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
   const [plate, setPlate] = useState('');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
-  const [year, setYear] = useState('2023');
+  const [year, setYear] = useState('2024');
   const [mileage, setMileage] = useState('0');
+  const [status, setStatus] = useState<'AVAILABLE' | 'MAINTENANCE'>('AVAILABLE');
   const [tenantId, setTenantId] = useState(tenants[0]?.id || '');
   const [loading, setLoading] = useState(false);
 
@@ -211,11 +212,17 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
         plate: plate.toUpperCase().trim(),
         brand,
         model,
-        year: parseInt(year, 10) || 2023,
+        year: parseInt(year, 10) || 2024,
         currentMileage: parseInt(mileage, 10) || 0,
+        status,
         tenantId: tenantId || tenants[0]?.id,
       });
       alert('Veículo cadastrado com sucesso no banco de dados!');
+      setPlate('');
+      setBrand('');
+      setModel('');
+      setMileage('0');
+      setStatus('AVAILABLE');
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -312,6 +319,18 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
             </div>
           </div>
 
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1">Status Inicial do Veículo</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as 'AVAILABLE' | 'MAINTENANCE')}
+              className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500"
+            >
+              <option value="AVAILABLE">🟢 Disponível no Pátio (Pronto para Rota)</option>
+              <option value="MAINTENANCE">🔧 Em Manutenção / Oficina</option>
+            </select>
+          </div>
+
           <div className="pt-3 flex gap-2">
             <button
               type="button"
@@ -372,30 +391,35 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !cpf || !email) {
-      alert('Preencha os campos obrigatórios (Nome, CPF e E-mail).');
+    if (!name || !cpf) {
+      alert('Preencha os campos obrigatórios (Nome e CPF).');
       return;
     }
 
     setLoading(true);
     try {
-      // Regra de Negocio: Se o gestor nao digitar senha, usa o CPF do funcionario
+      // Regra de Negocio: Se nao digitar senha, usa '123456' ou o CPF
       const chosenPassword = password.trim().length > 0 ? password.trim() : cpf.trim();
 
       await webApi.createUser({
         name,
         cpf,
-        email,
-        role,
+        email: email.trim() || undefined,
+        role: isFleetManager ? 'DRIVER' : role,
+        creatorRole: currentUserRole,
         password: chosenPassword,
         tenantId: tenantId || tenants[0]?.id,
       });
 
       alert(
-        `Colaborador "${name}" cadastrado com sucesso no banco de dados!\n` +
-        `Hierarquia: ${role}\n` +
+        `Colaborador "${name}" cadastrado com sucesso!\n` +
+        `Perfil: ${isFleetManager ? 'DRIVER (Motorista)' : role}\n` +
         `Senha de acesso: ${chosenPassword}`
       );
+      setName('');
+      setCpf('');
+      setEmail('');
+      setPassword('');
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -459,14 +483,13 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">E-mail Corporativo *</label>
+            <label className="block text-xs font-semibold text-slate-400 mb-1">E-mail Corporativo (Opcional)</label>
             <input
               type="email"
-              placeholder="carlos.silva@mkseguranca.com.br"
+              placeholder="nome@testeapresentacao.com.br"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
-              required
             />
           </div>
 
@@ -479,10 +502,10 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
               <div className="p-3 bg-slate-900 border border-blue-500/30 rounded-lg">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-blue-400">🚗 Motorista Operacional</span>
-                  <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-mono">Restrito</span>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-mono">Somente Motoristas</span>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  O perfil de <strong>Gestor de Frota</strong> tem permissão para cadastrar apenas motoristas. O cadastro de novos gestores e administradores é exclusivo do Dono da Empresa (Master).
+                  O perfil de <strong>Gestor de Frota</strong> tem permissão para cadastrar apenas <strong>Motoristas</strong>. O cadastro de outros gestores é exclusivo do Admin (Representante Legal).
                 </p>
               </div>
             ) : (
@@ -491,9 +514,9 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
               >
-                <option value="DRIVER">🚗 Motorista Operacional (Acesso restrito às suas viagens)</option>
-                <option value="FLEET_MANAGER">👔 Gestor de Rota / Frota (Controle da frota e cadastro de motoristas)</option>
-                <option value="ADMIN">👑 Administrador Geral / Dono (Gestão completa, frotas e equipe)</option>
+                <option value="DRIVER">🚗 Motorista (Rotas, checklists e seu histórico)</option>
+                <option value="FLEET_MANAGER">👔 Gestor de Frota (Cadastra motoristas, carros, status e relatórios)</option>
+                <option value="ADMIN">👑 Admin / Representante Legal (Permissão total no sistema)</option>
               </select>
             )}
           </div>
