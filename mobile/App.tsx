@@ -552,7 +552,7 @@ function MainApp() {
   if (!user) {
     return (
       <SafeAreaView style={styles.darkContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#0B1120" />
+        <StatusBar barStyle="light-content" />
         <ScrollView contentContainerStyle={styles.loginContent}>
           <View style={styles.brandHeader}>
             <View style={styles.shieldIconContainer}>
@@ -788,7 +788,7 @@ function MainApp() {
 
   return (
     <SafeAreaView style={styles.darkContainer}>
-      <StatusBar barStyle="light-content" backgroundColor="#0B1120" />
+      <StatusBar barStyle="light-content" />
 
       {/* Top Bar Executiva */}
       <View style={styles.topBar}>
