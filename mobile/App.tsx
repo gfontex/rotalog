@@ -705,7 +705,7 @@ function MainApp() {
                 value={customServerUrl}
                 onChangeText={setCustomServerUrl}
                 autoCapitalize="none"
-                placeholder="Ex: http://192.168.99.111:3001"
+                placeholder="Ex: http://192.168.99.113:3001"
                 placeholderTextColor="#64748B"
               />
 
@@ -715,13 +715,13 @@ function MainApp() {
                 <TouchableOpacity
                   style={styles.serverPresetBtn}
                   onPress={() => {
-                    const u = 'http://192.168.99.111:3001';
+                    const u = 'http://192.168.99.113:3001';
                     setCustomServerUrl(u);
                     setCustomApiUrl(u);
                     testServerConnection(u);
                   }}
                 >
-                  <Text style={styles.serverPresetText}>🏠 Wi-Fi Local (192.168.99.111)</Text>
+                  <Text style={styles.serverPresetText}>🏠 Wi-Fi Local (192.168.99.113)</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity

@@ -21,7 +21,7 @@ function resolveDefaultHost(): string {
   } catch (_) {}
 
   // 3. IP padrão da máquina na rede local
-  const LOCAL_MACHINE_IP = '192.168.99.111';
+  const LOCAL_MACHINE_IP = '192.168.99.113';
   return `http://${LOCAL_MACHINE_IP}:3001`;
 }
 
