@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { Download, Search, FileText, CheckCircle2, Clock, Coffee, AlertTriangle } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { UI_TOKENS } from '../theme';
+import { CorporateEmptyState } from './BrandLogo';
 
 interface ChecklistData {
   mileage: number;
@@ -61,15 +63,16 @@ export function TripReports({ trips }: TripReportsProps) {
 
   const filteredTrips = trips.filter((t) => {
     const q = search.toLowerCase();
-    const driverName = t.driver?.name?.toLowerCase() || '';
-    const plate = t.vehicle?.plate?.toLowerCase() || '';
-    const model = t.vehicle?.model?.toLowerCase() || '';
-    return driverName.includes(q) || plate.includes(q) || model.includes(q);
+    return (
+      (t.driver?.name && t.driver.name.toLowerCase().includes(q)) ||
+      (t.vehicle?.plate && t.vehicle.plate.toLowerCase().includes(q)) ||
+      (t.vehicle?.model && t.vehicle.model.toLowerCase().includes(q))
+    );
   });
 
   const exportChecklistsAndTripsXLSX = () => {
     if (filteredTrips.length === 0) {
-      alert('Não há dados de checklists ou viagens para exportar.');
+      alert('Não há dados de viagens/checklists para exportar.');
       return;
     }
 
@@ -182,37 +185,34 @@ export function TripReports({ trips }: TripReportsProps) {
   };
 
   return (
-    <div className="bg-[#1E293B] rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
-      {/* Cabeçalho do Relatório */}
-      <div className="p-5 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div className={`${UI_TOKENS.card} overflow-hidden`}>
+      <div className="p-5 border-b border-surface-border flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <FileText className="w-5 h-5 text-indigo-400" />
+          <h2 className="text-lg font-bold text-content-primary flex items-center gap-2">
+            <FileText className="w-5 h-5 text-brand-primary" />
             Relatório Operacional de Viagens & Checklists
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-content-secondary">
             Histórico detalhado com Km rodado, intervalo de refeição, inspeções e avarias
           </p>
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-          {/* Busca */}
           <div className="relative flex-1 sm:w-64">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-content-muted absolute left-3 top-2.5" />
             <input
               type="text"
               placeholder="Buscar motorista ou placa..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-[#0B1120] border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className="w-full pl-9 pr-3 py-1.5 bg-surface-bg border border-surface-border rounded-xl text-xs text-content-primary placeholder-content-muted focus:outline-none focus:border-brand-primary"
             />
           </div>
 
-          {/* Botão Exportar Excel (.xlsx) */}
           <button
             type="button"
             onClick={exportChecklistsAndTripsXLSX}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 cursor-pointer whitespace-nowrap"
+            className="keep-white flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
           >
             <Download className="w-4 h-4" />
             <span>Exportar Checklists (.xlsx)</span>
@@ -220,33 +220,31 @@ export function TripReports({ trips }: TripReportsProps) {
         </div>
       </div>
 
-      {/* Tabela de Viagens */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-slate-300">
-          <thead className="bg-[#0B1120] text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
-            <tr>
-              <th className="px-4 py-3">Motorista</th>
-              <th className="px-4 py-3">Veículo / Placa</th>
-              <th className="px-4 py-3">Horário de Saída</th>
-              <th className="px-4 py-3">Horário de Chegada</th>
-              <th className="px-4 py-3 text-center">Duração Líquida</th>
-              <th className="px-4 py-3 text-center">Almoço</th>
-              <th className="px-4 py-3 text-right">Km Inicial</th>
-              <th className="px-4 py-3 text-right">Km Final</th>
-              <th className="px-4 py-3 text-right">Km Percorrido</th>
-              <th className="px-4 py-3">Checklist (Saída / Retorno)</th>
-              <th className="px-4 py-3 text-center">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800/60">
-            {filteredTrips.length === 0 ? (
+        {filteredTrips.length === 0 ? (
+          <CorporateEmptyState
+            title="Nenhuma viagem registrada"
+            description="As rotas iniciadas e finalizadas pelos condutores serão listadas aqui."
+          />
+        ) : (
+          <table className="w-full text-left text-xs text-content-secondary">
+            <thead className="bg-surface-bg text-content-secondary uppercase tracking-wider font-semibold border-b border-surface-border">
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
-                  Nenhuma viagem registrada até o momento.
-                </td>
+                <th className="px-4 py-3">Motorista</th>
+                <th className="px-4 py-3">Veículo / Placa</th>
+                <th className="px-4 py-3">Horário de Saída</th>
+                <th className="px-4 py-3">Horário de Chegada</th>
+                <th className="px-4 py-3 text-center">Duração Líquida</th>
+                <th className="px-4 py-3 text-center">Almoço</th>
+                <th className="px-4 py-3 text-right">Km Inicial</th>
+                <th className="px-4 py-3 text-right">Km Final</th>
+                <th className="px-4 py-3 text-right">Km Percorrido</th>
+                <th className="px-4 py-3">Checklist (Saída / Retorno)</th>
+                <th className="px-4 py-3 text-center">Status</th>
               </tr>
-            ) : (
-              filteredTrips.map((t) => {
+            </thead>
+            <tbody className="divide-y divide-surface-border">
+              {filteredTrips.map((t) => {
                 const startDate = new Date(t.startTime);
                 const endDate = t.endTime ? new Date(t.endTime) : null;
                 const kmInitial = t.entryChecklist?.mileage || 0;
@@ -254,28 +252,24 @@ export function TripReports({ trips }: TripReportsProps) {
                 const hasChecklistProblem = t.entryChecklist?.hasProblem || t.exitChecklist?.hasProblem;
 
                 return (
-                  <tr key={t.id} className="hover:bg-slate-800/40 transition-colors">
-                    {/* Motorista */}
-                    <td className="px-4 py-3 font-semibold text-white">
+                  <tr key={t.id} className="hover:bg-surface-elevated/60 transition-colors">
+                    <td className="px-4 py-3 font-semibold text-content-primary">
                       <div>{t.driver?.name || 'Condutor'}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">CPF: {t.driver?.cpf || '-'}</div>
+                      <div className="text-[10px] text-content-muted font-mono">CPF: {t.driver?.cpf || '-'}</div>
                     </td>
 
-                    {/* Veículo */}
                     <td className="px-4 py-3">
-                      <div className="font-bold text-blue-400">{t.vehicle?.plate || '-'}</div>
-                      <div className="text-[10px] text-slate-400 truncate max-w-[150px]">
+                      <div className="font-bold text-brand-primary">{t.vehicle?.plate || '-'}</div>
+                      <div className="text-[10px] text-content-secondary truncate max-w-[150px]">
                         {t.vehicle?.brand} {t.vehicle?.model}
                       </div>
                     </td>
 
-                    {/* Saída */}
-                    <td className="px-4 py-3 font-mono text-slate-300">
+                    <td className="px-4 py-3 font-mono text-content-primary">
                       {startDate.toLocaleDateString('pt-BR')} {startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                     </td>
 
-                    {/* Chegada */}
-                    <td className="px-4 py-3 font-mono text-slate-300">
+                    <td className="px-4 py-3 font-mono text-content-primary">
                       {endDate ? (
                         `${endDate.toLocaleDateString('pt-BR')} ${endDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
                       ) : (
@@ -283,74 +277,67 @@ export function TripReports({ trips }: TripReportsProps) {
                       )}
                     </td>
 
-                    {/* Duração */}
                     <td className="px-4 py-3 text-center font-mono">
-                      <span className="bg-slate-800 px-2 py-0.5 rounded text-slate-200">
+                      <span className="bg-surface-elevated border border-surface-border px-2 py-0.5 rounded text-content-primary">
                         {t.totalDurationMinutes} min
                       </span>
                     </td>
 
-                    {/* Almoço */}
                     <td className="px-4 py-3 text-center font-mono">
                       {t.totalLunchMinutes > 0 ? (
-                        <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded flex items-center justify-center gap-1 w-max mx-auto">
+                        <span className={`px-2 py-0.5 rounded flex items-center justify-center gap-1 w-max mx-auto ${UI_TOKENS.badgeWarning}`}>
                           <Coffee className="w-3 h-3" />
                           {t.totalLunchMinutes} min
                         </span>
                       ) : (
-                        <span className="text-slate-500">0 min</span>
+                        <span className="text-content-muted">0 min</span>
                       )}
                     </td>
 
-                    {/* Km Inicial */}
-                    <td className="px-4 py-3 text-right font-mono text-slate-400">
+                    <td className="px-4 py-3 text-right font-mono text-content-secondary">
                       {kmInitial.toLocaleString('pt-BR')} km
                     </td>
 
-                    {/* Km Final */}
-                    <td className="px-4 py-3 text-right font-mono text-slate-400">
+                    <td className="px-4 py-3 text-right font-mono text-content-secondary">
                       {typeof kmFinal === 'number' ? `${kmFinal.toLocaleString('pt-BR')} km` : kmFinal}
                     </td>
 
-                    {/* Km Percorrido */}
                     <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400 text-sm">
                       +{t.totalDistanceKm} km
                     </td>
 
-                    {/* Checklist (Saída / Retorno) */}
                     <td className="px-4 py-3 max-w-[200px]">
                       {hasChecklistProblem ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[10px] font-bold">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${UI_TOKENS.badgeDanger}`}>
                           <AlertTriangle className="w-3 h-3" />
                           Avaria Reportada
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${UI_TOKENS.badgeSuccess}`}>
                           <CheckCircle2 className="w-3 h-3" />
                           Vistoria OK
                         </span>
                       )}
                       {(t.exitChecklist?.observation || t.entryChecklist?.observation) && (
-                        <p className="text-[10px] text-slate-400 truncate mt-1" title={t.exitChecklist?.observation || t.entryChecklist?.observation || ''}>
+                        <p className="text-[10px] text-content-secondary truncate mt-1" title={t.exitChecklist?.observation || t.entryChecklist?.observation || ''}>
                           {t.exitChecklist?.observation || t.entryChecklist?.observation}
                         </p>
                       )}
                     </td>
 
-                    {/* Status */}
                     <td className="px-4 py-3 text-center">
                       {t.status === 'COMPLETED' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-semibold border border-slate-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-elevated text-content-primary text-[10px] font-semibold border border-surface-border">
                           <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                           Concluída
                         </span>
                       ) : t.status === 'PAUSED_LUNCH' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-semibold border border-amber-500/30">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${UI_TOKENS.badgeWarning}`}>
                           <Coffee className="w-3 h-3" />
                           Almoço
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-semibold border border-blue-500/30">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${UI_TOKENS.badgeInfo}`}>
                           <Clock className="w-3 h-3 animate-spin" />
                           Em Rota
                         </span>
@@ -358,10 +345,10 @@ export function TripReports({ trips }: TripReportsProps) {
                     </td>
                   </tr>
                 );
-              })
-            )}
-          </tbody>
-        </table>
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

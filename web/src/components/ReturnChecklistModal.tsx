@@ -5,16 +5,14 @@ import {
   X,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   Car,
   Gauge,
   Fuel,
   FileText,
   ShieldAlert,
-  ArrowRight,
-  Sparkles,
 } from 'lucide-react';
 import { webApi } from '../services/api';
+import { UI_TOKENS } from '../theme';
 
 interface ReturnChecklistModalProps {
   isOpen: boolean;
@@ -45,7 +43,6 @@ export function ReturnChecklistModal({
 
   useEffect(() => {
     if (usage) {
-      // Sugere odômetro inicial + 25 km por padrão
       const startKm = usage.vehicle?.currentMileage || 45000;
       setExitMileage(startKm + 25);
 
@@ -103,9 +100,9 @@ export function ReturnChecklistModal({
       });
 
       if (hasProblem) {
-        alert(`⚠️ Rota encerrada! Como foram apontadas avarias, a viatura foi movida para a OFICINA (MANUTENÇÃO) e bloqueada para novos motoristas.`);
+        alert('Rota encerrada. Como foram apontadas avarias, a viatura foi movida para a OFICINA (MANUTENÇÃO) e bloqueada para novos motoristas.');
       } else {
-        alert(`✅ Viatura devolvida em perfeito estado! Rota finalizada e carro liberado no pátio.`);
+        alert('Viatura devolvida em perfeito estado. Rota finalizada e carro liberado no pátio.');
       }
 
       onSuccess();
@@ -118,26 +115,26 @@ export function ReturnChecklistModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
-      <div className="bg-[#0F172A] rounded-3xl max-w-2xl w-full border border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
+      <div className={`${UI_TOKENS.card} max-w-2xl w-full overflow-hidden flex flex-col max-h-[92vh]`}>
         {/* Cabeçalho */}
-        <div className="p-5 sm:p-6 bg-[#070B14] border-b border-slate-800 flex items-center justify-between">
+        <div className="p-5 sm:p-6 bg-surface-bg border-b border-surface-border flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${UI_TOKENS.badgeInfo}`}>
               <Car className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-white text-base sm:text-lg">
+              <h3 className="font-extrabold text-content-primary text-base sm:text-lg">
                 Vistoria de Devolução & Entrega da Viatura
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-content-secondary">
                 Conferência final de encerramento da rota e cálculo de quilometragem
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-xl text-content-secondary hover:text-content-primary hover:bg-surface-elevated transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -145,30 +142,30 @@ export function ReturnChecklistModal({
 
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 overflow-y-auto space-y-5 flex-1">
           {/* Card Resumo do Uso */}
-          <div className="p-4 bg-[#070B14] border border-slate-800 rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="p-4 bg-surface-bg border border-surface-border rounded-2xl grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Viatura</span>
-              <span className="font-mono font-bold text-white text-sm">{usage.vehicle?.plate || usage.vehiclePlate}</span>
-              <p className="text-xs text-slate-400">{usage.vehicle?.model || usage.vehicleModel}</p>
+              <span className="text-[10px] font-bold text-content-secondary uppercase tracking-wider block mb-0.5">Viatura</span>
+              <span className="font-mono font-bold text-content-primary text-sm">{usage.vehicle?.plate || usage.vehiclePlate}</span>
+              <p className="text-xs text-content-secondary">{usage.vehicle?.model || usage.vehicleModel}</p>
             </div>
 
             <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Condutor</span>
-              <span className="font-bold text-white text-sm">{usage.driver?.name || usage.driverName || 'Motorista'}</span>
-              <p className="text-xs text-slate-400">Saída: {new Date(usage.startTime).toLocaleTimeString('pt-BR')}</p>
+              <span className="text-[10px] font-bold text-content-secondary uppercase tracking-wider block mb-0.5">Condutor</span>
+              <span className="font-bold text-content-primary text-sm">{usage.driver?.name || usage.driverName || 'Motorista'}</span>
+              <p className="text-xs text-content-secondary">Saída: {new Date(usage.startTime).toLocaleTimeString('pt-BR')}</p>
             </div>
 
             <div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Km Inicial</span>
+              <span className="text-[10px] font-bold text-content-secondary uppercase tracking-wider block mb-0.5">Km Inicial</span>
               <span className="font-mono font-bold text-emerald-400 text-sm">{startKm.toLocaleString('pt-BR')} Km</span>
             </div>
           </div>
 
-          {/* Cálculo do Odômetro Final e Km Rodado */}
-          <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl space-y-3">
+          {/* Cálculo do Odômetro Final */}
+          <div className="p-4 bg-sky-500/10 border border-sky-500/25 rounded-2xl space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <label className="block text-xs font-bold text-blue-300 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-bold text-sky-400 uppercase tracking-wider mb-1">
                   Odômetro Final de Devolução (Km) *
                 </label>
                 <input
@@ -176,13 +173,13 @@ export function ReturnChecklistModal({
                   value={exitMileage}
                   onChange={(e) => setExitMileage(Number(e.target.value))}
                   min={startKm}
-                  className="px-3.5 py-2 bg-[#070B14] border border-slate-700 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 font-mono font-bold w-48"
+                  className="px-3.5 py-2 bg-surface-bg border border-surface-border rounded-xl text-sm text-content-primary focus:outline-none focus:border-brand-primary font-mono font-bold w-48"
                   required
                 />
               </div>
 
-              <div className="bg-[#070B14] p-3 rounded-xl border border-slate-800 text-right">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+              <div className="bg-surface-bg p-3 rounded-xl border border-surface-border text-right">
+                <span className="text-[10px] font-bold text-content-secondary uppercase tracking-wider block mb-0.5">
                   Distância Total Percorrida
                 </span>
                 <span className="text-xl font-black text-emerald-400 font-mono">
@@ -194,7 +191,7 @@ export function ReturnChecklistModal({
 
           {/* Itens do Checklist de Devolução */}
           <div>
-            <label className="text-xs font-bold text-slate-200 uppercase tracking-wider block mb-2.5">
+            <label className="text-xs font-bold text-content-primary uppercase tracking-wider block mb-2.5">
               Conferência dos Itens de Devolução
             </label>
 
@@ -206,14 +203,14 @@ export function ReturnChecklistModal({
                 return (
                   <div
                     key={item.id}
-                    className={`p-3.5 rounded-2xl border transition-all ${
-                      state.ok ? 'bg-[#070B14] border-slate-800' : 'bg-rose-500/5 border-rose-500/40'
+                    className={`p-3.5 rounded-xl border transition-all ${
+                      state.ok ? 'bg-surface-bg border-surface-border' : 'bg-rose-500/10 border-rose-500/35'
                     }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5">
-                        <Icon className={`w-4 h-4 ${state.ok ? 'text-slate-400' : 'text-rose-400'}`} />
-                        <span className="text-xs sm:text-sm font-semibold text-slate-200">
+                        <Icon className={`w-4 h-4 ${state.ok ? 'text-content-secondary' : 'text-rose-400'}`} />
+                        <span className="text-xs sm:text-sm font-semibold text-content-primary">
                           {item.label}
                         </span>
                       </div>
@@ -222,10 +219,10 @@ export function ReturnChecklistModal({
                         <button
                           type="button"
                           onClick={() => toggleItemOk(item.id, true)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                             state.ok
-                              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30'
-                              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                              ? 'keep-white bg-emerald-600 text-white'
+                              : 'bg-surface-elevated text-content-secondary hover:text-content-primary border border-surface-border'
                           }`}
                         >
                           <CheckCircle2 className="w-3.5 h-3.5" />
@@ -235,10 +232,10 @@ export function ReturnChecklistModal({
                         <button
                           type="button"
                           onClick={() => toggleItemOk(item.id, false)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                             !state.ok
-                              ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
-                              : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                              ? 'keep-white bg-rose-600 text-white'
+                              : 'bg-surface-elevated text-content-secondary hover:text-content-primary border border-surface-border'
                           }`}
                         >
                           <XCircle className="w-3.5 h-3.5" />
@@ -248,17 +245,17 @@ export function ReturnChecklistModal({
                     </div>
 
                     {item.isFuel && (
-                      <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center gap-2 flex-wrap">
-                        <span className="text-[11px] font-bold text-slate-400">Nível do Tanque:</span>
+                      <div className="mt-3 pt-2.5 border-t border-surface-border flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold text-content-secondary">Nível do Tanque:</span>
                         {['CHEIO', '3/4', '1/2', '1/4', 'RESERVA'].map((lvl) => (
                           <button
                             key={lvl}
                             type="button"
                             onClick={() => setFuelLevel(lvl)}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                               fuelLevel === lvl
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                                ? 'keep-white bg-brand-primary text-white'
+                                : 'bg-surface-elevated text-content-secondary hover:text-content-primary border border-surface-border'
                             }`}
                           >
                             {lvl}
@@ -274,7 +271,7 @@ export function ReturnChecklistModal({
                           placeholder="Descreva o problema ou avaria identificada na devolução..."
                           value={state.obs}
                           onChange={(e) => setItemObs(item.id, e.target.value)}
-                          className="w-full px-3 py-1.5 bg-[#0B1120] border border-rose-500/40 rounded-xl text-xs text-rose-200 placeholder-rose-400/50 focus:outline-none focus:border-rose-400"
+                          className="w-full px-3 py-1.5 bg-surface-card border border-rose-500/40 rounded-xl text-xs text-rose-400 placeholder-rose-400/50 focus:outline-none focus:border-rose-400"
                         />
                       </div>
                     )}
@@ -284,12 +281,11 @@ export function ReturnChecklistModal({
             </div>
           </div>
 
-          {/* Alerta de Triagem Automática para Oficina */}
           {hasProblem && (
-            <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-start gap-3">
-              <ShieldAlert className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className={`p-4 rounded-xl text-xs flex items-start gap-3 ${UI_TOKENS.badgeWarning}`}>
+              <ShieldAlert className="w-5 h-5 shrink-0 mt-0.5" />
               <div>
-                <strong className="block font-bold text-amber-200 mb-0.5">
+                <strong className="block font-bold mb-0.5">
                   Regra Automática de Manutenção:
                 </strong>
                 Como foram apontadas avarias na devolução, ao confirmar, o veículo será automaticamente bloqueado no status <strong>OFICINA (MAINTENANCE)</strong> e um alerta prioritário será emitido para o gestor.
@@ -297,9 +293,8 @@ export function ReturnChecklistModal({
             </div>
           )}
 
-          {/* Observações Gerais */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-bold text-content-secondary uppercase tracking-wider mb-1.5">
               Considerações Finais da Devolução
             </label>
             <textarea
@@ -307,15 +302,15 @@ export function ReturnChecklistModal({
               placeholder="Ex: Rota finalizada sem intercorrências, veículo devolvido no pátio 2."
               value={generalObs}
               onChange={(e) => setGeneralObs(e.target.value)}
-              className="w-full px-3.5 py-2 bg-[#070B14] border border-slate-700/80 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              className={UI_TOKENS.input}
             />
           </div>
 
-          <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-3">
+          <div className="pt-3 border-t border-surface-border flex items-center justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700 transition-colors"
+              className={UI_TOKENS.btnSecondary}
             >
               Cancelar
             </button>
@@ -323,7 +318,7 @@ export function ReturnChecklistModal({
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 text-white font-extrabold rounded-xl transition-all shadow-xl shadow-blue-600/25 text-xs flex items-center gap-2 cursor-pointer"
+              className={UI_TOKENS.btnPrimary}
             >
               {loading ? 'Finalizando...' : 'Confirmar Devolução e Encerrar Rota'}
             </button>

@@ -8,9 +8,12 @@ html[data-theme='rotalog-navy'] {
   --bg-main: #040D21;
   --bg-card: #0A1633;
   --bg-elevated: #0E1F47;
+  --bg-logo: #040D21;
   --border-primary: #1A3163;
   --brand-accent: #1D9BF0;
-  --brand-glow: rgba(29, 155, 240, 0.24);
+  --brand-accent-hover: #0284C7;
+  --brand-secondary: #2563EB;
+  --brand-glow: rgba(29, 155, 240, 0.20);
   --text-primary: #F8FAFC;
   --text-secondary: #94A3B8;
   --text-muted: #64748B;
@@ -21,9 +24,12 @@ html[data-theme='titanium-light'] {
   --bg-main: #F1F5F9;
   --bg-card: #FFFFFF;
   --bg-elevated: #F8FAFC;
+  --bg-logo: #040D21;
   --border-primary: #CBD5E1;
   --brand-accent: #0284C7;
-  --brand-glow: rgba(2, 132, 199, 0.16);
+  --brand-accent-hover: #0369A1;
+  --brand-secondary: #2563EB;
+  --brand-glow: rgba(2, 132, 199, 0.12);
   --text-primary: #0F172A;
   --text-secondary: #475569;
   --text-muted: #64748B;
@@ -38,45 +44,26 @@ body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
-  transition: background-color 0.25s ease, color 0.25s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* =========================================================================
- * Mapeamento de superfícies e bordas para todos os 5 temas
- * ========================================================================= */
-html[data-theme] .bg-\[\#070B14\],
-html[data-theme] .bg-\[\#0B1120\],
-html[data-theme] .bg-\[\#111827\],
-html[data-theme] .bg-\[\#131B2A\] {
+/* Mapeamento de utilitários legados e tokens de superfície */
+html[data-theme] .bg-surface-bg,
+html[data-theme] .bg-slate-950 {
   background-color: var(--bg-main);
 }
 
-html[data-theme] .bg-\[\#0B1120\]\/95 {
-  background-color: color-mix(in srgb, var(--bg-card) 92%, transparent);
-}
-
-html[data-theme] .bg-\[\#0F172A\],
-html[data-theme] .bg-\[\#1E293B\] {
+html[data-theme] .bg-surface-card,
+html[data-theme] .bg-slate-900 {
   background-color: var(--bg-card);
 }
 
-html[data-theme] .bg-\[\#0F172A\]\/80 {
-  background-color: color-mix(in srgb, var(--bg-card) 85%, transparent);
-}
-
-html[data-theme] .bg-slate-900 {
-  background-color: var(--bg-elevated);
-}
-
+html[data-theme] .bg-surface-elevated,
 html[data-theme] .bg-slate-800 {
   background-color: var(--bg-elevated);
 }
 
-html[data-theme] .hover\:bg-slate-900:hover,
-html[data-theme] .hover\:bg-slate-800:hover {
-  background-color: var(--bg-elevated);
-}
-
+html[data-theme] .border-surface-border,
 html[data-theme] .border-slate-800,
 html[data-theme] .border-slate-800\/80,
 html[data-theme] .border-slate-700,
@@ -84,31 +71,20 @@ html[data-theme] .border-slate-700\/80 {
   border-color: var(--border-primary);
 }
 
+html[data-theme] .divide-surface-border > :not([hidden]) ~ :not([hidden]),
 html[data-theme] .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
 html[data-theme] .divide-slate-800\/60 > :not([hidden]) ~ :not([hidden]) {
   border-color: var(--border-primary);
 }
 
-/* Mantém caixa da logo RotaLog sempre com azul-marinho fiel à marca */
 html[data-theme] .logo-navy-box {
-  background-color: #040D21;
-  border-color: rgba(56, 189, 248, 0.45);
+  background-color: var(--bg-logo);
+  border-color: rgba(56, 189, 248, 0.42);
 }
 
-/* =========================================================================
- * Ajustes específicos de contraste no tema claro (Titanium Light)
- * ========================================================================= */
-html[data-theme='titanium-light'] .from-\[\#0F172A\] {
-  background-image: none;
-  background-color: #FFFFFF;
-}
-
-html[data-theme='titanium-light'] .from-blue-950\/80 {
-  background-image: linear-gradient(to right, #E0F2FE, #FFFFFF, #DBEAFE);
-}
-
+/* Contraste aprimorado em Modo Claro */
 html[data-theme='titanium-light'] :is(.text-white, .text-slate-100, .text-slate-200, .text-slate-300):not(.keep-white):not(.keep-white *) {
-  color: #0F172A;
+  color: var(--text-primary);
 }
 
 html[data-theme='titanium-light'] :is(
@@ -118,24 +94,27 @@ html[data-theme='titanium-light'] :is(
   button[class*="bg-indigo-6"],
   button[class*="bg-amber-6"],
   button[class*="bg-rose-6"],
+  button[class*="bg-brand-primary"],
   button[class*="from-"],
-  .logo-navy-box
+  .logo-navy-box,
+  .keep-white
 ) :is(.text-white, .text-slate-100, span),
 html[data-theme='titanium-light'] button[class*="bg-emerald-6"],
 html[data-theme='titanium-light'] button[class*="bg-blue-6"],
 html[data-theme='titanium-light'] button[class*="bg-sky-6"],
 html[data-theme='titanium-light'] button[class*="bg-rose-6"],
 html[data-theme='titanium-light'] button[class*="bg-amber-6"],
+html[data-theme='titanium-light'] button[class*="bg-brand-primary"],
 html[data-theme='titanium-light'] button[class*="from-"] {
   color: #FFFFFF;
 }
 
 html[data-theme='titanium-light'] .text-slate-400 {
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 html[data-theme='titanium-light'] .text-slate-500 {
-  color: #64748B;
+  color: var(--text-muted);
 }
 
 html[data-theme='titanium-light'] .text-sky-300,

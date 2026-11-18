@@ -25,7 +25,7 @@ export function MetricCards({ stats }: MetricCardsProps) {
       icon: Car,
       color: 'text-blue-400',
       bgColor: 'bg-blue-500/10',
-      borderColor: 'border-blue-500/20',
+      borderColor: 'border-blue-500/25',
     },
     {
       title: 'Em Rota Ativa',
@@ -34,7 +34,7 @@ export function MetricCards({ stats }: MetricCardsProps) {
       icon: Navigation,
       color: 'text-emerald-400',
       bgColor: 'bg-emerald-500/10',
-      borderColor: 'border-emerald-500/20',
+      borderColor: 'border-emerald-500/25',
       pulse: stats.inUseVehicles > 0,
     },
     {
@@ -42,9 +42,9 @@ export function MetricCards({ stats }: MetricCardsProps) {
       value: stats.availableVehicles,
       sub: 'Prontos para nova saída',
       icon: CheckCircle2,
-      color: 'text-cyan-400',
-      bgColor: 'bg-cyan-500/10',
-      borderColor: 'border-cyan-500/20',
+      color: 'text-sky-400',
+      bgColor: 'bg-sky-500/10',
+      borderColor: 'border-sky-500/25',
     },
     {
       title: 'Oficina / Manutenção',
@@ -53,7 +53,7 @@ export function MetricCards({ stats }: MetricCardsProps) {
       icon: Wrench,
       color: 'text-amber-400',
       bgColor: 'bg-amber-500/10',
-      borderColor: 'border-amber-500/20',
+      borderColor: 'border-amber-500/25',
     },
     {
       title: 'Km Total Rodado',
@@ -62,7 +62,7 @@ export function MetricCards({ stats }: MetricCardsProps) {
       icon: Gauge,
       color: 'text-indigo-400',
       bgColor: 'bg-indigo-500/10',
-      borderColor: 'border-indigo-500/20',
+      borderColor: 'border-indigo-500/25',
     },
     {
       title: 'Ponto CLT Hoje',
@@ -71,7 +71,7 @@ export function MetricCards({ stats }: MetricCardsProps) {
       icon: Clock,
       color: 'text-purple-400',
       bgColor: 'bg-purple-500/10',
-      borderColor: 'border-purple-500/20',
+      borderColor: 'border-purple-500/25',
     },
   ];
 
@@ -82,17 +82,17 @@ export function MetricCards({ stats }: MetricCardsProps) {
         return (
           <div
             key={index}
-            className={`bg-[#1E293B] rounded-xl p-4 border ${card.borderColor} shadow-lg transition-all hover:translate-y-[-2px]`}
+            className={`bg-surface-card rounded-2xl p-4 border ${card.borderColor} transition-all hover:translate-y-[-2px]`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-400">{card.title}</span>
+              <span className="text-xs font-semibold text-content-secondary">{card.title}</span>
               <div className={`p-2 rounded-lg ${card.bgColor} ${card.color}`}>
                 <IconComponent className={`w-4 h-4 ${card.pulse ? 'animate-pulse' : ''}`} />
               </div>
             </div>
             <div className="mt-3">
-              <p className="text-2xl font-black text-white">{card.value}</p>
-              <p className="text-[11px] text-slate-400 mt-0.5 truncate">{card.sub}</p>
+              <p className="text-2xl font-black text-content-primary">{card.value}</p>
+              <p className="text-[11px] text-content-secondary mt-0.5 truncate">{card.sub}</p>
             </div>
           </div>
         );

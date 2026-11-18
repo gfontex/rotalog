@@ -2,42 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Clock, ClipboardCheck, Car, Sun, Moon } from 'lucide-react';
-
-export type AppThemeId = 'rotalog-navy' | 'titanium-light';
-
-export interface AppThemeOption {
-  id: AppThemeId;
-  name: string;
-  shortName: string;
-  badgeColor: string;
-  previewBg: string;
-  previewCard: string;
-  previewAccent: string;
-  isLight: boolean;
-}
-
-export const APP_THEMES: AppThemeOption[] = [
-  {
-    id: 'rotalog-navy',
-    name: 'Modo Escuro',
-    shortName: 'Modo Escuro',
-    badgeColor: '#1D9BF0',
-    previewBg: '#040D21',
-    previewCard: '#0A1633',
-    previewAccent: '#1D9BF0',
-    isLight: false,
-  },
-  {
-    id: 'titanium-light',
-    name: 'Modo Claro',
-    shortName: 'Modo Claro',
-    badgeColor: '#0284C7',
-    previewBg: '#F1F5F9',
-    previewCard: '#FFFFFF',
-    previewAccent: '#0284C7',
-    isLight: true,
-  },
-];
+import { APP_THEMES, AppThemeId, ASSETS } from '../theme';
 
 const THEME_STORAGE_KEY = '@rotalog:theme';
 const THEME_EVENT_NAME = 'rotalog:theme-updated';
@@ -100,7 +65,7 @@ export function useAppTheme() {
     try {
       localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
     } catch {
-      // Ignore storage quota / restricted context errors
+      // Ignore storage quota errors
     }
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent<AppThemeId>(THEME_EVENT_NAME, { detail: nextTheme }));
@@ -117,7 +82,7 @@ export function ThemeSwitcherBar({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <div
-        className="flex items-center gap-1 bg-[#070B14] border border-slate-800 rounded-xl p-1"
+        className="flex items-center gap-1 bg-surface-bg border border-surface-border rounded-xl p-1"
         role="group"
         aria-label="Selecionar tema claro ou escuro"
       >
@@ -134,15 +99,12 @@ export function ThemeSwitcherBar({ compact = false }: { compact?: boolean }) {
               aria-pressed={active}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
                 active
-                  ? 'keep-white text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'keep-white bg-brand-primary text-white shadow-sm'
+                  : 'text-content-secondary hover:text-content-primary'
               }`}
-              style={{
-                backgroundColor: active ? item.previewAccent : 'transparent',
-              }}
             >
               <Icon className="w-3.5 h-3.5 shrink-0" />
-              <span className="hidden sm:inline">{item.isLight ? 'Claro' : 'Escuro'}</span>
+              <span className="hidden sm:inline">{item.shortName}</span>
             </button>
           );
         })}
@@ -153,7 +115,7 @@ export function ThemeSwitcherBar({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center justify-center">
       <div
-        className="inline-flex items-center gap-1.5 bg-[#0F172A] border border-slate-800 rounded-2xl p-1.5 shadow-lg"
+        className="inline-flex items-center gap-1.5 bg-surface-card border border-surface-border rounded-2xl p-1.5"
         role="group"
         aria-label="Alternar entre Modo Escuro e Modo Claro"
       >
@@ -168,12 +130,9 @@ export function ThemeSwitcherBar({ compact = false }: { compact?: boolean }) {
               aria-pressed={active}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
                 active
-                  ? 'keep-white text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'keep-white bg-brand-primary text-white shadow-sm'
+                  : 'text-content-secondary hover:text-content-primary'
               }`}
-              style={{
-                backgroundColor: active ? item.previewAccent : 'transparent',
-              }}
             >
               <Icon className="w-4 h-4" />
               <span>{item.name}</span>
@@ -188,17 +147,17 @@ export function ThemeSwitcherBar({ compact = false }: { compact?: boolean }) {
 export function RotaLogHeaderBrand() {
   return (
     <div className="flex items-center gap-3">
-      <div className="logo-navy-box w-11 h-11 rounded-xl bg-[#040D21] border border-sky-400/40 overflow-hidden shadow-lg shadow-sky-500/20 flex items-center justify-center shrink-0">
+      <div className="logo-navy-box w-11 h-11 rounded-xl bg-surface-logo border border-sky-400/40 overflow-hidden flex items-center justify-center shrink-0">
         <img
-          src="/logo-rotalog.jpg"
+          src={ASSETS.logo}
           alt="Logo RotaLog Controle de Frotas"
           className="w-full h-full object-cover scale-110"
         />
       </div>
       <div>
         <div className="flex items-center gap-1.5">
-          <span className="text-lg sm:text-xl font-black italic tracking-tight text-white">
-            Rota<span className="text-[#1D9BF0]">Log</span>
+          <span className="text-lg sm:text-xl font-black italic tracking-tight text-content-primary">
+            Rota<span className="text-brand-primary">Log</span>
           </span>
         </div>
         <div className="flex items-center gap-1.5">
@@ -217,12 +176,11 @@ export function RotaLogBrandHero() {
   return (
     <div className="flex flex-col items-center text-center">
       <div className="relative group">
-        <div className="absolute -inset-2 rounded-3xl bg-gradient-to-tr from-sky-500/30 via-blue-600/20 to-cyan-400/30 blur-xl opacity-80 group-hover:opacity-100 transition-opacity" />
-        <div className="logo-navy-box relative w-52 sm:w-64 rounded-3xl bg-[#040D21] border border-sky-500/30 p-3 shadow-2xl shadow-sky-500/20 overflow-hidden">
+        <div className="logo-navy-box relative w-52 sm:w-60 rounded-2xl bg-surface-logo border border-sky-500/30 p-3 overflow-hidden">
           <img
-            src="/logo-rotalog.jpg"
+            src={ASSETS.logo}
             alt="RotaLog — Controle de Frotas"
-            className="w-full h-auto rounded-2xl object-contain"
+            className="w-full h-auto rounded-xl object-contain"
           />
         </div>
       </div>
@@ -237,20 +195,42 @@ export function RotaLogBrandHero() {
         </div>
 
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-xs font-bold text-sky-300">
-            <Clock className="w-3.5 h-3.5 text-sky-400" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-xs font-bold text-sky-400">
+            <Clock className="w-3.5 h-3.5" />
             Ponto CLT
           </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-xs font-bold text-sky-300">
-            <ClipboardCheck className="w-3.5 h-3.5 text-sky-400" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-xs font-bold text-sky-400">
+            <ClipboardCheck className="w-3.5 h-3.5" />
             Check List
           </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-xs font-bold text-sky-300">
-            <Car className="w-3.5 h-3.5 text-sky-400" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-xs font-bold text-sky-400">
+            <Car className="w-3.5 h-3.5" />
             Gestão de Frotas
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function CorporateEmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="py-10 px-4 flex flex-col items-center justify-center text-center">
+      <div className="logo-navy-box w-24 h-24 rounded-2xl border border-sky-500/25 overflow-hidden mb-3">
+        <img
+          src={ASSETS.emptyState}
+          alt={title}
+          className="w-full h-full object-cover"
+        />
+      </div>
+      <h4 className="text-sm font-bold text-content-primary">{title}</h4>
+      <p className="text-xs text-content-secondary max-w-sm mt-1">{description}</p>
     </div>
   );
 }

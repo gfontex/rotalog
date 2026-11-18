@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { Clock, Search, WifiOff, Wifi, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { UI_TOKENS } from '../theme';
+import { CorporateEmptyState } from './BrandLogo';
 
 interface PunchRecord {
   id: string;
@@ -28,10 +30,10 @@ export function TimeClockMirror({ punches }: TimeClockMirrorProps) {
   });
 
   const punchTypeMap: any = {
-    ENTRADA: { label: 'Entrada Turno', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
-    ALMOCO_SAIDA: { label: 'Saída Almoço', color: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
-    ALMOCO_RETORNO: { label: 'Retorno Almoço', color: 'text-blue-400 bg-blue-500/10 border-blue-500/30' },
-    SAIDA: { label: 'Saída Turno', color: 'text-red-400 bg-red-500/10 border-red-500/30' },
+    ENTRADA: { label: 'Entrada Turno', color: UI_TOKENS.badgeSuccess },
+    ALMOCO_SAIDA: { label: 'Saída Almoço', color: UI_TOKENS.badgeWarning },
+    ALMOCO_RETORNO: { label: 'Retorno Almoço', color: UI_TOKENS.badgeInfo },
+    SAIDA: { label: 'Saída Turno', color: UI_TOKENS.badgeDanger },
   };
 
   const exportTimeClockXLSX = () => {
@@ -58,18 +60,18 @@ export function TimeClockMirror({ punches }: TimeClockMirrorProps) {
         'Tipo da Marcação': punchTypeMap[p.type]?.label || p.type,
         'Data da Batida': dateObj.toLocaleDateString('pt-BR'),
         Horário: dateObj.toLocaleTimeString('pt-BR'),
-        'Modo de Gravação': p.isOffline ? 'Offline Sincronizado' : 'Online em Tempo Real',
+        'Modo de Registro': p.isOffline ? 'Offline Sincronizado' : 'Online em Tempo Real',
       };
     });
 
     const ws = XLSX.utils.json_to_sheet(rows);
     ws['!cols'] = [
-      { wch: 32 },
+      { wch: 30 },
       { wch: 16 },
       { wch: 24 },
-      { wch: 18 },
-      { wch: 15 },
-      { wch: 12 },
+      { wch: 20 },
+      { wch: 16 },
+      { wch: 14 },
       { wch: 24 },
     ];
 
@@ -79,36 +81,34 @@ export function TimeClockMirror({ punches }: TimeClockMirrorProps) {
   };
 
   return (
-    <div className="bg-[#1E293B] rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
-      {/* Cabeçalho */}
-      <div className="p-5 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+    <div className={`${UI_TOKENS.card} overflow-hidden`}>
+      <div className="p-5 border-b border-surface-border flex flex-col sm:flex-row items-center justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <h2 className="text-lg font-bold text-content-primary flex items-center gap-2">
             <Clock className="w-5 h-5 text-purple-400" />
             Espelho de Ponto Eletrônico CLT
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-content-secondary">
             Registro de batidas manuais em conformidade com as diretrizes trabalhistas
           </p>
         </div>
 
-        {/* Busca + Exportação Excel (.xlsx) */}
         <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
           <div className="relative flex-1 sm:w-64">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+            <Search className="w-4 h-4 text-content-muted absolute left-3 top-2.5" />
             <input
               type="text"
               placeholder="Buscar por colaborador ou CPF..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-[#0B1120] border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500"
+              className="w-full pl-9 pr-3 py-1.5 bg-surface-bg border border-surface-border rounded-xl text-xs text-content-primary placeholder-content-muted focus:outline-none focus:border-brand-primary"
             />
           </div>
 
           <button
             type="button"
             onClick={exportTimeClockXLSX}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 cursor-pointer whitespace-nowrap"
+            className="keep-white flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
           >
             <Download className="w-4 h-4" />
             <span>Exportar Ponto (.xlsx)</span>
@@ -116,58 +116,56 @@ export function TimeClockMirror({ punches }: TimeClockMirrorProps) {
         </div>
       </div>
 
-      {/* Tabela de Batidas */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-slate-300">
-          <thead className="bg-[#0B1120] text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
-            <tr>
-              <th className="px-4 py-3">Colaborador</th>
-              <th className="px-4 py-3">CPF</th>
-              <th className="px-4 py-3">Função</th>
-              <th className="px-4 py-3">Tipo da Marcação</th>
-              <th className="px-4 py-3">Data da Batida</th>
-              <th className="px-4 py-3">Horário</th>
-              <th className="px-4 py-3 text-center">Modo de Gravação</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800/60">
-            {filteredPunches.length === 0 ? (
+        {filteredPunches.length === 0 ? (
+          <CorporateEmptyState
+            title="Nenhuma batida de ponto encontrada"
+            description="Registros de entrada, almoço e saída dos colaboradores serão exibidos aqui."
+          />
+        ) : (
+          <table className="w-full text-left text-xs text-content-secondary">
+            <thead className="bg-surface-bg text-content-secondary uppercase tracking-wider font-semibold border-b border-surface-border">
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
-                  Nenhuma batida de ponto encontrada.
-                </td>
+                <th className="px-4 py-3">Colaborador</th>
+                <th className="px-4 py-3">CPF</th>
+                <th className="px-4 py-3">Função</th>
+                <th className="px-4 py-3">Tipo da Marcação</th>
+                <th className="px-4 py-3">Data da Batida</th>
+                <th className="px-4 py-3">Horário</th>
+                <th className="px-4 py-3 text-center">Modo de Gravação</th>
               </tr>
-            ) : (
-              filteredPunches.map((p) => {
+            </thead>
+            <tbody className="divide-y divide-surface-border">
+              {filteredPunches.map((p) => {
                 const dateObj = new Date(p.timestamp);
-                const styleObj = punchTypeMap[p.type] || { label: p.type, color: 'text-slate-400 bg-slate-800' };
+                const styleObj = punchTypeMap[p.type] || { label: p.type, color: 'bg-surface-elevated text-content-secondary border border-surface-border' };
 
                 return (
-                  <tr key={p.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="px-4 py-3 font-bold text-white">{p.userName}</td>
-                    <td className="px-4 py-3 font-mono text-slate-400">{p.userCpf || '-'}</td>
-                    <td className="px-4 py-3 text-slate-400">
+                  <tr key={p.id} className="hover:bg-surface-elevated/60 transition-colors">
+                    <td className="px-4 py-3 font-bold text-content-primary">{p.userName}</td>
+                    <td className="px-4 py-3 font-mono text-content-secondary">{p.userCpf || '-'}</td>
+                    <td className="px-4 py-3 text-content-secondary">
                       {p.userRole === 'DRIVER' ? 'Motorista' : p.userRole === 'FLEET_MANAGER' ? 'Gestor de Frota' : p.userRole}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${styleObj.color}`}>
+                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold ${styleObj.color}`}>
                         {styleObj.label}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-mono text-slate-300">
+                    <td className="px-4 py-3 font-mono text-content-primary">
                       {dateObj.toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-4 py-3 font-mono font-bold text-base text-purple-300">
+                    <td className="px-4 py-3 font-mono font-bold text-base text-purple-400">
                       {dateObj.toLocaleTimeString('pt-BR')}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {p.isOffline ? (
-                        <span className="inline-flex items-center gap-1 text-amber-400 text-[10px] font-semibold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded ${UI_TOKENS.badgeWarning}`}>
                           <WifiOff className="w-3 h-3" />
                           Offline Sincronizado
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-emerald-400 text-[10px] font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded ${UI_TOKENS.badgeSuccess}`}>
                           <Wifi className="w-3 h-3" />
                           Online em Tempo Real
                         </span>
@@ -175,10 +173,10 @@ export function TimeClockMirror({ punches }: TimeClockMirrorProps) {
                     </td>
                   </tr>
                 );
-              })
-            )}
-          </tbody>
-        </table>
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

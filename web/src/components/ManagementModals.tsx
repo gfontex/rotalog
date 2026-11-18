@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Car, UserPlus, Save, Building2, ShieldCheck, KeyRound } from 'lucide-react';
+import { X, Car, UserPlus, Save, Building2, ShieldCheck, KeyRound, Info } from 'lucide-react';
 import { webApi } from '../services/api';
+import { UI_TOKENS } from '../theme';
 
 // =========================================================================
-// MODAL: CADASTRAR NOVA EMPRESA / BASE (QUANDO VOCE VENDE UMA CONTA)
+// MODAL: CADASTRAR NOVA EMPRESA / BASE
 // =========================================================================
 interface NewTenantModalProps {
   isOpen: boolean;
@@ -41,7 +42,7 @@ export function NewTenantModal({ isOpen, onClose, onSuccess }: NewTenantModalPro
         adminEmail,
         adminPassword: adminPassword || adminCpf,
       });
-      alert(`Empresa "${name}" e conta Administrador criadas com sucesso no banco de dados!`);
+      alert(`Empresa "${name}" e conta Administrador criadas com sucesso no banco de dados.`);
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -52,89 +53,89 @@ export function NewTenantModal({ isOpen, onClose, onSuccess }: NewTenantModalPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#1E293B] rounded-2xl max-w-lg w-full border border-slate-800 shadow-2xl p-6">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className={`${UI_TOKENS.card} max-w-lg w-full p-6`}>
+        <div className="flex items-center justify-between pb-4 border-b border-surface-border">
           <div className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-indigo-400" />
-            <h3 className="font-bold text-white text-base">Criar Nova Empresa / Base Operacional</h3>
+            <Building2 className="w-5 h-5 text-brand-primary" />
+            <h3 className="font-bold text-content-primary text-base">Criar Nova Empresa / Base Operacional</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-content-secondary hover:text-content-primary cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
-          <div className="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-lg text-xs text-indigo-300">
+          <div className={`p-3 rounded-xl text-xs ${UI_TOKENS.badgeInfo}`}>
             Ao cadastrar uma nova empresa (ex: Teste Apresentação), o sistema gera automaticamente a conta de <strong>Administrador Geral</strong> que receberá as credenciais para gerenciar a frota e os colaboradores.
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Nome da Empresa / Base *</label>
+              <label className="block text-xs font-semibold text-content-secondary mb-1">Nome da Empresa / Base *</label>
               <input
                 type="text"
                 placeholder="Ex: Teste Apresentação"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
+                className={UI_TOKENS.input}
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">CNPJ (Opcional)</label>
+              <label className="block text-xs font-semibold text-content-secondary mb-1">CNPJ (Opcional)</label>
               <input
                 type="text"
                 placeholder="Ex: 12.345.678/0001-90"
                 value={cnpj}
                 onChange={(e) => setCnpj(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
+                className={`${UI_TOKENS.input} font-mono`}
               />
             </div>
           </div>
 
-          <div className="pt-2 border-t border-slate-800">
-            <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Conta do Administrador da Empresa</h4>
+          <div className="pt-2 border-t border-surface-border">
+            <h4 className="text-xs font-bold text-content-primary uppercase tracking-wider mb-2">Conta do Administrador da Empresa</h4>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Nome do Gestor / Admin *</label>
+                <label className="block text-xs font-semibold text-content-secondary mb-1">Nome do Gestor / Admin *</label>
                 <input
                   type="text"
                   placeholder="Ex: Roberto Gestor MK"
                   value={adminName}
                   onChange={(e) => setAdminName(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className={UI_TOKENS.input}
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">CPF do Admin *</label>
+                  <label className="block text-xs font-semibold text-content-secondary mb-1">CPF do Admin *</label>
                   <input
                     type="text"
                     placeholder="Ex: 000.111.222-33"
                     value={adminCpf}
                     onChange={(e) => setAdminCpf(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
+                    className={`${UI_TOKENS.input} font-mono`}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 mb-1">E-mail do Admin *</label>
+                  <label className="block text-xs font-semibold text-content-secondary mb-1">E-mail do Admin *</label>
                   <input
                     type="email"
-                    placeholder="admin@mkseguranca.com.br"
+                    placeholder="admin@empresa.com.br"
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
+                    className={UI_TOKENS.input}
                     required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">
+                <label className="block text-xs font-semibold text-content-secondary mb-1">
                   Senha do Administrador (Padrão: CPF)
                 </label>
                 <input
@@ -142,7 +143,7 @@ export function NewTenantModal({ isOpen, onClose, onSuccess }: NewTenantModalPro
                   placeholder="Deixe em branco para usar o CPF"
                   value={adminPassword}
                   onChange={(e) => setAdminPassword(e.target.value)}
-                  className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-indigo-500"
+                  className={UI_TOKENS.input}
                 />
               </div>
             </div>
@@ -152,14 +153,14 @@ export function NewTenantModal({ isOpen, onClose, onSuccess }: NewTenantModalPro
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700"
+              className={`flex-1 ${UI_TOKENS.btnSecondary}`}
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500 flex items-center justify-center gap-1 shadow-lg shadow-indigo-600/20"
+              className={`flex-1 ${UI_TOKENS.btnPrimary}`}
             >
               <Save className="w-4 h-4" />
               {loading ? 'Salvando...' : 'Criar Empresa & Admin'}
@@ -217,7 +218,7 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
         status,
         tenantId: tenantId || tenants[0]?.id,
       });
-      alert('Veículo cadastrado com sucesso no banco de dados!');
+      alert('Veículo cadastrado com sucesso no banco de dados.');
       setPlate('');
       setBrand('');
       setModel('');
@@ -233,14 +234,14 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#1E293B] rounded-2xl max-w-md w-full border border-slate-800 shadow-2xl p-6">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className={`${UI_TOKENS.card} max-w-md w-full p-6`}>
+        <div className="flex items-center justify-between pb-4 border-b border-surface-border">
           <div className="flex items-center gap-2">
-            <Car className="w-5 h-5 text-blue-400" />
-            <h3 className="font-bold text-white text-base">Cadastrar Novo Veículo na Frota</h3>
+            <Car className="w-5 h-5 text-brand-primary" />
+            <h3 className="font-bold text-content-primary text-base">Cadastrar Novo Veículo na Frota</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-content-secondary hover:text-content-primary cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -248,11 +249,11 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
           {tenants.length > 1 && (
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Empresa / Base</label>
+              <label className="block text-xs font-semibold text-content-secondary mb-1">Empresa / Base</label>
               <select
                 value={tenantId}
                 onChange={(e) => setTenantId(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500"
+                className={UI_TOKENS.input}
               >
                 {tenants.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
@@ -262,37 +263,37 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">Placa do Veículo *</label>
+            <label className="block text-xs font-semibold text-content-secondary mb-1">Placa do Veículo *</label>
             <input
               type="text"
-              placeholder="Ex: MKS1A01"
+              placeholder="Ex: TAP1A01"
               value={plate}
               onChange={(e) => setPlate(e.target.value)}
-              className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 uppercase font-mono"
+              className={`${UI_TOKENS.input} uppercase font-mono`}
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Marca *</label>
+              <label className="block text-xs font-semibold text-content-secondary mb-1">Marca *</label>
               <input
                 type="text"
                 placeholder="Ex: Fiat"
                 value={brand}
                 onChange={(e) => setBrand(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500"
+                className={UI_TOKENS.input}
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Modelo *</label>
+              <label className="block text-xs font-semibold text-content-secondary mb-1">Modelo *</label>
               <input
                 type="text"
                 placeholder="Ex: Strada Freedom"
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500"
+                className={UI_TOKENS.input}
                 required
               />
             </div>
@@ -300,34 +301,34 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Ano de Fabricação</label>
+              <label className="block text-xs font-semibold text-content-secondary mb-1">Ano de Fabricação</label>
               <input
                 type="number"
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
+                className={`${UI_TOKENS.input} font-mono`}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Odômetro Atual (Km)</label>
+              <label className="block text-xs font-semibold text-content-secondary mb-1">Odômetro Atual (Km)</label>
               <input
                 type="number"
                 value={mileage}
                 onChange={(e) => setMileage(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 font-mono"
+                className={`${UI_TOKENS.input} font-mono`}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">Status Inicial do Veículo</label>
+            <label className="block text-xs font-semibold text-content-secondary mb-1">Status Inicial do Veículo</label>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as 'AVAILABLE' | 'MAINTENANCE')}
-              className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500"
+              className={UI_TOKENS.input}
             >
-              <option value="AVAILABLE">🟢 Disponível no Pátio (Pronto para Rota)</option>
-              <option value="MAINTENANCE">🔧 Em Manutenção / Oficina</option>
+              <option value="AVAILABLE">Disponível no Pátio (Pronto para Rota)</option>
+              <option value="MAINTENANCE">Em Manutenção / Oficina</option>
             </select>
           </div>
 
@@ -335,14 +336,14 @@ export function NewVehicleModal({ isOpen, onClose, onSuccess, tenants = [] }: Ne
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700"
+              className={`flex-1 ${UI_TOKENS.btnSecondary}`}
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 rounded-lg bg-blue-600 text-white text-xs font-bold hover:bg-blue-500 flex items-center justify-center gap-1 shadow-lg shadow-blue-600/20"
+              className={`flex-1 ${UI_TOKENS.btnPrimary}`}
             >
               <Save className="w-4 h-4" />
               {loading ? 'Salvando...' : 'Salvar Veículo'}
@@ -370,7 +371,7 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState(isFleetManager ? 'DRIVER' : 'DRIVER');
+  const [role, setRole] = useState('DRIVER');
   const [password, setPassword] = useState('');
   const [tenantId, setTenantId] = useState(tenants[0]?.id || '');
   const [loading, setLoading] = useState(false);
@@ -398,7 +399,6 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
 
     setLoading(true);
     try {
-      // Regra de Negocio: Se nao digitar senha, usa '123456' ou o CPF
       const chosenPassword = password.trim().length > 0 ? password.trim() : cpf.trim();
 
       await webApi.createUser({
@@ -412,7 +412,7 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
       });
 
       alert(
-        `Colaborador "${name}" cadastrado com sucesso!\n` +
+        `Colaborador "${name}" cadastrado com sucesso.\n` +
         `Perfil: ${isFleetManager ? 'DRIVER (Motorista)' : role}\n` +
         `Senha de acesso: ${chosenPassword}`
       );
@@ -430,14 +430,14 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#1E293B] rounded-2xl max-w-md w-full border border-slate-800 shadow-2xl p-6">
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className={`${UI_TOKENS.card} max-w-md w-full p-6`}>
+        <div className="flex items-center justify-between pb-4 border-b border-surface-border">
           <div className="flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-emerald-400" />
-            <h3 className="font-bold text-white text-base">Cadastrar Colaborador & Senha</h3>
+            <h3 className="font-bold text-content-primary text-base">Cadastrar Colaborador & Senha</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-content-secondary hover:text-content-primary cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -445,11 +445,11 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
           {tenants.length > 1 && (
             <div>
-              <label className="block text-xs font-semibold text-slate-400 mb-1">Empresa / Base</label>
+              <label className="block text-xs font-semibold text-content-secondary mb-1">Empresa / Base</label>
               <select
                 value={tenantId}
                 onChange={(e) => setTenantId(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
+                className={UI_TOKENS.input}
               >
                 {tenants.map((t) => (
                   <option key={t.id} value={t.id}>{t.name}</option>
@@ -459,52 +459,52 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">Nome Completo *</label>
+            <label className="block text-xs font-semibold text-content-secondary mb-1">Nome Completo *</label>
             <input
               type="text"
               placeholder="Ex: Carlos Eduardo Silva"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
+              className={UI_TOKENS.input}
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">CPF (apenas números ou com traço) *</label>
+            <label className="block text-xs font-semibold text-content-secondary mb-1">CPF (apenas números ou com traço) *</label>
             <input
               type="text"
               placeholder="Ex: 111.222.333-44"
               value={cpf}
               onChange={(e) => setCpf(e.target.value)}
-              className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+              className={`${UI_TOKENS.input} font-mono`}
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">E-mail Corporativo (Opcional)</label>
+            <label className="block text-xs font-semibold text-content-secondary mb-1">E-mail Corporativo (Opcional)</label>
             <input
               type="email"
               placeholder="nome@testeapresentacao.com.br"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
+              className={UI_TOKENS.input}
             />
           </div>
 
-          {/* Hierarquia Operacional / Perfil de Acesso */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">
+            <label className="block text-xs font-semibold text-content-secondary mb-1">
               Hierarquia Operacional / Perfil de Acesso *
             </label>
             {isFleetManager ? (
-              <div className="p-3 bg-slate-900 border border-blue-500/30 rounded-lg">
+              <div className="p-3 bg-surface-elevated border border-blue-500/30 rounded-xl">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-blue-400">🚗 Motorista Operacional</span>
-                  <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-mono">Somente Motoristas</span>
+                  <Car className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-xs font-bold text-blue-400">Motorista Operacional</span>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-mono">Somente Motoristas</span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1">
+                <p className="text-[11px] text-content-secondary mt-1">
                   O perfil de <strong>Gestor de Frota</strong> tem permissão para cadastrar apenas <strong>Motoristas</strong>. O cadastro de outros gestores é exclusivo do Admin (Representante Legal).
                 </p>
               </div>
@@ -512,32 +512,34 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full px-3 py-2 bg-[#0B1120] border border-slate-800 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500"
+                className={UI_TOKENS.input}
               >
-                <option value="DRIVER">🚗 Motorista (Rotas, checklists e seu histórico)</option>
-                <option value="FLEET_MANAGER">👔 Gestor de Frota (Cadastra motoristas, carros, status e relatórios)</option>
-                <option value="ADMIN">👑 Admin / Representante Legal (Permissão total no sistema)</option>
+                <option value="DRIVER">Motorista (Rotas, checklists e seu histórico)</option>
+                <option value="FLEET_MANAGER">Gestor de Frota (Cadastra motoristas, carros, status e relatórios)</option>
+                <option value="ADMIN">Admin / Representante Legal (Permissão total no sistema)</option>
               </select>
             )}
           </div>
 
-          {/* Campo de Senha com Recomendacao */}
-          <div className="bg-slate-900 p-3 rounded-lg border border-slate-800">
+          <div className="bg-surface-elevated p-3 rounded-xl border border-surface-border">
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
+              <label className="text-xs font-semibold text-content-primary flex items-center gap-1.5">
                 <KeyRound className="w-3.5 h-3.5 text-amber-400" />
                 Senha de Acesso do Colaborador
               </label>
             </div>
-            <p className="text-[11px] text-amber-400/90 mb-2">
-              💡 <strong>Recomendação:</strong> O padrão é o <strong>CPF do funcionário</strong>. Se deixar vazio, o CPF será definido como senha inicial.
+            <p className="text-[11px] text-amber-400 mb-2 flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                <strong>Recomendação:</strong> Se deixar vazio, o CPF será definido como senha inicial.
+              </span>
             </p>
             <input
               type="text"
               placeholder="Digite uma senha personalizada ou deixe em branco"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-[#0B1120] border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-emerald-500 font-mono"
+              className={`${UI_TOKENS.input} font-mono`}
             />
           </div>
 
@@ -545,14 +547,14 @@ export function NewUserModal({ isOpen, onClose, onSuccess, tenants = [], current
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-bold hover:bg-slate-700"
+              className={`flex-1 ${UI_TOKENS.btnSecondary}`}
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-500 flex items-center justify-center gap-1 shadow-lg shadow-emerald-600/20"
+              className="keep-white flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Save className="w-4 h-4" />
               {loading ? 'Salvando...' : 'Salvar no Banco'}
