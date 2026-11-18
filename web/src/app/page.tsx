@@ -11,6 +11,7 @@ import { NotificationDrawer } from '../components/NotificationDrawer';
 import { NewVehicleModal, NewUserModal } from '../components/ManagementModals';
 import { ChecklistModal } from '../components/ChecklistModal';
 import { ReturnChecklistModal } from '../components/ReturnChecklistModal';
+import { RotaLogBrandHero, RotaLogHeaderBrand, ThemeSwitcherBar } from '../components/BrandLogo';
 import { webApi } from '../services/api';
 import {
   Car,
@@ -297,28 +298,27 @@ export default function DashboardPage() {
     ];
 
     return (
-      <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8 selection:bg-indigo-500 selection:text-white">
-        <div className="max-w-lg w-full mx-auto flex items-center justify-between py-2">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/20">
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <span className="font-black text-white text-lg tracking-wider block">ROTALOG</span>
-              <span className="text-[10px] text-slate-400 font-medium">Gestão de Frotas & Ponto CLT</span>
-            </div>
+      <div className="min-h-screen bg-[#070B14] text-slate-100 flex flex-col justify-between p-4 sm:p-6 lg:p-8 selection:bg-sky-500 selection:text-white">
+        <div className="max-w-3xl w-full mx-auto flex flex-col gap-4 py-2">
+          <div className="flex items-center justify-between gap-3">
+            <RotaLogHeaderBrand />
+            <span className="text-[10px] font-extrabold uppercase px-3 py-1 rounded-full bg-[#0F172A] border border-slate-800 text-sky-400">
+              Login Único • 3 Perfis
+            </span>
           </div>
-          <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
-            Login Único • 3 Perfis
-          </span>
+
+          <ThemeSwitcherBar />
         </div>
 
         <div className="max-w-lg w-full mx-auto my-5 bg-[#0F172A] border border-slate-800 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-purple-500 via-blue-500 to-emerald-500" />
+          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-sky-400 via-blue-500 to-indigo-500" />
 
-          <div className="text-center mb-4">
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">Portal de Acesso</h1>
-            <p className="text-xs text-slate-400 mt-1">
+          <div className="mb-5 pt-1">
+            <RotaLogBrandHero />
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight text-center mt-5">
+              Portal de Acesso
+            </h1>
+            <p className="text-xs text-slate-400 mt-1 text-center">
               O perfil de acesso é definido automaticamente após o login pelo seu CPF e senha.
             </p>
           </div>
@@ -394,7 +394,7 @@ export default function DashboardPage() {
             <button
               type="submit"
               disabled={loginLoading}
-              className="w-full py-3.5 mt-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-blue-600/20 text-sm flex items-center justify-center gap-2 cursor-pointer"
+              className="keep-white w-full py-3.5 mt-1 bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-black rounded-2xl transition-all shadow-xl shadow-sky-500/25 text-sm flex items-center justify-center gap-2 cursor-pointer"
             >
               {loginLoading ? 'Identificando Perfil...' : 'Entrar no Sistema'}
               <ArrowRight className="w-4 h-4" />

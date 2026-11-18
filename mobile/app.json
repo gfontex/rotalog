@@ -6,14 +6,14 @@
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "splash": {
-      "backgroundColor": "#0B1120"
+      "backgroundColor": "#040D21"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0B1120"
+        "backgroundColor": "#040D21"
       }
     },
     "plugins": [

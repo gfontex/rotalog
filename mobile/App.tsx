@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api, BASE_URL, setCustomApiUrl } from './src/services/api';
@@ -160,7 +161,76 @@ class RootErrorBoundary extends React.Component<{ children: React.ReactNode }, E
   }
 }
 
+const MOBILE_THEMES = {
+  navy: {
+    id: 'navy' as const,
+    label: 'Navy',
+    bg: '#040D21',
+    card: '#0A1633',
+    inputBg: '#061129',
+    border: '#1A3163',
+    accent: '#1D9BF0',
+    text: '#F8FAFC',
+    subtext: '#94A3B8',
+    isLight: false,
+  },
+  emerald: {
+    id: 'emerald' as const,
+    label: 'Obsidian',
+    bg: '#060B11',
+    card: '#0E1722',
+    inputBg: '#091018',
+    border: '#1F3549',
+    accent: '#10B981',
+    text: '#F8FAFC',
+    subtext: '#94A3B8',
+    isLight: false,
+  },
+  royal: {
+    id: 'royal' as const,
+    label: 'Royal',
+    bg: '#09071A',
+    card: '#13112E',
+    inputBg: '#0D0B21',
+    border: '#302B6E',
+    accent: '#8B5CF6',
+    text: '#F8FAFC',
+    subtext: '#A5B4FC',
+    isLight: false,
+  },
+  amber: {
+    id: 'amber' as const,
+    label: 'Express',
+    bg: '#0D0E12',
+    card: '#171922',
+    inputBg: '#101218',
+    border: '#363C52',
+    accent: '#F59E0B',
+    text: '#F8FAFC',
+    subtext: '#A1A1AA',
+    isLight: false,
+  },
+  light: {
+    id: 'light' as const,
+    label: 'Claro',
+    bg: '#F1F5F9',
+    card: '#FFFFFF',
+    inputBg: '#F8FAFC',
+    border: '#CBD5E1',
+    accent: '#0284C7',
+    text: '#0F172A',
+    subtext: '#475569',
+    isLight: true,
+  },
+};
+
+type MobileThemeId = keyof typeof MOBILE_THEMES;
+
 function MainApp() {
+  // Aparência / Tema visual selecionável no app
+  const [appTheme, setAppTheme] = useState<MobileThemeId>('navy');
+  const themeColors = MOBILE_THEMES[appTheme];
+
   // Estado de Autenticacao Unica (perfil definido ao logar)
   const [user, setUser] = useState<UserProfile & { tenantId?: string } | null>(null);
   const [companyInput, setCompanyInput] = useState('Teste Apresentação');
@@ -688,19 +758,69 @@ function MainApp() {
     const allQuickUsers = Array.isArray(quickUsers) ? quickUsers : [];
 
     return (
-      <SafeAreaView style={styles.darkContainer}>
-        <StatusBar barStyle="light-content" />
+      <SafeAreaView style={[styles.darkContainer, { backgroundColor: themeColors.bg }]}>
+        <StatusBar barStyle={themeColors.isLight ? 'dark-content' : 'light-content'} />
         <ScrollView contentContainerStyle={styles.loginContent}>
           <View style={styles.brandHeader}>
-            <View style={styles.shieldIconContainer}>
-              <Ionicons name="shield-checkmark" size={40} color="#10B981" />
+            <View style={[styles.logoFrame, { borderColor: themeColors.accent }]}>
+              <Image
+                source={require('./assets/logo-rotalog.jpg')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.brandTitle}>ROTALOG</Text>
-            <Text style={styles.brandSubtitle}>Gestão Operacional de Frotas & Ponto CLT</Text>
-            <View style={styles.manualBadge}>
-              <Ionicons name="layers-outline" size={14} color="#10B981" />
-              <Text style={styles.manualBadgeText}>Tela Única • 3 Tipos de Login por Perfil</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+              <Text style={[styles.brandTitle, { color: themeColors.text }]}>Rota</Text>
+              <Text style={[styles.brandTitle, { color: '#1D9BF0' }]}>Log</Text>
             </View>
+            <Text style={[styles.brandSubtitle, { color: themeColors.accent, fontWeight: '800', letterSpacing: 2 }]}>
+              — CONTROLE DE FROTAS —
+            </Text>
+
+            <View style={styles.pillarsRow}>
+              <View style={[styles.pillarPill, { borderColor: themeColors.border, backgroundColor: themeColors.card }]}>
+                <Ionicons name="time-outline" size={13} color={themeColors.accent} />
+                <Text style={[styles.pillarText, { color: themeColors.subtext }]}>Ponto CLT</Text>
+              </View>
+              <View style={[styles.pillarPill, { borderColor: themeColors.border, backgroundColor: themeColors.card }]}>
+                <Ionicons name="clipboard-outline" size={13} color={themeColors.accent} />
+                <Text style={[styles.pillarText, { color: themeColors.subtext }]}>Check List</Text>
+              </View>
+              <View style={[styles.pillarPill, { borderColor: themeColors.border, backgroundColor: themeColors.card }]}>
+                <Ionicons name="car-sport-outline" size={13} color={themeColors.accent} />
+                <Text style={[styles.pillarText, { color: themeColors.subtext }]}>Gestão de Frotas</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Seletor de Aparências (5 Temas) */}
+          <View style={styles.themePickerRow}>
+            {(Object.values(MOBILE_THEMES)).map((t) => {
+              const selected = appTheme === t.id;
+              return (
+                <TouchableOpacity
+                  key={t.id}
+                  style={[
+                    styles.themeChip,
+                    {
+                      backgroundColor: selected ? t.accent : themeColors.card,
+                      borderColor: selected ? t.accent : themeColors.border,
+                    },
+                  ]}
+                  onPress={() => setAppTheme(t.id)}
+                >
+                  <View style={[styles.themeDot, { backgroundColor: t.bg, borderColor: '#FFFFFF' }]} />
+                  <Text
+                    style={[
+                      styles.themeChipText,
+                      { color: selected ? '#FFFFFF' : themeColors.subtext },
+                    ]}
+                  >
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* Legenda dos 3 Tipos de Acesso Reconhecidos Automaticamente no Login */}
@@ -714,7 +834,7 @@ function MainApp() {
             ).map((badge) => (
               <View
                 key={badge.key}
-                style={[styles.loginTabBtn, { borderColor: badge.color }]}
+                style={[styles.loginTabBtn, { backgroundColor: themeColors.card, borderColor: badge.color }]}
               >
                 <Text style={[styles.loginTabText, { color: badge.color }]}>
                   {badge.label}
@@ -724,20 +844,20 @@ function MainApp() {
           </View>
 
           {/* Formulario Unico de Login */}
-          <View style={[styles.card, { borderTopWidth: 3, borderTopColor: '#10B981' }]}>
-            <Text style={styles.cardTitle}>Acesso ao Sistema</Text>
-            <View style={[styles.permissionBox, { borderColor: '#334155' }]}>
-              <Text style={styles.permissionBoxText}>
+          <View style={[styles.card, { backgroundColor: themeColors.card, borderColor: themeColors.border, borderTopWidth: 3, borderTopColor: themeColors.accent }]}>
+            <Text style={[styles.cardTitle, { color: themeColors.text }]}>Acesso ao Sistema</Text>
+            <View style={[styles.permissionBox, { backgroundColor: themeColors.inputBg, borderColor: themeColors.border }]}>
+              <Text style={[styles.permissionBoxText, { color: themeColors.subtext }]}>
                 Informe seu CPF e senha. O tipo de login (Admin, Gestor ou Motorista) e suas permissões são definidos automaticamente ao entrar.
               </Text>
             </View>
 
             {/* Campo 1: Empresa / Base */}
-            <Text style={styles.inputLabel}>Empresa / Base Operacional *</Text>
-            <View style={styles.inputRow}>
-              <Ionicons name="business-outline" size={20} color="#94A3B8" style={{ marginRight: 8 }} />
+            <Text style={[styles.inputLabel, { color: themeColors.subtext }]}>Empresa / Base Operacional *</Text>
+            <View style={[styles.inputRow, { backgroundColor: themeColors.inputBg, borderColor: themeColors.border }]}>
+              <Ionicons name="business-outline" size={20} color={themeColors.subtext} style={{ marginRight: 8 }} />
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: themeColors.text }]}
                 placeholder="Ex: Teste Apresentação"
                 placeholderTextColor="#64748B"
                 value={companyInput}
@@ -746,11 +866,11 @@ function MainApp() {
             </View>
 
             {/* Campo 2: CPF */}
-            <Text style={styles.inputLabel}>CPF do Usuário *</Text>
-            <View style={styles.inputRow}>
-              <Ionicons name="person-outline" size={20} color="#94A3B8" style={{ marginRight: 8 }} />
+            <Text style={[styles.inputLabel, { color: themeColors.subtext }]}>CPF do Usuário *</Text>
+            <View style={[styles.inputRow, { backgroundColor: themeColors.inputBg, borderColor: themeColors.border }]}>
+              <Ionicons name="person-outline" size={20} color={themeColors.subtext} style={{ marginRight: 8 }} />
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: themeColors.text }]}
                 placeholder="Ex: 111.111.111-11"
                 placeholderTextColor="#64748B"
                 value={cpfInput}
@@ -761,13 +881,13 @@ function MainApp() {
 
             {/* Campo 3: Senha */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={styles.inputLabel}>Senha de Acesso *</Text>
+              <Text style={[styles.inputLabel, { color: themeColors.subtext }]}>Senha de Acesso *</Text>
               <Text style={styles.inputTip}>Padrão fictícia: 123456</Text>
             </View>
-            <View style={styles.inputRow}>
-              <Ionicons name="lock-closed-outline" size={20} color="#94A3B8" style={{ marginRight: 8 }} />
+            <View style={[styles.inputRow, { backgroundColor: themeColors.inputBg, borderColor: themeColors.border }]}>
+              <Ionicons name="lock-closed-outline" size={20} color={themeColors.subtext} style={{ marginRight: 8 }} />
               <TextInput
-                style={styles.textInput}
+                style={[styles.textInput, { color: themeColors.text }]}
                 placeholder="Digite sua senha (ex: 123456)"
                 placeholderTextColor="#64748B"
                 value={passwordInput}
@@ -777,7 +897,7 @@ function MainApp() {
             </View>
 
             <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: '#10B981' }, loadingAuth && { opacity: 0.7 }]}
+              style={[styles.primaryButton, { backgroundColor: themeColors.accent }, loadingAuth && { opacity: 0.7 }]}
               onPress={() => handleLogin()}
               disabled={loadingAuth}
             >
@@ -793,12 +913,12 @@ function MainApp() {
           </View>
 
           {/* Atalhos Ficticios da Empresa Teste Apresentação (Todos os 3 Perfis) */}
-          <View style={styles.quickCard}>
+          <View style={[styles.quickCard, { backgroundColor: themeColors.card, borderColor: themeColors.border }]}>
             <View style={styles.quickHeader}>
               <Ionicons name="flash" size={18} color="#F59E0B" />
               <Text style={styles.quickTitle}>Acessos Fictícios • Teste Apresentação</Text>
             </View>
-            <Text style={styles.quickDesc}>
+            <Text style={[styles.quickDesc, { color: themeColors.subtext }]}>
               Toque em qualquer colaborador para entrar direto (o sistema identifica o perfil automaticamente):
             </Text>
 
@@ -820,7 +940,7 @@ function MainApp() {
               return (
                 <TouchableOpacity
                   key={u.id}
-                  style={styles.quickUserItem}
+                  style={[styles.quickUserItem, { backgroundColor: themeColors.inputBg, borderColor: themeColors.border }]}
                   onPress={() => {
                     const comp = u.tenant?.name || 'Teste Apresentação';
                     setCompanyInput(comp);
@@ -833,15 +953,15 @@ function MainApp() {
                     <Text style={styles.avatarText}>{(u.name || 'U').charAt(0)}</Text>
                   </View>
                   <View style={{ flex: 1, marginLeft: 10 }}>
-                    <Text style={styles.quickUserName}>{u.name}</Text>
+                    <Text style={[styles.quickUserName, { color: themeColors.text }]}>{u.name}</Text>
                     <Text style={[styles.quickUserSub, { color: roleColor, fontWeight: '700' }]}>
                       {roleBadge}
                     </Text>
-                    <Text style={styles.quickUserSub}>
+                    <Text style={[styles.quickUserSub, { color: themeColors.subtext }]}>
                       CPF: {u.cpf} • Senha: {userPassword}
                     </Text>
                   </View>
-                  <Ionicons name="arrow-forward-circle" size={22} color="#64748B" />
+                  <Ionicons name="arrow-forward-circle" size={22} color={themeColors.accent} />
                 </TouchableOpacity>
               );
             })}
@@ -952,16 +1072,21 @@ function MainApp() {
   const isDriver = user.role === 'DRIVER';
 
   return (
-    <SafeAreaView style={styles.darkContainer}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView style={[styles.darkContainer, { backgroundColor: themeColors.bg }]}>
+      <StatusBar barStyle={themeColors.isLight ? 'dark-content' : 'light-content'} />
 
-      {/* Top Bar Executiva */}
-      <View style={styles.topBar}>
+      {/* Top Bar Executiva com Logo RotaLog & Seletor Rápido de Aparência */}
+      <View style={[styles.topBar, { backgroundColor: themeColors.card, borderBottomColor: themeColors.border }]}>
+        <Image
+          source={require('./assets/logo-rotalog.jpg')}
+          style={{ width: 36, height: 36, borderRadius: 8, marginRight: 10, backgroundColor: '#040D21' }}
+          resizeMode="cover"
+        />
         <View style={styles.topBarLeft}>
-          <Text style={styles.topBarName}>{user.name}</Text>
+          <Text style={[styles.topBarName, { color: themeColors.text }]}>{user.name}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-            <Text style={styles.topBarTenant}>{user.tenantName}</Text>
-            <Text style={styles.topBarTenant}>•</Text>
+            <Text style={[styles.topBarTenant, { color: themeColors.subtext }]}>{user.tenantName}</Text>
+            <Text style={[styles.topBarTenant, { color: themeColors.subtext }]}>•</Text>
             <Text
               style={[
                 styles.topBarTenant,
@@ -986,12 +1111,29 @@ function MainApp() {
         </View>
 
         <View style={styles.topBarRight}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: 8 }}>
+            {(Object.values(MOBILE_THEMES)).map((t) => (
+              <TouchableOpacity
+                key={t.id}
+                onPress={() => setAppTheme(t.id)}
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 7,
+                  backgroundColor: t.accent,
+                  borderWidth: appTheme === t.id ? 2 : 1,
+                  borderColor: appTheme === t.id ? themeColors.text : 'rgba(255,255,255,0.35)',
+                }}
+              />
+            ))}
+          </View>
+
           <TouchableOpacity
-            style={[styles.offlineChip, isSimulatedOffline && styles.offlineChipActive]}
+            style={[styles.offlineChip, { backgroundColor: themeColors.inputBg, borderColor: themeColors.border }, isSimulatedOffline && styles.offlineChipActive]}
             onPress={() => setIsSimulatedOffline(!isSimulatedOffline)}
           >
             <View style={[styles.statusDot, { backgroundColor: isSimulatedOffline ? '#F59E0B' : '#10B981' }]} />
-            <Text style={styles.offlineChipText}>{isSimulatedOffline ? 'Offline' : 'Online'}</Text>
+            <Text style={[styles.offlineChipText, { color: themeColors.text }]}>{isSimulatedOffline ? 'Offline' : 'Online'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -1882,7 +2024,7 @@ function MainApp() {
       </Modal>
 
       {/* Barra Inferior (Tabs Contextuais por Hierarquia) */}
-      <View style={styles.bottomNav}>
+      <View style={[styles.bottomNav, { backgroundColor: themeColors.card, borderTopColor: themeColors.border }]}>
         <TouchableOpacity
           style={[styles.navItem, activeTab === 'route' && styles.navItemActive]}
           onPress={() => setActiveTab('route')}
@@ -1890,9 +2032,9 @@ function MainApp() {
           <Ionicons
             name={activeTab === 'route' ? 'car' : 'car-outline'}
             size={21}
-            color={activeTab === 'route' ? '#3B82F6' : '#94A3B8'}
+            color={activeTab === 'route' ? themeColors.accent : themeColors.subtext}
           />
-          <Text style={[styles.navText, activeTab === 'route' && styles.navTextActive]}>
+          <Text style={[styles.navText, activeTab === 'route' && { color: themeColors.accent, fontWeight: '700' }]}>
             {isDriver ? 'Iniciar Rota' : 'Frota'}
           </Text>
         </TouchableOpacity>
@@ -1905,9 +2047,9 @@ function MainApp() {
             <Ionicons
               name={activeTab === 'users' ? 'people' : 'people-outline'}
               size={21}
-              color={activeTab === 'users' ? '#8B5CF6' : '#94A3B8'}
+              color={activeTab === 'users' ? '#8B5CF6' : themeColors.subtext}
             />
-            <Text style={[styles.navText, activeTab === 'users' && { color: '#8B5CF6' }]}>
+            <Text style={[styles.navText, activeTab === 'users' && { color: '#8B5CF6', fontWeight: '700' }]}>
               Cadastros
             </Text>
           </TouchableOpacity>
@@ -1920,9 +2062,9 @@ function MainApp() {
           <Ionicons
             name={activeTab === 'timeclock' ? 'time' : 'time-outline'}
             size={21}
-            color={activeTab === 'timeclock' ? '#10B981' : '#94A3B8'}
+            color={activeTab === 'timeclock' ? '#10B981' : themeColors.subtext}
           />
-          <Text style={[styles.navText, activeTab === 'timeclock' && { color: '#10B981' }]}>
+          <Text style={[styles.navText, activeTab === 'timeclock' && { color: '#10B981', fontWeight: '700' }]}>
             Ponto CLT
           </Text>
         </TouchableOpacity>
@@ -1934,9 +2076,9 @@ function MainApp() {
           <Ionicons
             name={activeTab === 'history' ? 'document-text' : 'document-text-outline'}
             size={21}
-            color={activeTab === 'history' ? '#F59E0B' : '#94A3B8'}
+            color={activeTab === 'history' ? '#F59E0B' : themeColors.subtext}
           />
-          <Text style={[styles.navText, activeTab === 'history' && { color: '#F59E0B' }]}>
+          <Text style={[styles.navText, activeTab === 'history' && { color: '#F59E0B', fontWeight: '700' }]}>
             {isDriver ? 'Histórico' : 'Relatórios'}
           </Text>
         </TouchableOpacity>
@@ -1948,7 +2090,7 @@ function MainApp() {
 const styles = StyleSheet.create({
   darkContainer: {
     flex: 1,
-    backgroundColor: '#0B1120',
+    backgroundColor: '#040D21',
   },
   loginContent: {
     padding: 24,
@@ -1957,7 +2099,71 @@ const styles = StyleSheet.create({
   },
   brandHeader: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 18,
+  },
+  logoFrame: {
+    width: 150,
+    height: 150,
+    borderRadius: 24,
+    backgroundColor: '#040D21',
+    borderWidth: 1.5,
+    borderColor: '#1D9BF0',
+    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 6,
+  },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 18,
+  },
+  pillarsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
+  },
+  pillarPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  pillarText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  themePickerRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 6,
+    marginBottom: 14,
+  },
+  themeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  themeDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+  },
+  themeChipText: {
+    fontSize: 11,
+    fontWeight: '800',
   },
   shieldIconContainer: {
     width: 76,
@@ -1973,11 +2179,12 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 30,
     fontWeight: '900',
+    fontStyle: 'italic',
     color: '#F8FAFC',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
   },
   brandSubtitle: {
-    fontSize: 13,
+    fontSize: 11,
     color: '#94A3B8',
     marginTop: 4,
     textAlign: 'center',

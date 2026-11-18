@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, Bell, Car, UserPlus, RefreshCw, Radio, LogOut, User, Building2 } from 'lucide-react';
+import { Bell, Car, UserPlus, RefreshCw, Radio, LogOut, Building2 } from 'lucide-react';
+import { RotaLogHeaderBrand, ThemeSwitcherBar } from './BrandLogo';
 
 interface HeaderProps {
   onOpenNewVehicle: () => void;
@@ -85,20 +86,15 @@ export function Header({
       <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3.5">
         {/* Logo & Identificação da Empresa */}
         <div className="flex items-center justify-between w-full md:w-auto">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 via-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 border border-emerald-400/20">
-              <ShieldCheck className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg sm:text-xl font-black tracking-wider text-white">ROTALOG</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                  <Radio className="w-2.5 h-2.5 animate-pulse text-emerald-400" />
-                  SISTEMA ONLINE
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-                <Building2 className="w-3.5 h-3.5 text-indigo-400" />
+          <div className="flex items-center gap-3.5">
+            <RotaLogHeaderBrand />
+            <div className="hidden sm:flex flex-col border-l border-slate-800 pl-3">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/30 flex items-center gap-1 w-fit">
+                <Radio className="w-2.5 h-2.5 animate-pulse text-sky-400" />
+                SISTEMA ONLINE
+              </span>
+              <p className="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
+                <Building2 className="w-3.5 h-3.5 text-sky-400" />
                 Base: <strong className="text-slate-200 font-semibold">{currentUser?.tenantName || selectedTenantName}</strong>
               </p>
             </div>
@@ -118,6 +114,9 @@ export function Header({
 
         {/* Ações Rápidas & Perfil */}
         <div className="flex items-center gap-2.5 w-full md:w-auto justify-end flex-wrap">
+          {/* Seletor de Aparências (5 Temas) */}
+          <ThemeSwitcherBar compact />
+
           {/* Relógio em Tempo Real */}
           <div className="hidden lg:flex items-center bg-[#070B14] border border-slate-800/80 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-mono">
             <span>{time || '--:--:--'}</span>
