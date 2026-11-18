@@ -8,6 +8,13 @@ echo.
 
 cd /d "%~dp0backend"
 
+if not exist .env (
+    if exist .env.example (
+        echo [INFO] Criando arquivo .env a partir de .env.example...
+        copy /Y .env.example .env > nul
+    )
+)
+
 if not exist node_modules (
     echo [INFO] Instalando dependencias do backend...
     call npm install

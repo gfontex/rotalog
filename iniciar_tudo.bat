@@ -26,12 +26,12 @@ echo ======================================================================
 echo.
 echo  * Painel Web:         http://localhost:3000
 echo  * Backend API:        http://localhost:3001
-echo  * App Mobile (Expo):  Verifique a janela do terminal para ler o QR Code
+echo  * App Mobile (Expo):  http://localhost:8081 (ou QR Code no Expo Go)
 echo.
-echo  Credenciais de Testes (Acesso Rapido na tela de login):
-echo   - Carlos Silva (Motorista): CPF 111.222.333-44
-echo   - Joao Pereira (Motorista): CPF 222.333.444-55
-echo   - Roberto Santos (Gestor):  CPF 333.444.555-66
+echo  Credenciais de Acesso (Empresa: Teste Apresentacao / Senha: 123456):
+echo   - Admin (Representante Legal): CPF 111.111.111-11
+echo   - Gestor de Frota:             CPF 222.222.222-22
+echo   - Motorista Operacional:       CPF 333.333.333-33
 echo.
 echo  (Os 3 servicos estao rodando em suas respectivas janelas abertas)
 echo ======================================================================

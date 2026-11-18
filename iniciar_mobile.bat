@@ -21,6 +21,11 @@ set /p MODO="Escolha o modo [1, 2 ou 3] e pressione ENTER (Padrao: 1): "
 
 cd /d "%~dp0mobile"
 
+if not exist node_modules (
+    echo [INFO] Instalando dependencias do app mobile...
+    call npm install
+)
+
 if "%MODO%"=="2" goto EXEC_WEB
 if "%MODO%"=="3" goto EXEC_LAN
 
