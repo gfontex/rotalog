@@ -2,6 +2,15 @@
 
 import React, { useState } from 'react';
 import { Download, Search, FileText, CheckCircle2, Clock, Coffee, AlertTriangle } from 'lucide-react';
+import * as XLSX from 'xlsx';
+
+interface ChecklistData {
+  mileage: number;
+  hasProblem?: boolean;
+  itemsResult?: any;
+  observation?: string | null;
+  createdAt?: string;
+}
 
 interface TripItem {
   id: string;
@@ -22,17 +31,29 @@ interface TripItem {
     brand: string;
     model: string;
   } | null;
-  entryChecklist?: {
-    mileage: number;
-  } | null;
-  exitChecklist?: {
-    mileage: number;
-    hasProblem: boolean;
-  } | null;
+  entryChecklist?: ChecklistData | null;
+  exitChecklist?: ChecklistData | null;
 }
 
 interface TripReportsProps {
   trips: TripItem[];
+}
+
+function formatCheckItem(items: any, keys: string[]): string {
+  if (!items || typeof items !== 'object') return 'OK';
+  for (const k of keys) {
+    if (items[k] !== undefined) {
+      const val = items[k];
+      if (typeof val === 'boolean') return val ? 'OK' : 'AVARIA';
+      if (typeof val === 'object' && val !== null) {
+        if (val.ok === false) {
+          return val.observation ? `AVARIA (${val.observation})` : 'AVARIA';
+        }
+        return 'OK';
+      }
+    }
+  }
+  return 'OK';
 }
 
 export function TripReports({ trips }: TripReportsProps) {
@@ -46,55 +67,118 @@ export function TripReports({ trips }: TripReportsProps) {
     return driverName.includes(q) || plate.includes(q) || model.includes(q);
   });
 
-  const exportCSV = () => {
-    if (trips.length === 0) {
-      alert('Não há dados para exportar.');
+  const exportChecklistsAndTripsXLSX = () => {
+    if (filteredTrips.length === 0) {
+      alert('Não há dados de checklists ou viagens para exportar.');
       return;
     }
 
-    const headers = [
-      'ID Viagem',
-      'Motorista',
-      'CPF',
-      'Placa',
-      'Veiculo',
-      'Saida',
-      'Chegada',
-      'Duracao (min)',
-      'Almoco (min)',
-      'Km Inicial',
-      'Km Final',
-      'Km Percorrido',
-      'Status',
+    const checklistRows: any[] = [];
+    filteredTrips.forEach((t) => {
+      const baseInfo = {
+        Motorista: t.driver?.name || 'N/A',
+        CPF: t.driver?.cpf || 'N/A',
+        Placa: t.vehicle?.plate || 'N/A',
+        Veículo: `${t.vehicle?.brand || ''} ${t.vehicle?.model || ''}`.trim() || 'N/A',
+      };
+
+      if (t.entryChecklist) {
+        const items = t.entryChecklist.itemsResult || {};
+        checklistRows.push({
+          ...baseInfo,
+          'Tipo Checklist': 'Saída (Início de Rota)',
+          'Data/Hora': new Date(t.entryChecklist.createdAt || t.startTime).toLocaleString('pt-BR'),
+          'Odômetro (Km)': t.entryChecklist.mileage || 0,
+          'Resultado Geral': t.entryChecklist.hasProblem ? 'AVARIA REPORTADA' : 'CONFORME',
+          Combustível: items.fuelLevel ? String(items.fuelLevel) : formatCheckItem(items, ['fuel']),
+          Pneus: formatCheckItem(items, ['tires']),
+          Lataria: formatCheckItem(items, ['bodywork']),
+          Luzes: formatCheckItem(items, ['lights', 'headlights']),
+          Documentação: formatCheckItem(items, ['docs', 'documents']),
+          Observações: t.entryChecklist.observation || '-',
+        });
+      }
+
+      if (t.exitChecklist) {
+        const items = t.exitChecklist.itemsResult || {};
+        checklistRows.push({
+          ...baseInfo,
+          'Tipo Checklist': 'Devolução (Fim de Rota)',
+          'Data/Hora': new Date(t.exitChecklist.createdAt || t.endTime || t.startTime).toLocaleString('pt-BR'),
+          'Odômetro (Km)': t.exitChecklist.mileage || 0,
+          'Resultado Geral': t.exitChecklist.hasProblem ? 'AVARIA REPORTADA' : 'CONFORME',
+          Combustível: items.fuelLevel ? String(items.fuelLevel) : formatCheckItem(items, ['fuel']),
+          Pneus: formatCheckItem(items, ['tires']),
+          Lataria: formatCheckItem(items, ['bodywork']),
+          Luzes: formatCheckItem(items, ['lights', 'headlights']),
+          Documentação: formatCheckItem(items, ['docs', 'documents']),
+          Observações: t.exitChecklist.observation || '-',
+        });
+      }
+    });
+
+    const tripRows = filteredTrips.map((t) => ({
+      Motorista: t.driver?.name || 'N/A',
+      CPF: t.driver?.cpf || 'N/A',
+      Placa: t.vehicle?.plate || 'N/A',
+      Veículo: `${t.vehicle?.brand || ''} ${t.vehicle?.model || ''}`.trim(),
+      Saída: new Date(t.startTime).toLocaleString('pt-BR'),
+      Chegada: t.endTime ? new Date(t.endTime).toLocaleString('pt-BR') : 'Em Aberto',
+      'Duração Líquida (min)': t.totalDurationMinutes || 0,
+      'Almoço (min)': t.totalLunchMinutes || 0,
+      'Km Inicial': t.entryChecklist?.mileage || 0,
+      'Km Final': t.exitChecklist?.mileage ?? '-',
+      'Km Percorrido': t.totalDistanceKm || 0,
+      Status:
+        t.status === 'COMPLETED'
+          ? 'Concluída'
+          : t.status === 'PAUSED_LUNCH'
+          ? 'Pausa Almoço'
+          : 'Em Rota',
+    }));
+
+    const wsChecklists = XLSX.utils.json_to_sheet(
+      checklistRows.length > 0
+        ? checklistRows
+        : [{ Motorista: 'Nenhum checklist vinculado às viagens filtradas' }]
+    );
+    wsChecklists['!cols'] = [
+      { wch: 28 },
+      { wch: 16 },
+      { wch: 11 },
+      { wch: 24 },
+      { wch: 22 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 16 },
+      { wch: 40 },
     ];
 
-    const rows = filteredTrips.map((t) => [
-      t.id,
-      t.driver?.name || 'N/A',
-      t.driver?.cpf || 'N/A',
-      t.vehicle?.plate || 'N/A',
-      `${t.vehicle?.brand || ''} ${t.vehicle?.model || ''}`.trim(),
-      new Date(t.startTime).toLocaleString('pt-BR'),
-      t.endTime ? new Date(t.endTime).toLocaleString('pt-BR') : 'Em Aberto',
-      t.totalDurationMinutes || 0,
-      t.totalLunchMinutes || 0,
-      t.entryChecklist?.mileage || 0,
-      t.exitChecklist?.mileage || 0,
-      t.totalDistanceKm || 0,
-      t.status,
-    ]);
+    const wsTrips = XLSX.utils.json_to_sheet(tripRows);
+    wsTrips['!cols'] = [
+      { wch: 28 },
+      { wch: 16 },
+      { wch: 11 },
+      { wch: 24 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 14 },
+    ];
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(';'), ...rows.map((e) => e.join(';'))].join('\n');
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `relatorio_viagens_rotalog_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsChecklists, 'Checklists de Vistoria');
+    XLSX.utils.book_append_sheet(wb, wsTrips, 'Viagens e Quilometragem');
+    XLSX.writeFile(wb, `relatorio_checklists_e_viagens_${Date.now()}.xlsx`);
   };
 
   return (
@@ -104,14 +188,14 @@ export function TripReports({ trips }: TripReportsProps) {
         <div>
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <FileText className="w-5 h-5 text-indigo-400" />
-            Relatório Operacional de Viagens & Quilometragem
+            Relatório Operacional de Viagens & Checklists
           </h2>
           <p className="text-xs text-slate-400">
-            Histórico detalhado com Km rodado, intervalo de refeição e tempo em trânsito
+            Histórico detalhado com Km rodado, intervalo de refeição, inspeções e avarias
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
           {/* Busca */}
           <div className="relative flex-1 sm:w-64">
             <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
@@ -124,13 +208,14 @@ export function TripReports({ trips }: TripReportsProps) {
             />
           </div>
 
-          {/* Botão Exportar CSV */}
+          {/* Botão Exportar Excel (.xlsx) */}
           <button
-            onClick={exportCSV}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20"
+            type="button"
+            onClick={exportChecklistsAndTripsXLSX}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 cursor-pointer whitespace-nowrap"
           >
             <Download className="w-4 h-4" />
-            <span>Exportar CSV</span>
+            <span>Exportar Checklists (.xlsx)</span>
           </button>
         </div>
       </div>
@@ -149,13 +234,14 @@ export function TripReports({ trips }: TripReportsProps) {
               <th className="px-4 py-3 text-right">Km Inicial</th>
               <th className="px-4 py-3 text-right">Km Final</th>
               <th className="px-4 py-3 text-right">Km Percorrido</th>
+              <th className="px-4 py-3">Checklist (Saída / Retorno)</th>
               <th className="px-4 py-3 text-center">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {filteredTrips.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={11} className="px-4 py-8 text-center text-slate-500">
                   Nenhuma viagem registrada até o momento.
                 </td>
               </tr>
@@ -165,6 +251,7 @@ export function TripReports({ trips }: TripReportsProps) {
                 const endDate = t.endTime ? new Date(t.endTime) : null;
                 const kmInitial = t.entryChecklist?.mileage || 0;
                 const kmFinal = t.exitChecklist?.mileage || '-';
+                const hasChecklistProblem = t.entryChecklist?.hasProblem || t.exitChecklist?.hasProblem;
 
                 return (
                   <tr key={t.id} className="hover:bg-slate-800/40 transition-colors">
@@ -228,6 +315,26 @@ export function TripReports({ trips }: TripReportsProps) {
                     {/* Km Percorrido */}
                     <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400 text-sm">
                       +{t.totalDistanceKm} km
+                    </td>
+
+                    {/* Checklist (Saída / Retorno) */}
+                    <td className="px-4 py-3 max-w-[200px]">
+                      {hasChecklistProblem ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 text-[10px] font-bold">
+                          <AlertTriangle className="w-3 h-3" />
+                          Avaria Reportada
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Vistoria OK
+                        </span>
+                      )}
+                      {(t.exitChecklist?.observation || t.entryChecklist?.observation) && (
+                        <p className="text-[10px] text-slate-400 truncate mt-1" title={t.exitChecklist?.observation || t.entryChecklist?.observation || ''}>
+                          {t.exitChecklist?.observation || t.entryChecklist?.observation}
+                        </p>
+                      )}
                     </td>
 
                     {/* Status */}

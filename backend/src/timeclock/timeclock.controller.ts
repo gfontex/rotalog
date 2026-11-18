@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { TimeclockService } from './timeclock.service';
 import { PunchClockDto, SyncTimeClocksDto } from './dto/timeclock.dto';
 
@@ -24,5 +25,19 @@ export class TimeclockController {
   @Get('report')
   async getReport(@Query('tenantId') tenantId?: string) {
     return this.timeclockService.getReport(tenantId);
+  }
+
+  @Get('export-xlsx')
+  async exportXlsx(
+    @Query('tenantId') tenantId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.timeclockService.exportXlsxBuffer(tenantId);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename="relatorio_ponto_colaboradores.xlsx"',
+      'Content-Length': buffer.length,
+    });
+    res.send(buffer);
   }
 }

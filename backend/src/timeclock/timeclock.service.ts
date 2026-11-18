@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { PunchClockDto, SyncTimeClocksDto } from './dto/timeclock.dto';
+import * as XLSX from 'xlsx';
 
 @Injectable()
 export class TimeclockService {
@@ -97,5 +98,63 @@ export class TimeclockService {
       userCpf: p.user?.cpf || '',
       userRole: p.user?.role || '',
     }));
+  }
+
+  async exportXlsxBuffer(tenantId?: string): Promise<Buffer> {
+    const records = await this.getReport(tenantId);
+
+    const typeLabels: Record<string, string> = {
+      ENTRADA: 'Entrada Turno',
+      ALMOCO_SAIDA: 'Saída Almoço',
+      ALMOCO_RETORNO: 'Retorno Almoço',
+      SAIDA: 'Saída Turno',
+    };
+
+    const roleLabels: Record<string, string> = {
+      ADMIN: 'Admin (Representante Legal)',
+      FLEET_MANAGER: 'Gestor de Frota',
+      DRIVER: 'Motorista',
+    };
+
+    const rows =
+      records.length > 0
+        ? records.map((p) => {
+            const dt = new Date(p.timestamp);
+            return {
+              Colaborador: p.userName,
+              CPF: p.userCpf || '-',
+              Cargo: roleLabels[p.userRole] || p.userRole || '-',
+              'Tipo da Batida': typeLabels[p.type] || p.type,
+              Data: dt.toLocaleDateString('pt-BR'),
+              Horário: dt.toLocaleTimeString('pt-BR'),
+              'Modo de Registro': p.isOffline ? 'Offline Sincronizado' : 'Online',
+            };
+          })
+        : [
+            {
+              Colaborador: 'Nenhum registro encontrado',
+              CPF: '-',
+              Cargo: '-',
+              'Tipo da Batida': '-',
+              Data: '-',
+              Horário: '-',
+              'Modo de Registro': '-',
+            },
+          ];
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 32 },
+      { wch: 16 },
+      { wch: 24 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 12 },
+      { wch: 22 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ponto CLT Colaboradores');
+    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
   }
 }

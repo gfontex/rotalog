@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Clock, Search, ShieldCheck, WifiOff, Wifi } from 'lucide-react';
+import { Clock, Search, WifiOff, Wifi, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface PunchRecord {
   id: string;
@@ -33,6 +34,50 @@ export function TimeClockMirror({ punches }: TimeClockMirrorProps) {
     SAIDA: { label: 'Saída Turno', color: 'text-red-400 bg-red-500/10 border-red-500/30' },
   };
 
+  const exportTimeClockXLSX = () => {
+    if (filteredPunches.length === 0) {
+      alert('Não há batidas de ponto para exportar.');
+      return;
+    }
+
+    const rows = filteredPunches.map((p) => {
+      const dateObj = new Date(p.timestamp);
+      const roleLabel =
+        p.userRole === 'DRIVER'
+          ? 'Motorista'
+          : p.userRole === 'FLEET_MANAGER'
+          ? 'Gestor de Frota'
+          : p.userRole === 'ADMIN'
+          ? 'Admin (Representante Legal)'
+          : p.userRole;
+
+      return {
+        Colaborador: p.userName,
+        CPF: p.userCpf || '-',
+        Função: roleLabel,
+        'Tipo da Marcação': punchTypeMap[p.type]?.label || p.type,
+        'Data da Batida': dateObj.toLocaleDateString('pt-BR'),
+        Horário: dateObj.toLocaleTimeString('pt-BR'),
+        'Modo de Gravação': p.isOffline ? 'Offline Sincronizado' : 'Online em Tempo Real',
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [
+      { wch: 32 },
+      { wch: 16 },
+      { wch: 24 },
+      { wch: 18 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 24 },
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Ponto dos Colaboradores');
+    XLSX.writeFile(wb, `relatorio_ponto_colaboradores_${Date.now()}.xlsx`);
+  };
+
   return (
     <div className="bg-[#1E293B] rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
       {/* Cabeçalho */}
@@ -47,16 +92,27 @@ export function TimeClockMirror({ punches }: TimeClockMirrorProps) {
           </p>
         </div>
 
-        {/* Busca */}
-        <div className="relative w-full sm:w-64">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
-          <input
-            type="text"
-            placeholder="Buscar por colaborador ou CPF..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 bg-[#0B1120] border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500"
-          />
+        {/* Busca + Exportação Excel (.xlsx) */}
+        <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+          <div className="relative flex-1 sm:w-64">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              placeholder="Buscar por colaborador ou CPF..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 bg-[#0B1120] border border-slate-800 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-purple-500"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={exportTimeClockXLSX}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 cursor-pointer whitespace-nowrap"
+          >
+            <Download className="w-4 h-4" />
+            <span>Exportar Ponto (.xlsx)</span>
+          </button>
         </div>
       </div>
 

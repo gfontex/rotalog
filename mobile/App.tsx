@@ -11,6 +11,7 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { api, BASE_URL, setCustomApiUrl } from './src/services/api';
@@ -1322,6 +1323,19 @@ function MainApp() {
           {/* Visao de Gestao: Espelho de Ponto de toda a Empresa */}
           {!isDriver && (
             <View style={{ marginTop: 18 }}>
+              <TouchableOpacity
+                style={[styles.addMgmtBtn, { backgroundColor: '#059669', marginBottom: 12, marginTop: 0 }]}
+                onPress={() => {
+                  const tenantQuery = user?.tenantId ? `?tenantId=${user.tenantId}` : '';
+                  Linking.openURL(`${BASE_URL}/timeclock/export-xlsx${tenantQuery}`).catch(() => {
+                    Alert.alert('Erro', 'Não foi possível abrir o download da planilha XLSX.');
+                  });
+                }}
+              >
+                <Ionicons name="download-outline" size={18} color="#FFFFFF" />
+                <Text style={styles.addMgmtBtnText}>Exportar Ponto dos Colaboradores (.xlsx)</Text>
+              </TouchableOpacity>
+
               <Text style={styles.sectionHeading}>
                 Espelho de Ponto CLT da Empresa ({allPunches.length})
               </Text>
@@ -1436,6 +1450,35 @@ function MainApp() {
                   </Text>
                   <Text style={styles.reportKpiLbl}>Oficina</Text>
                 </View>
+              </View>
+
+              {/* Botoes de Exportacao Direta em Excel (.xlsx) */}
+              <View style={{ gap: 8, marginBottom: 14 }}>
+                <TouchableOpacity
+                  style={[styles.addMgmtBtn, { backgroundColor: '#059669', marginTop: 0 }]}
+                  onPress={() => {
+                    const tenantQuery = user?.tenantId ? `?tenantId=${user.tenantId}` : '';
+                    Linking.openURL(`${BASE_URL}/checklists/export-xlsx${tenantQuery}`).catch(() => {
+                      Alert.alert('Erro', 'Não foi possível abrir o download dos Checklists XLSX.');
+                    });
+                  }}
+                >
+                  <Ionicons name="document-attach-outline" size={18} color="#FFFFFF" />
+                  <Text style={styles.addMgmtBtnText}>Exportar Relatório de Checklists (.xlsx)</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.addMgmtBtn, { backgroundColor: '#7C3AED', marginTop: 0 }]}
+                  onPress={() => {
+                    const tenantQuery = user?.tenantId ? `?tenantId=${user.tenantId}` : '';
+                    Linking.openURL(`${BASE_URL}/timeclock/export-xlsx${tenantQuery}`).catch(() => {
+                      Alert.alert('Erro', 'Não foi possível abrir o download do Ponto CLT XLSX.');
+                    });
+                  }}
+                >
+                  <Ionicons name="download-outline" size={18} color="#FFFFFF" />
+                  <Text style={styles.addMgmtBtnText}>Exportar Relatório de Ponto CLT (.xlsx)</Text>
+                </TouchableOpacity>
               </View>
             </View>
           )}
